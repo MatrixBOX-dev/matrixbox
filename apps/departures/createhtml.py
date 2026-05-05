@@ -470,6 +470,10 @@ def huvudsidan(request):
         functions.colors()
         functions.switch(_screen=False)
         return (200, {}, "")
+    elif "large_list" in request.params: 
+        varinit.settings["large_list"] = 1 - int(varinit.settings.get("large_list", 0))
+        functions.switch(_screen=False)
+        return (200, {}, "")
     elif "invert" in request.params: 
         varinit.settings["invert"] = 1 - int(varinit.settings["invert"])
         functions.colors()
