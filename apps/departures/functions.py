@@ -211,6 +211,7 @@ def manual_dns():
     except: pass
 
 def wifiattempt(errmsg=True, _timeout=None, skipversion=False):
+    _timeout = 5
     if "no_dhcp" in os.listdir(): manual_dns()
     if varinit.settings["ssid"] == "my_ssid": return
     try:

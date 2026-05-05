@@ -29,16 +29,17 @@ if varinit.display.width <= 64 or varinit.display.height > 32:
 scroll_mode()
 while not varinit.exit:
     while wifi.radio.connected == False and not varinit.exit:           # CHECK CONNECTION ###################
-        wifi.radio.enabled = True ####### TEST
-        wifi.radio.start_dhcp()
+        try: wifi.radio.stop_ap()
+        except: pass
+        
         start_ap()
         stop_wifi = False
         if varinit.tg3.y == 32: functions.switch(force=True, wifi_screen=True)
         varinit.reset_timer = time.monotonic()
         while wifi.radio.connected == False and not varinit.exit:
             if time.monotonic() > varinit.reset_timer + varinit.network_delay:
-                varinit.reset_timer = time.monotonic()                  
-                wifiattempt(errmsg=False, _timeout=3, skipversion=True)
+                varinit.reset_timer = time.monotonic()
+                wifiattempt(errmsg=False, _timeout=10, skipversion=True)
                 update_screen()
             ampule.listen(socket)
     if varinit.settings["listmode"] and not varinit.tg3.y == 0: functions.switch(force=False, _cls=bottom)
