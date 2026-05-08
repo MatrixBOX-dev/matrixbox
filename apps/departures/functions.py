@@ -796,6 +796,7 @@ def list_mode(mini=False, half=False):
 
     if varinit.if_long > 128: version_delay(slowdown=1)
     large_list = varinit.matrix.height >= 64 and not mini and not half and not varinit.rotated and int(varinit.settings.get("large_list", 0))
+    xs_line_id = varinit.display.width <= 64 and not varinit.rotated and int(varinit.settings.get("xs_line_id", 0))
     varinit.currentfont = 1
     if mini: varinit.currentfont = 2
     elif large_list: varinit.currentfont = 0
@@ -900,6 +901,8 @@ def list_mode(mini=False, half=False):
                 if varinit.rotated or varinit.display.width <= 64:
                     _w = varinit.if_long if varinit.rotated else varinit.display.width
                     _max_px = _w - strlen(all[3])
+                    if not varinit.rotated and xs_line_id:
+                        _max_px -= strlen(all[1][:varinit.settings["line_length"]]) + 2
                     while len(all[2]) > 0 and strlen(all[2]) > _max_px:
                         all[2] = all[2][:-1]
                 elif large_list:
@@ -948,6 +951,9 @@ def list_mode(mini=False, half=False):
                 if varinit.rotated or varinit.display.width <= 64:
                     added_space = ""
                     line = ""
+                    if not varinit.rotated and xs_line_id:
+                        line = all[1][:varinit.settings["line_length"]]
+                        added_space = (strlen(line) + 2) * "("
                 elif mini:
                     added_space = varinit.settings["line_length"] * "(((("
                     if half: added_space = ""
@@ -967,7 +973,7 @@ def list_mode(mini=False, half=False):
                 else:
                     renderstring(multiple_offset + minsleft, 100+x, 0, 0, inv, mini=mini, sys_msg=min_color)
                     renderstring(multiple_offset + added_space + dest, 100+x, 0, 0, inv, mini=mini)
-                    if not half and not varinit.rotated and varinit.display.width > 64: renderstring(multiple_offset + line, 100+x, 0, 0, inv,  mini=mini, sys_msg=lin_color)
+                    if not half and not varinit.rotated and (varinit.display.width > 64 or xs_line_id): renderstring(multiple_offset + line, 100+x, 0, 0, inv,  mini=mini, sys_msg=lin_color)
                     if x > varinit.if_tall // 8 - 1: continue
             num -= 1
             
