@@ -583,12 +583,13 @@ def connect_to_wifi():
 </div>"""
 
 def _preset_buttons():
-    def _pbtn(label, s, w, h, svg):
-        return f'<button class="btn btn-sm" onclick="if(confirm(\'Switch to {label} ({w}x{h})? Device will reboot.\'))fetch(\'/preset?s={s}\',{{method:\'POST\'}})" title="{label} {w}x{h}">{svg}<br><span style="font-size:.6rem">{label}</span></button>'
+    def _pbtn(label, s, w, h, svg, rot=None):
+        rot_js = f"var _r=document.getElementById('rotation');if(_r){{_r.value={rot};var _rv=document.getElementById('v_rotation');if(_rv)_rv.textContent={rot};}}" if rot is not None else ""
+        return f'<button class="btn btn-sm" onclick="if(confirm(\'Switch to {label} ({w}x{h})? Device will reboot.\')){{var _ew=document.getElementById(\'width\');if(_ew){{_ew.value={w};var _vw=document.getElementById(\'v_width\');if(_vw)_vw.textContent={w};}}var _eh=document.getElementById(\'height\');if(_eh){{_eh.value={h};var _vh=document.getElementById(\'v_height\');if(_vh)_vh.textContent={h};}}{rot_js}fetch(\'/preset?s={s}\',{{method:\'POST\'}})}}" title="{label} {w}x{h}">{svg}<br><span style="font-size:.6rem">{label}</span></button>'
     return ''.join([
         _pbtn('XS','xs',64,32,'<svg width="20" height="16" viewBox="0 0 20 16"><rect x="4" y="4" width="12" height="8" rx="1" fill="black" stroke="currentColor" stroke-width="1.5"/></svg>'),
         _pbtn('X','x',128,32,'<svg width="28" height="16" viewBox="0 0 28 16"><rect x="2" y="4" width="24" height="8" rx="1" fill="black" stroke="currentColor" stroke-width="1.5"/></svg>'),
-        _pbtn('XL','xl',192,32,'<svg width="36" height="16" viewBox="0 0 36 16"><rect x="2" y="4" width="32" height="8" rx="1" fill="black" stroke="currentColor" stroke-width="1.5"/></svg>'),
+        _pbtn('XL','xl',192,32,'<svg width="36" height="16" viewBox="0 0 36 16"><rect x="2" y="4" width="32" height="8" rx="1" fill="black" stroke="currentColor" stroke-width="1.5"/></svg>', rot=180),
         _pbtn('2X','2x',128,64,'<svg width="24" height="18" viewBox="0 0 24 18"><rect x="2" y="1" width="20" height="16" rx="1" fill="black" stroke="currentColor" stroke-width="1.5"/></svg>'),
     ])
 
@@ -745,6 +746,7 @@ def _preset(request):
             settings["width"] = w
             settings["height"] = h
             settings["tiles"] = 1
+            if p == "xl": settings["rotation"] = 180
             savesettings(settings)
             microcontroller.reset()
     return (200, {}, "")
@@ -1042,4 +1044,5 @@ def _ai_refresh(request):
         return (200, {}, json.dumps({"ok": True, "result": r}))
     except Exception as e:
         return (200, {}, json.dumps({"ok": False, "result": str(e)}))
+
 
