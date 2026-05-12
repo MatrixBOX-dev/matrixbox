@@ -58,7 +58,7 @@ screensaver = time.monotonic()
 def start_hotspot():
     try:
         wifi.radio.start_ap(ssid=macid)
-        wifi.radio.start_dhcp_ap()
+        #wifi.radio.start_dhcp_ap() # Removed (maybe causing connection error http://None )
         pprint("Started WIFI: ")
         pprint(str(macid))
         pprint(str(wifi.radio.ipv4_address_ap))
