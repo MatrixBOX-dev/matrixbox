@@ -252,7 +252,7 @@ def start_ap():
         ap_name = "matrixbox-" + "".join([hex(i) for i in wifi.radio.mac_address]).replace("0x","")[:3] # mac-id för hotspot
         ap_name = str(ap_name)
         wifi.radio.start_ap(ssid=ap_name)
-        wifi.radio.start_dhcp_ap()
+        #wifi.radio.start_dhcp_ap() # Removed DHCP, maybe causing bug http://None ?
         print("Started AP: ", varinit.ap_name)#,pwd_gen())
     except Exception as e: print("Failed to start AP: ", e)
 
