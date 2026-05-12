@@ -36,7 +36,15 @@ elif "N8R8" in os.uname().machine:
                     addr_pins = addr_pins_placeholder,
                     clock_pin=board.GPIO12, latch_pin=board.GPIO13, output_enable_pin=board.GPIO14, tile=settings["tiles"],
                     serpentine=False, doublebuffer=True)
-
+elif "ESP32-S2" in os.uname().machine:  # FK-8F1
+    _bit_depth = 4
+    addr_pins_placeholder = [board.IO38, board.IO37, board.IO36, board.IO35]
+    if settings["height"] == 64: addr_pins_placeholder.append(board.IO34)
+    matrix = RGBMatrix(width=settings["width"], height=settings["height"], bit_depth=_bit_depth,
+                    rgb_pins=[board.IO12, board.IO13, board.IO17, board.IO21, board.IO20, board.IO16],
+                    addr_pins=addr_pins_placeholder,
+                    clock_pin=board.IO10, latch_pin=board.IO33, output_enable_pin=board.IO11, tile=settings["tiles"],
+                    serpentine=False, doublebuffer=True)
 try: microcontroller.cpu.frequency = 180000000
 except: pass
 print("--------------------------------------------------------- ")
