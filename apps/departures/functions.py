@@ -215,6 +215,7 @@ def wifiattempt(errmsg=True, _timeout=None, skipversion=False):
     if "no_dhcp" in os.listdir(): manual_dns()
     if varinit.settings["ssid"] == "my_ssid": return
     try:
+        wifi.radio.enabled = True
         wifi.radio.connect(ssid=varinit.settings["ssid"], password=varinit.settings["password"].replace("%23","#"), timeout=_timeout)
         print("Connected to ", varinit.settings["ssid"])
         if not varinit.first_start: sysprint(varinit.settings["ssid"], 100, cls=topbottom)
