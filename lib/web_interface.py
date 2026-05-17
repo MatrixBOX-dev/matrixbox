@@ -789,13 +789,13 @@ def _save(request):
 def _download_content():
     free = _fmt_size(_free_space())
     apps = list_available_apps(get_updates())
-    return """<div class="logo"><h1>App Store</h1><p>Install or update apps</p></div>
+    return """<div class="logo"><h1>Apps</h1><p>Install or update apps</p></div>
 <div class="card" style="text-align:center;padding:12px"><span style="font-size:.8rem;color:var(--muted)">Available space: </span><span style="font-size:.9rem;font-weight:700;color:#fff;text-shadow:0 0 8px rgba(255,255,255,.4)">""" + free + """</span></div>
 <div class="card"><div class="section-title">Available</div>""" + str(apps) + """</div>"""
 
 @ampule.route('/download')
 def download(request):
-    return (200, {}, _shell(_download_content(), "App Store", "/f/download"))
+    return (200, {}, _shell(_download_content(), "Apps", "/f/download"))
 
 @ampule.route("/f/apps")
 def _f_apps(request):
