@@ -16,7 +16,8 @@ def settings():
                 "ai_provider":"",
                 "ai_key":"",
                 "ai_model":""}
-
+     try: settings["repository_url"] = settings["repository_url"].replace("https://raw.githubusercontent.com/matrixbox", "https://raw.githubusercontent.com/MatrixBOX-dev")
+     except: pass
      try: #iteration
             defaults = set(settings)
             with open("settings.txt") as f: settings.update(json.loads(f.read()))
