@@ -364,7 +364,7 @@ def fetch_data(host, port=80, args="", headers = "", filetype="text"):
     except Exception as e: 
         print("Socket error: ", e)
         #if "-2" in str(e): reset()
-        if "-2" in str(e): wifi.radio.enabled = False                  ######## TESTAR
+        #if "-2" in str(e): wifi.radio.enabled = False                  ######## TESTAR
             
     except: print("Socket error")
     try:
