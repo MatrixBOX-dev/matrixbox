@@ -494,7 +494,7 @@ def get_departure(num = "1", dataout = [["1", "^ Data error","","",""]]):
         else: 
             varinit.active_message = True
             if str(wifi.radio.ipv4_address) == "0.0.0.0":   ########
-                wifi.radio.enabled = False                  ######## TESTAR
+                pass#wifi.radio.enabled = False                  ######## TESTAR
             return [["1", "-","","",""]]
       except Exception as e: 
         cls(topbottom)
