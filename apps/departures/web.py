@@ -12,7 +12,7 @@ country_and_operators = {
   "cr":[["za","ZET (Zagreb)"]],
   "nl":[["ns","Nederlandse Spoorwegen"]],
   "ch":[["ch","Switzerland"],["sbb","SBB"]],
-  "fr":[["pa","Paris"]],
+  "fr":[ ["sncf","SNCF"], ["pa","Paris"], ["ilevia","Ilévia"]],
   "lt":[["vil","Vilnius"]],
   "be":[["sncb","SNCB"]],
   "uk":[["lo","Tfl (London)"]],
