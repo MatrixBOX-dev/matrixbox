@@ -14,7 +14,7 @@ country_and_operators = {
   "ch":[["ch","Switzerland"],["sbb","SBB"]],
   "fr":[["sncf","SNCF"], ["pa","Paris"], ["ilevia","Ilévia"], ["met","Le MET"]],
   "lt":[["vil","Vilnius"]],
-  "be":[["sncb","SNCB"]],
+  "be":[["sncb","SNCB"], ["delijn","De Lijn"]],
   "uk":[["lo","Tfl (London)"]],
   "hu":[["bu","Budapest"]],
   "cz":[["pr","Prague (PID)"]],
