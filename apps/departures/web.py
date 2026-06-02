@@ -20,7 +20,7 @@ country_and_operators = {
   "cz":[["pr","Prague (PID)"]],
   "it":[["ro","Rome"]],
   "pt":[["carris","Carris"]],
-  "pl":[["wa","Warsaw"],["pkp","PKP"],["kr","Krakow"],["wa_tram","Warszawa Tram"],["plk","PLK"]],
+  "pl":[["wa","Warsaw"],["kr","Krakow"],["wa_tram","Warszawa Tram"],["plk","PLK"]],
   "at":[["wl","Vienna"]],
   "es":[["barcelona","Barcelona (AMB)"]],
   "ie":[["all","All real-time operators"]],
