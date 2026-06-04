@@ -9,7 +9,7 @@ _release_time = 0
 _long_threshold = 0.8  # seconds held before counted as long press
 _noise_threshold = 0.03  # presses shorter than this are treated as noise
 
-def check_if_button_pressed():
+def check_if_button_pressed(strict=True):
     global _btn_state, _btn_time, _release_time
     now = time.monotonic()
     pressed = time_button()
@@ -21,7 +21,7 @@ def check_if_button_pressed():
         return 0
 
     if _btn_state == 1:  # noise filter on press
-        if now - _btn_time < _noise_threshold:
+        if strict and now - _btn_time < _noise_threshold:
             return 0  # too short — wait
         if not pressed:
             _btn_state = 0  # gone within noise window — discard
