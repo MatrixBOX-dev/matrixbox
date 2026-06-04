@@ -37,7 +37,8 @@ elif check_if_button_pressed_on_boot():
     pprint("Unlocking filesystem")
 else:
     lock()
-    pprint("Locked filesystem")
+    pprint("Hold to unlock")
+    #pprint("Locked filesystem")
     time.sleep(1)
 
 try: os.remove("code.py")
