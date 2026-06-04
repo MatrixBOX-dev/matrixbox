@@ -190,7 +190,7 @@ wifi.radio.tx_power = float(settings["wifi_power"])
 
 from web_interface import *
 connect_to_network()
-first_start = False
+#first_start = False
 
 while 1:
     print("Entered main loop")
