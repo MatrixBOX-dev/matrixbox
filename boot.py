@@ -16,7 +16,7 @@ def check_if_button_pressed_on_boot():
     try:
         deadline = time.monotonic() + 0.5
         while time.monotonic() < deadline:
-            result = check_if_button_pressed()
+            result = check_if_button_pressed(strict=False)
             if result:
                 return result
         return 0
