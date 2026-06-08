@@ -495,7 +495,7 @@ def huvudsidan(request):
             print(e)
         return (200, {}, "")
     elif "line_length" in request.params:
-        if int(request.params["line_length"]) > -1 and int(request.params["line_length"]) < 7:
+        if int(request.params["line_length"]) > -1 and int(request.params["line_length"]) < 9:
             varinit.settings["line_length"] = int(request.params["line_length"])
             functions.switch(_screen=False)
         return (200, {}, "")
