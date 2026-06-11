@@ -213,9 +213,7 @@ while 1:
             print("Attempting... " + str(wifi.radio.tx_power))
             wifi.radio.tx_power += 1
             if wifi.radio.tx_power == 21: wifi.radio.tx_power = 18
-            if not first_start:
-                check_network_again_timer = connect_to_network(timeout=3, silent=True)
-            else: check_network_again_timer = time.monotonic()
+            check_network_again_timer = connect_to_network(timeout=3, silent=True)
         if first_start == False and wifi.radio.connected: wifi.radio.stop_ap()
         
     while wifi.radio.connected or wifi.radio.ap_active:
