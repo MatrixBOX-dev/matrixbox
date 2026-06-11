@@ -460,6 +460,7 @@ input[type="color"]::-webkit-color-swatch{border:none;border-radius:5px}
 .back-btn:hover{color:var(--text);border-color:var(--accent)}
 .error-msg{color:#ff7070;font-size:.82rem;margin-top:10px;text-align:center}
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes store-pulse{0%,100%{box-shadow:0 2px 12px rgba(0,176,80,.3),0 0 0 0 rgba(220,220,255,0)}60%{box-shadow:0 2px 12px rgba(0,176,80,.3),0 0 0 5px rgba(220,220,255,.22)}}
 @keyframes reboot-blink{0%,100%{color:#ff6060;border-color:rgba(255,96,96,.7);background:rgba(255,96,96,.15)}50%{color:var(--muted);border-color:var(--border);background:transparent}}
 .nav-x.reboot-needed{animation:reboot-blink 1s ease-in-out infinite}
 .busy-warn{position:fixed;top:46px;left:0;right:0;background:linear-gradient(90deg,#c8a800,#f5e040);color:#111;text-align:center;font-weight:700;font-size:.86rem;padding:10px;z-index:200;letter-spacing:.3px}
@@ -619,7 +620,7 @@ def _apps_content():
             ver_html = f'<div style="font-size:.7rem;color:var(--muted);margin-top:2px">v{ver}</div>' if ver else ''
             installed_apps += f'<div class="app-item"><div><span class="app-name">{app}</span>{ver_html}</div>' + _run_button_html(app) + """</div>"""
     if not installed_apps:
-        installed_apps = '<p style="color:var(--muted);text-align:center;padding:16px 0 8px;font-size:.9rem">No apps installed yet</p><div style="text-align:center;padding-bottom:8px"><button class="btn btn-sm btn-success" onclick="nav(\'/f/download\')">&#x2B07; Visit the Store</button></div>'
+        installed_apps = '<p style="color:var(--muted);text-align:center;padding:16px 0 8px;font-size:.9rem">No apps installed yet</p><div style="text-align:center;padding-bottom:8px"><button class="btn btn-sm btn-success" style="animation:store-pulse 2.5s ease-in-out infinite" onclick="nav(\'/f/download\')">&#x2B07; Visit the Store</button></div>'
     preset_html = '<div class="card" style="margin-top:10px"><div class="section-title">Screen Size</div><div class="action-row">' + _preset_buttons() + '</div></div>' if _showed_wifi else ''
     return wifi_html + preset_html + """<div class="logo">
     <h1><span style="color:#fff">Matrix</span><span style="color:#f0c800;font-weight:900">BOX</span></h1>
