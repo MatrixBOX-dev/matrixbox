@@ -12,8 +12,9 @@
 
 ## MAKING CUSTOM APPS:
 1. The device runs CircuitPython, a fork of Python for microcontrollers.
-2. To get an idea of how to program an app you can study the provided examples apps like CLOCK or SCROLLER.
-3. A new app is recognized as a directory in the root folder (e.g. '/appname') with a file "&#x5F;&#x5F;init&#x5F;&#x5F;.py" inside.
+2. To get an idea of how to program an app you can study the provided apps like CLOCK or SCROLLER.
+3. A new app is recognized as (1) a directory in the root folder (e.g. '/appname') with (2) a file "&#x5F;&#x5F;init&#x5F;&#x5F;.py" inside.
+4. If you use a coding agent to write your apps you can refer it to system_prompt.md for general guidelines.
 
 
 
