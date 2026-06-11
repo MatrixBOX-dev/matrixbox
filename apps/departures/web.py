@@ -65,18 +65,16 @@ PAGE_TPL = """<!DOCTYPE html>
 <div id="screenbtns" style="{SCREEN_BTN_DISP}">{SCREEN_BUTTONS}</div>
 </div>
 </div><div class="col">
+<select id="newstation" class="form-control" name="newstation" data-p="newstation" data-e="change" {RESULT_DIS} {RESULT_STYLE} onchange="this.style.animation=''">{RESULTS}</select>
+</div></div>
+<div class="form-row" style="margin-bottom:.5rem"><div class="col">
 <input type="text" id="sstring" class="form-control" name="sstring" placeholder="{STATION_PH}" {SEARCH_DIS} {SSTRING_PULSE} onkeydown="if(event.key==='Enter'){event.preventDefault();doSearch()}">
-<div style="text-align:right;margin-top:.4rem">
+</div><div class="col" style="flex:0 0 auto;display:flex;align-items:center">
 <button type="button" class="btn btn-outline-secondary btn-sm" id="searchbtn" onclick="doSearch()" {SEARCH_DIS}>{T_SEARCH}</button>
-</div>
-<select id="newstation" class="form-control" name="newstation" data-p="newstation" data-e="change" style="margin-top:.4rem" {RESULT_DIS} {RESULT_STYLE} onchange="this.style.animation=''">{RESULTS}</select>
 </div></div></div>
 <div class="card">
-<div class="grp"><div class="grp-title">&#9881; {T_BRIGHTNESS} / {SCROLL_LABEL}</div>
-<div class="form-row"><div class="col">
-<label for="brightness">{T_BRIGHTNESS}</label>
-<select id="brightness" name="brightness" class="form-control" data-p="brightness" data-e="change">{BRIGHTNESS_OPTIONS}</select>
-</div>{SCROLL_SECTION}<div class="col">
+<div class="grp"><div class="grp-title">&#9881; {SCROLL_LABEL} / {T_NO_DEPARTURES}</div>
+<div class="form-row">{SCROLL_SECTION}<div class="col">
 <label for="maxdest">{T_NO_DEPARTURES}</label>
 <select id="maxdest" name="maxdest" class="form-control" data-p="maxdest" data-e="change">{MAXDEST_OPTIONS}</select>
 </div></div></div>
@@ -461,7 +459,7 @@ def html():
     # build page using pre-split template (single pass, no scanning)
     _v = {
         "CSS": css, "TITLE": T["title"],
-        "HEADER": T["title"] + " - t-skylt" + functions.id[-2:],
+        "HEADER": T["title"] + "",
         "CONN_STATUS": conn,
         "ONOFF_CHK": "checked" if int(varinit.on_off_counter) else "",
         "VERSION_TEXT": vmsg, "UPDATE_DIS": update_dis,
