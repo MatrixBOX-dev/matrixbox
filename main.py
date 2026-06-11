@@ -79,10 +79,11 @@ def connect_to_network(timeout=False, silent=False):
         savesettings(settings)
     except Exception as e: 
         if not silent: 
-            if "unknown failure" in str(e).lower():
-                print(e)
-                e = "Router distance!"
-            pprint(str(e))
+            if "unknown failure" in str(e).lower(): e = "Router distance!"
+            if "no network with" in str(e).lower(): e = "Wrong WIFI name"
+            if "authentication failure" in str(e).lower(): e = "Wrong password"
+            print(e)
+            pprint(str(e), color="red")
         wifi_status = str(e)
         print(e)
     return time.monotonic()
