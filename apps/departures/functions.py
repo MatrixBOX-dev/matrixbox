@@ -293,11 +293,13 @@ def disp_init():
 def refresh(times = 2):
     if cpver == 9 and microcontroller.cpu.frequency == 160000000:
         if varinit.if_long > 128: return display.refresh(minimum_frames_per_second=0)
-        #time.sleep(0.001) ########## REMOVED for smoother scroll
+        if varinit.tg2.x > 64:
+            time.sleep(0.001) ########## REMOVED for smoother scroll
         display.refresh(minimum_frames_per_second=0)
         delay = 0.002
         if not int(varinit.settings["scroll"]): return
-        #time.sleep(0.001) ########## REMOVED for smoother scroll
+        if varinit.tg2.x > 64:
+            time.sleep(0.001) ########## REMOVED for smoother scroll
         for i in range(2 + int(varinit.settings["scroll"])):
             if varinit.cpver == 9: time.sleep(delay)
             display.refresh(minimum_frames_per_second=0)
