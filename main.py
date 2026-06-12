@@ -1,5 +1,5 @@
 
-import sys, wifi, socketpool, time, os, json, microcontroller, ampule
+import sys, wifi, socketpool, time, os, json, microcontroller, ampule, gc
 import load_settings
 import digitalio, board
 import adafruit_connection_manager, adafruit_requests
@@ -106,39 +106,38 @@ def webinterface(request):
 def initialize_app():
     global autostart
     ampule_routes_backup = ampule.routes.copy()
-    
-    try: 
+    palette_backup = [palette[i] for i in range(12)]  # restored on exit
+
+    try:
         clearscreen(lines=True)
         pprint(f"Starting {load_settings.app_running}...")
         os.chdir(load_settings.app_running)
         time.sleep(0.5)
+        ampule.routes.clear()  # apps start with a clean route table
         import __init__
-    except Exception as e: 
-        #pprint(f"{load_settings.app_running} crashed.")
-        try: pprint(f"{e}")
-        except: pass
+    except Exception as e:
         print(f"{e}")
         settings["autostart"] = 0
-    finally: 
-        palette[0] = (0)
+    finally:
+        for i, backup in enumerate(palette_backup):
+            palette[i] = backup
         try: microcontroller.cpu.frequency = 160000000
         except: pass
         autostart = False
         ampule.routes = ampule_routes_backup.copy()
-        try: 
+        try:
             for codefile in os.listdir():
-                try: del sys.modules[codefile.replace(".py", "")]
+                try: del sys.modules[codefile.rsplit(".", 1)[0]]
                 except: pass
-            #del sys.modules["__init__"]
-            #del sys.modules["code"]
         except: pass
+        gc.collect()  # reclaim the exited app's bitmaps so the next launch is clean
         display.root_group = rf_group
         os.chdir("/")
-        clearscreen()
+        clearscreen(lines=True)  # zero the window so a buggy app leaves no artifacts
         show_logo()
-        _wifi_address = str(wifi.radio.ipv4_address) if wifi.radio.ipv4_address else "OFFLINE"
-        pprint(_wifi_address)
-        pprint("Select app:")
+        _wifi_address = f"IP: {wifi.radio.ipv4_address}" if wifi.radio.ipv4_address else "OFFLINE"
+        pprint(_wifi_address, line=1)
+        pprint("Select app:", line=2)
         show_first_app()
         return False
 

@@ -38,18 +38,10 @@ Serial console: Connect via USB serial (default baud 115200).
 == CREATING APPS ==
 NEVER name an app after a Python module (time, json, os, sys, math, etc.)!
 
-__init__.py TEMPLATE (MUST be exactly this):
+__init__.py TEMPLATE:
 ```
 from __main__ import *
-ampule.routes.clear()
-_sp = []
-for i in range(12):
-    try: _sp.append(palette[i])
-    except: _sp.append(0)
 import code
-for i in range(12):
-    try: palette[i] = _sp[i]
-    except: pass
 ```
 
 code.py TEMPLATE:
