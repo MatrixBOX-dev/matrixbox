@@ -120,7 +120,7 @@ def _pprint(string, line=False, color="white", font=font_mini, _refresh=False, c
         if len(line_window) > max_lines: line_window.pop(0)
         _lines = line_window
     pixwidth = 0
-    _color = _color_map.get(color, 5)
+    _color = color if isinstance(color, int) else _color_map.get(color, 5)
     offs = 1 + top_offset
     try:
         for lin, stringline in enumerate(_lines):
@@ -159,7 +159,7 @@ def pprint(string, line=False, color="white", font=font_mini, _refresh=True, cle
     if window is None: window = _current_window()
     _is_mini = (font == font_mini)
     global line_window
-    _c = _color_map.get(color, 5)
+    _c = color if isinstance(color, int) else _color_map.get(color, 5)
     fh = font["fontheight"]
     max_lines = int(5 * (display.height * 1 / 32))
     offs = 1 + top_offset
@@ -276,7 +276,7 @@ def scroll_line(new_text, line_num=-1, color="yellow"):
     lin = max_lines - 1 if line_num == -1 else line_num
     y_base = (6 * lin) + 1
     w = display.width
-    _c = _color_map.get(color, 5)
+    _c = color if isinstance(color, int) else _color_map.get(color, 5)
     new_lower = new_text.lower()
     step = max(2, w // 16)
     cols = []
