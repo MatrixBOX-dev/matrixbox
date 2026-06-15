@@ -1,10 +1,24 @@
 <style>
-.clock-preview{height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;letter-spacing:3px;border:1px solid var(--border);background:var(--bg);transition:background .2s,color .2s;margin-top:4px}
+/* ── pixel clock – marketing aesthetic ── */
+:root{--bg:#f7f7f7;--surface:#fff;--surface2:#f0f0f0;--surface3:#e8e8e8;--text:#1a1a1a;--muted:#888;--border:rgba(0,0,0,.08);--accent:#1a1a1a;--accent2:#555;--shadow:0 1px 3px rgba(0,0,0,.05);--r:0px;--r-lg:0px}
+.card{border-color:#e8e8e8;box-shadow:none;margin-bottom:1px;border-radius:0}
+.section-title{font-size:.68rem;letter-spacing:2.5px;color:#bbb;border-bottom:1px solid #eee;font-weight:400}
+.seg{background:#efefef;border-color:#e0e0e0;border-radius:0}
+.seg button{border-radius:0;font-weight:400}
+.seg button.on{background:#1a1a1a;color:#fff;box-shadow:none}
+.sw input:checked+.sl{background:#1a1a1a;border-color:#1a1a1a}
+.color-swatch{border-color:#ddd}
+.btn{background:#1a1a1a;color:#fff;border-radius:0;box-shadow:none;font-size:.72rem;letter-spacing:2px;text-transform:uppercase;font-weight:400}
+.btn:hover{background:#333;opacity:1;transform:none;box-shadow:none}
+input[type="color"]{border-color:#e0e0e0;border-radius:0}
+input[type="text"]{border-color:#e0e0e0;border-radius:0}
+input[type="text"]:focus{border-color:#1a1a1a;box-shadow:none}
+.clock-preview{height:44px;border-radius:0;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;letter-spacing:3px;border:1px solid #ccc;background:#000;color:#fff;transition:background .2s,color .2s;margin-top:4px}
 </style>
 
-<div class="card">
-<div class="section-title">Preview</div>
-<div class="clock-preview" id="pv">12:34</div>
+<div style="padding:18px 0 16px;text-align:center;border-bottom:1px solid #eee;margin-bottom:14px">
+<div style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:1.5rem;font-weight:400;letter-spacing:-.5px;color:#1a1a1a">pixel clock</div>
+<div style="font-size:.65rem;letter-spacing:3px;text-transform:uppercase;color:#bbb;margin-top:5px">settings</div>
 </div>
 
 <div class="card">
@@ -17,66 +31,13 @@
 
 <div class="card">
 <div class="section-title">Colors</div>
-<div id="digital-colors">
-<label>Text</label>
-<div class="swatch-row">
-<input type="color" id="fp" value="#ffffff" oninput="sc('f',this.value)">
-<div class="color-swatch" style="background:#fff" onclick="sc('f','#ffffff')"></div>
-<div class="color-swatch" style="background:#ff4444" onclick="sc('f','#ff4444')"></div>
-<div class="color-swatch" style="background:#4488ff" onclick="sc('f','#4488ff')"></div>
-<div class="color-swatch" style="background:#44ff44" onclick="sc('f','#44ff44')"></div>
-<div class="color-swatch" style="background:#ffff44" onclick="sc('f','#ffff44')"></div>
-<div class="color-swatch" style="background:#ff8800" onclick="sc('f','#ff8800')"></div>
-<div class="color-swatch" style="background:#ff44ff" onclick="sc('f','#ff44ff')"></div>
-<div class="color-swatch" style="background:#44ffff" onclick="sc('f','#44ffff')"></div>
+<div class="toggle-item"><span>Foreground</span><input type="color" id="fp" value="#ffffff" oninput="sc('f',this.value)"></div>
+<div class="toggle-item"><span>Shadow</span><label class="sw"><input type="checkbox" id="show_shadow" onchange="p('show_shadow='+(this.checked?1:0));document.getElementById('shadow-color').style.display=this.checked?'':' none'"><span class="sl"></span></label></div>
+<div id="shadow-color" style="display:none">
+<div class="toggle-item" style="padding-top:4px;padding-bottom:4px"><span style="opacity:.6;font-size:.82rem">Shadow Color</span><input type="color" id="shp" value="#404040" oninput="p('shadow_hex='+this.value.slice(1))"></div>
 </div>
-<label>Background</label>
-<div class="swatch-row">
-<input type="color" id="bp" value="#000000" oninput="sc('b',this.value)">
-<div class="color-swatch" style="background:#000;border-color:rgba(255,255,255,.2)" onclick="sc('b','#000000')"></div>
-<div class="color-swatch" style="background:#0a0a1e" onclick="sc('b','#0a0a1e')"></div>
-<div class="color-swatch" style="background:#000033" onclick="sc('b','#000033')"></div>
-<div class="color-swatch" style="background:#330000" onclick="sc('b','#330000')"></div>
-<div class="color-swatch" style="background:#003300" onclick="sc('b','#003300')"></div>
-<div class="color-swatch" style="background:#1a1a2e" onclick="sc('b','#1a1a2e')"></div>
-</div>
-</div>
-<div id="analog-colors" style="display:none">
-<label>Hour Hand</label>
-<div class="swatch-row">
-<input type="color" id="hp" value="#ffffff" oninput="sh('hour_hex',this.value)">
-<div class="color-swatch" style="background:#fff" onclick="sh('hour_hex','#ffffff')"></div>
-<div class="color-swatch" style="background:#ff4444" onclick="sh('hour_hex','#ff4444')"></div>
-<div class="color-swatch" style="background:#44ff44" onclick="sh('hour_hex','#44ff44')"></div>
-<div class="color-swatch" style="background:#ffff44" onclick="sh('hour_hex','#ffff44')"></div>
-<div class="color-swatch" style="background:#ff8800" onclick="sh('hour_hex','#ff8800')"></div>
-</div>
-<label>Minute Hand</label>
-<div class="swatch-row">
-<input type="color" id="mp" value="#4488ff" oninput="sh('min_hex',this.value)">
-<div class="color-swatch" style="background:#4488ff" onclick="sh('min_hex','#4488ff')"></div>
-<div class="color-swatch" style="background:#fff" onclick="sh('min_hex','#ffffff')"></div>
-<div class="color-swatch" style="background:#44ff44" onclick="sh('min_hex','#44ff44')"></div>
-<div class="color-swatch" style="background:#44ffff" onclick="sh('min_hex','#44ffff')"></div>
-<div class="color-swatch" style="background:#ff44ff" onclick="sh('min_hex','#ff44ff')"></div>
-</div>
-<label>Second Hand</label>
-<div class="swatch-row">
-<input type="color" id="sp" value="#ff4444" oninput="sh('sec_hex',this.value)">
-<div class="color-swatch" style="background:#ff4444" onclick="sh('sec_hex','#ff4444')"></div>
-<div class="color-swatch" style="background:#ff8800" onclick="sh('sec_hex','#ff8800')"></div>
-<div class="color-swatch" style="background:#ffff44" onclick="sh('sec_hex','#ffff44')"></div>
-<div class="color-swatch" style="background:#fff" onclick="sh('sec_hex','#ffffff')"></div>
-<div class="color-swatch" style="background:#44ffff" onclick="sh('sec_hex','#44ffff')"></div>
-</div>
-<label>Background</label>
-<div class="swatch-row">
-<input type="color" id="abp" value="#000000" oninput="sc('b',this.value)">
-<div class="color-swatch" style="background:#000;border-color:rgba(255,255,255,.2)" onclick="sc('b','#000000')"></div>
-<div class="color-swatch" style="background:#0a0a1e" onclick="sc('b','#0a0a1e')"></div>
-<div class="color-swatch" style="background:#1a1a2e" onclick="sc('b','#1a1a2e')"></div>
-</div>
-</div>
+<div class="toggle-item"><span>Background</span><input type="color" id="bp" value="#000000" oninput="sc('b',this.value)"></div>
+<div class="toggle-item"><span>Frame</span><input type="color" id="fmp" value="#2a2a2a" oninput="p('frame_hex='+this.value.slice(1))"></div>
 </div>
 
 <div class="card">
@@ -85,16 +46,7 @@
 <div class="toggle-item" id="border-opt" style="display:none"><span>Show Circle</span><label class="sw"><input type="checkbox" id="show_border" onchange="p('show_border='+(this.checked?1:0))"><span class="sl"></span></label></div>
 <div class="toggle-item" id="dots-opt" style="display:none"><span>Show Hour Dots</span><label class="sw"><input type="checkbox" id="show_dots" onchange="p('show_dots='+(this.checked?1:0))"><span class="sl"></span></label></div>
 <div id="dots-color" style="display:none;margin-top:6px">
-<label>Dot Color</label>
-<div class="swatch-row">
-<input type="color" id="dcp" value="#ffffff" oninput="sdc(this.value)">
-<div class="color-swatch" style="background:#fff" onclick="sdc('#ffffff')"></div>
-<div class="color-swatch" style="background:#ff4444" onclick="sdc('#ff4444')"></div>
-<div class="color-swatch" style="background:#4488ff" onclick="sdc('#4488ff')"></div>
-<div class="color-swatch" style="background:#44ff44" onclick="sdc('#44ff44')"></div>
-<div class="color-swatch" style="background:#ffff44" onclick="sdc('#ffff44')"></div>
-<div class="color-swatch" style="background:#ff8800" onclick="sdc('#ff8800')"></div>
-</div>
+<div class="toggle-item"><span>Dot Color</span><input type="color" id="dcp" value="#ffffff" oninput="sdc(this.value)"></div>
 </div>
 </div>
 
@@ -105,17 +57,7 @@
 <div class="toggle-item"><span>Show Temperature</span><label class="sw"><input type="checkbox" id="show_temp" onchange="p('show_temp='+(this.checked?1:0))"><span class="sl"></span></label></div>
 <div class="toggle-item"><span>Accent Line</span><label class="sw"><input type="checkbox" id="accent" onchange="p('accent='+(this.checked?1:0))"><span class="sl"></span></label></div>
 <div id="accent-color" style="display:none;margin-top:6px">
-<label>Accent Color</label>
-<div class="swatch-row">
-<input type="color" id="acp" value="#4488ff" oninput="sac(this.value)">
-<div class="color-swatch" style="background:#4488ff" onclick="sac('#4488ff')"></div>
-<div class="color-swatch" style="background:#ff4444" onclick="sac('#ff4444')"></div>
-<div class="color-swatch" style="background:#44ff44" onclick="sac('#44ff44')"></div>
-<div class="color-swatch" style="background:#ffff44" onclick="sac('#ffff44')"></div>
-<div class="color-swatch" style="background:#ff8800" onclick="sac('#ff8800')"></div>
-<div class="color-swatch" style="background:#ff44ff" onclick="sac('#ff44ff')"></div>
-<div class="color-swatch" style="background:#44ffff" onclick="sac('#44ffff')"></div>
-</div>
+<div class="toggle-item"><span>Accent Color</span><input type="color" id="acp" value="#4488ff" oninput="sac(this.value)"></div>
 </div>
 </div>
 
@@ -162,14 +104,9 @@ var dt,_mode="digital";
 function p(q){fetch("/?"+q,{method:"POST"})}
 function sc(t,h){
 if(t==='f')document.getElementById('fp').value=h;
-else{document.getElementById('bp').value=h;if(document.getElementById('abp'))document.getElementById('abp').value=h;}
+else document.getElementById('bp').value=h;
 upv();clearTimeout(dt);
 dt=setTimeout(function(){p((t==='f'?'f_hex':'b_hex')+'='+h.slice(1))},200);
-}
-function sh(k,h){
-var el=document.getElementById(k==='hour_hex'?'hp':k==='min_hex'?'mp':'sp');
-if(el)el.value=h;
-clearTimeout(dt);dt=setTimeout(function(){p(k+'='+h.slice(1))},200);
 }
 function sac(h){document.getElementById('acp').value=h;p('accent_hex='+h.slice(1))}
 function sdc(h){document.getElementById('dcp').value=h;p('dots_hex='+h.slice(1))}
@@ -179,14 +116,12 @@ function sm(m,send){
 _mode=m;if(send)p('mode='+m);
 document.querySelectorAll('#mode-seg button').forEach(function(b){b.classList.remove('on')});
 document.getElementById('mode_'+m).classList.add('on');
-document.getElementById('digital-colors').style.display=m==='digital'?'':'none';
-document.getElementById('analog-colors').style.display=m==='analog'?'':'none';
 document.getElementById('digital-opts').style.display=m==='digital'?'':'none';
 document.getElementById('border-opt').style.display=m==='analog'?'':'none';
 document.getElementById('dots-opt').style.display=m==='analog'?'':'none';
 document.getElementById('dots-color').style.display=(m==='analog'&&document.getElementById('show_dots').checked)?'':'none';
 }
-function upv(){var v=document.getElementById('pv');v.style.backgroundColor=document.getElementById('bp').value;v.style.color=document.getElementById('fp').value}
+function upv(){var v=document.getElementById('pv');if(!v)return;v.style.backgroundColor=document.getElementById('bp').value;v.style.color=document.getElementById('fp').value}
 document.getElementById('accent').addEventListener('change',function(){document.getElementById('accent-color').style.display=this.checked?'':'none'});
 fetch("/settings").then(function(r){return r.json()}).then(function(s){
 document.getElementById("show_day").checked=s.show_day==1;
@@ -205,10 +140,11 @@ if(s.accent==1)document.getElementById('accent-color').style.display='';
 if(s.accent_hex)document.getElementById("acp").value=s.accent_hex;
 if(s.city)document.getElementById("city").value=s.city;
 if(s.f_hex)document.getElementById("fp").value=s.f_hex;
-if(s.b_hex){document.getElementById("bp").value=s.b_hex;document.getElementById("abp").value=s.b_hex;}
-if(s.hour_hex)document.getElementById("hp").value=s.hour_hex;
-if(s.min_hex)document.getElementById("mp").value=s.min_hex;
-if(s.sec_hex)document.getElementById("sp").value=s.sec_hex;
+if(s.b_hex)document.getElementById("bp").value=s.b_hex;
+document.getElementById("show_shadow").checked=s.show_shadow!=0;
+if(s.show_shadow!=0)document.getElementById("shadow-color").style.display='';
+if(s.shadow_hex)document.getElementById("shp").value=s.shadow_hex;
+if(s.frame_hex)document.getElementById("fmp").value=s.frame_hex;
 if(s.font){var fb=document.getElementById('fb_'+s.font);if(fb){document.querySelectorAll('#font-seg button').forEach(function(b){b.classList.remove('on')});fb.classList.add('on')}}
 var sc=s.scale||1;var sb=document.getElementById('sc_'+sc);
 document.querySelectorAll('#scale-seg button').forEach(function(b){b.classList.remove('on')});

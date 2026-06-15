@@ -20,7 +20,8 @@ _DEFAULTS = {"show_date": 1, "show_day": 1, "show_seconds": 0, "show_temp": 0, "
     "f_hex": "#ffffff", "b_hex": "#000000", "scale": 1, "mode": "digital", "font": "large",
     "hour_hex": "#ffffff", "min_hex": "#4488ff", "sec_hex": "#ff4444",
     "show_border": 1, "h12": 0, "blink_colon": 1, "rainbow": 0,
-    "accent": 0, "accent_hex": "#4488ff", "show_dots": 1, "dots_hex": "#ffffff"}
+    "accent": 0, "accent_hex": "#4488ff", "show_dots": 1, "dots_hex": "#ffffff",
+    "shadow_hex": "", "frame_hex": "", "show_shadow": 1}
 for _k, _v in _DEFAULTS.items():
     if _k not in clocksettings: clocksettings[_k] = _v
 
@@ -33,8 +34,11 @@ def apply_colors():
     bg = hex_to_rgb(clocksettings["b_hex"])
     palette[0] = (0, 0, 0)
     palette[5] = fg
-    palette[12] = (fg[0] // 4, fg[1] // 4, fg[2] // 4)
-    palette[13] = (fg[0] // 6, fg[1] // 6, fg[2] // 6)
+    if clocksettings.get("show_shadow", 1):
+        palette[12] = hex_to_rgb(clocksettings["shadow_hex"]) if clocksettings.get("shadow_hex") else (fg[0] // 4, fg[1] // 4, fg[2] // 4)
+    else:
+        palette[12] = (0, 0, 0)
+    palette[13] = hex_to_rgb(clocksettings["frame_hex"]) if clocksettings.get("frame_hex") else (fg[0] // 6, fg[1] // 6, fg[2] // 6)
     palette[14] = bg
     palette[15] = hex_to_rgb(clocksettings["hour_hex"])
     palette[16] = hex_to_rgb(clocksettings["min_hex"])
@@ -98,8 +102,8 @@ def get_settings(request):
 #   "hex"  -> store as "#" + value
 #   "str"  -> store as string
 #   "rebuild" -> store + rebuild_display
-_INT_PARAMS = ["show_date", "show_day", "show_seconds", "h12", "blink_colon", "accent"]
-_HEX_PARAMS = ["f_hex", "b_hex", "hour_hex", "min_hex", "sec_hex", "accent_hex", "dots_hex"]
+_INT_PARAMS = ["show_date", "show_day", "show_seconds", "h12", "blink_colon", "accent", "show_shadow"]
+_HEX_PARAMS = ["f_hex", "b_hex", "hour_hex", "min_hex", "sec_hex", "accent_hex", "dots_hex", "shadow_hex", "frame_hex"]
 _ANALOG_RESET = ["show_border", "show_dots"]
 
 @ampule.route("/", method="POST")
@@ -322,8 +326,9 @@ def draw_time(timestring, colon_vis=True):
 
     # build display string with optional colon blink
     dstr = timestring
+    colon_blank = "(" * f.get(":", (3,))[0]  # pixel-width placeholder for hidden colon
     if clocksettings["blink_colon"] and not colon_vis:
-        dstr = dstr.replace(":", " ")
+        dstr = dstr.replace(":", colon_blank)
 
     # 12h conversion for display
     if clocksettings["h12"]:
@@ -334,7 +339,7 @@ def draw_time(timestring, colon_vis=True):
         if h12 == 0: h12 = 12
         hstr = str(h12)
         if clocksettings["blink_colon"] and not colon_vis:
-            dstr = hstr + " " + parts[1] if len(parts) == 2 else hstr + " " + parts[1] + " " + parts[2]
+            dstr = hstr + colon_blank + parts[1] if len(parts) == 2 else hstr + colon_blank + parts[1] + colon_blank + parts[2]
         else:
             dstr = hstr + ":" + parts[1] if len(parts) == 2 else hstr + ":" + parts[1] + ":" + parts[2]
         # reference string for stable box: widest 12h is "12:88" or "12:88:88"
@@ -347,9 +352,10 @@ def draw_time(timestring, colon_vis=True):
     tw = strlen(dstr, f)
     ref_w = strlen(ref, f)
     tmp = displayio.Bitmap(tw + 2, fh + 2, 20)
+    _shadow = clocksettings.get("show_shadow", 1)
     pprint(dstr, 0, font=f, clear=False, color="white",
            top_offset=-1, _refresh=False, window=tmp, _clearscreen=False,
-           block=True, shadow_color=12)
+           block=bool(_shadow), shadow_color=12)
     sw = (ref_w + 2) * scale
     sh = (fh + 2) * scale
 
@@ -388,7 +394,7 @@ def draw_time(timestring, colon_vis=True):
                          skip_source_index=0)
     else:
         bitmaptools.rotozoom(screen, tmp,
-                             ox=DISP_W // 2, oy=box_y + box_h // 2,
+                             ox=DISP_W // 2, oy=box_y + BOX_PAD + 1 + (tmp.height // 2) * scale,
                              px=tmp.width // 2, py=tmp.height // 2,
                              angle=0.0, scale=float(scale),
                              skip_index=0)
