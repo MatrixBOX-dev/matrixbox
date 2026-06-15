@@ -41,6 +41,15 @@ def _app_ver(path):
     except: pass
     return ""
 
+def _app_ver_data(path):
+    try:
+        for f in os.listdir(path):
+            if f[0] == "v" and f[1:2].isdigit():
+                with open(path + "/" + f) as fh:
+                    return json.loads(fh.read())
+    except: pass
+    return {}
+
 def _dir_size(path):
     total = 0
     try:
@@ -64,6 +73,10 @@ def _fmt_size(b):
 def _free_space():
     s = os.statvfs("/")
     return s[0] * s[3]  # block size * free blocks
+
+def _total_space():
+    s = os.statvfs("/")
+    return s[0] * s[2]  # block size * total blocks
 
 def _run_button_html(app):
     return """<button class="btn btn-sm" onclick="run"""+app+"""()">&#9654; Run</button>
@@ -336,17 +349,37 @@ def get_updates(force=False):
                     _remote_vers[k] = fn[1:]
                     break
         load_settings.remote_versions = _remote_vers
+        _remote_ver_data = {}
+        for k, ver in _remote_vers.items():
+            if k in ("/", "lib"): continue
+            try:
+                vr = requests.get(settings["repository_url"] + "apps/" + k + "/v" + ver, headers={"User-Agent": "MatrixBox"}, timeout=5)
+                _remote_ver_data[k] = json.loads(vr.text)
+                vr.close()
+            except: pass
+        load_settings.remote_ver_data = _remote_ver_data
         _cached_apps = apps
     except Exception as e:
         print("get_updates error:", e)
         apps = _cached_apps if _cached_apps else {}
     return apps
-    
+
+def _ver_detail_html(data, ver):
+    html = ""
+    desc = data.get("description", "")
+    if desc:
+        html += '<div style="font-size:.75rem;color:var(--muted);margin-top:3px">' + desc + '</div>'
+    changes = data.get("v" + ver, [])
+    if changes:
+        lines = "v" + ver + ":<br>" + "<br>".join(["-" + c for c in changes])
+        html += '<div style="font-size:.71rem;color:#888;margin-top:4px;line-height:1.6">' + lines + '</div>'
+    return html
+
 def list_available_apps(apps):
     print("Apps: ", apps)
     load_settings.latest_available_apps = apps
     remote_vers = getattr(load_settings, 'remote_versions', {})
-    sys_l = _app_ver("lib")
+    sys_l = _app_ver("lib") or _app_ver("/")
     sys_r = remote_vers.get("/", "")
     sys_ver = 'v' + sys_l if sys_l else 'system'
     if sys_r and sys_l and sys_r != sys_l:
@@ -372,13 +405,28 @@ def list_available_apps(apps):
                 upd_btn = '<button class="btn btn-sm" style="background:linear-gradient(135deg,#00c85d,#00e676);color:#000;border:2px solid #f0c800" onclick="install'+dir+'(event)">&#x21BB; Update</button>'
             else:
                 upd_btn = '<button class="btn btn-sm btn-warning" onclick="install'+dir+'(event)">&#x21BB; Reinstall</button>'
-            applist += f'<div class="download-item"><div><span class="download-name">&#x2713; {dir}</span><div style="font-size:.7rem;color:#f0c800;margin-top:2px">{ver_info}</div></div><div style="display:flex;gap:6px">' + _run_button_html(dir) + upd_btn + """<button class="btn btn-sm" style="background:#ff4b4b;color:#fff;padding:7px 9px" onclick="if(confirm('Delete """+dir+"""?'))del"""+dir+"""(event)">&#x2715;</button>
+            _vd = getattr(load_settings, 'remote_ver_data', {}).get(dir, {}) or _app_ver_data(dir)
+            _vdh = _ver_detail_html(_vd, l_ver or r_ver)
+            _vn = f'v{l_ver}' if l_ver else ''
+            _vn_span = f'<span style="font-size:.75rem;color:#f0c800;font-weight:600;margin-left:6px">{_vn}</span>' if _vn else ''
+            _upd_note = f'<div style="font-size:.7rem;color:#f0c800;margin-top:1px">&#x2192; v{r_ver} available</div>' if (r_ver and l_ver and r_ver != l_ver) else ''
+            _emoji = _vd.get('emoji', '')
+            _icon = _vd.get('icon', 0)
+            _icon_html = (f'<span style="font-size:.95rem;margin-right:5px;flex-shrink:0">{_emoji}</span>') if _emoji else (('<img src="data:' + ('image/jpeg' if _icon[:4]=='/9j/' else 'image/png') + ';base64,' + _icon + '" width="20" height="20" style="width:20px;height:20px;border-radius:4px;object-fit:cover;flex-shrink:0;margin-right:6px;vertical-align:middle">') if _icon[:1] != '<' else ('<div style="width:20px;height:20px;flex-shrink:0;margin-right:6px;border-radius:4px;overflow:hidden">' + _icon.replace('<svg ', '<svg width="100%" height="100%" ', 1) + '</div>')) if (isinstance(_icon, str) and _icon) else ''
+            _vrow = f'<div><span style="font-size:.92rem;font-weight:700;color:#fff">{dir}</span>{_vn_span}</div><div style="font-size:.7rem;color:var(--muted);margin-top:1px">{sz}</div>{_upd_note}'
+            applist += f'<div class="download-item" style="flex-direction:column;align-items:stretch"><div style="display:flex;align-items:flex-start;justify-content:space-between"><div style="display:flex;min-width:0;flex:1">{_icon_html}<div style="min-width:0">{_vrow}</div></div><div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px">' + _run_button_html(dir) + upd_btn + """<button class="btn btn-sm" style="background:#ff4b4b;color:#fff;padding:7px 9px" onclick="if(confirm('Delete """+dir+"""?'))del"""+dir+"""(event)">&#x2715;</button>
 <script>function install"""+dir+"""(e){_busyWait("/?install="""+dir+"""",e.currentTarget)}
-function del"""+dir+"""(e){_busyWait("/?delete="""+dir+"""",e.currentTarget)}</script></div></div>"""
+function del"""+dir+"""(e){_busyWait("/?delete="""+dir+"""",e.currentTarget)}</script></div></div>""" + _vdh + '</div>'
         else:
-            ver_label = f'{dir} <span style="color:#f0c800">v{r_ver}</span>' if r_ver else dir
-            applist += f'<div class="download-item"><span class="download-name">{ver_label}</span>' + """<button class="btn btn-sm btn-success" onclick="install"""+dir+"""(event)">&#x2B07; Install</button>
-<script>function install"""+dir+"""(e){_busyWait("/?install="""+dir+"""",e.currentTarget)}</script></div>"""
+            _vd = getattr(load_settings, 'remote_ver_data', {}).get(dir, {})
+            _vdh = _ver_detail_html(_vd, r_ver)
+            _vn_span = f'<span style="font-size:.75rem;color:#f0c800;font-weight:600;margin-left:6px">v{r_ver}</span>' if r_ver else ''
+            _emoji = _vd.get('emoji', '')
+            _icon = _vd.get('icon', 0)
+            _icon_html = (f'<span style="font-size:.95rem;margin-right:5px;flex-shrink:0">{_emoji}</span>') if _emoji else (('<img src="data:' + ('image/jpeg' if _icon[:4]=='/9j/' else 'image/png') + ';base64,' + _icon + '" width="20" height="20" style="width:20px;height:20px;border-radius:4px;object-fit:cover;flex-shrink:0;margin-right:6px;vertical-align:middle">') if _icon[:1] != '<' else ('<div style="width:20px;height:20px;flex-shrink:0;margin-right:6px;border-radius:4px;overflow:hidden">' + _icon.replace('<svg ', '<svg width="100%" height="100%" ', 1) + '</div>')) if (isinstance(_icon, str) and _icon) else ''
+            _vrow = f'<div><span style="font-size:.92rem;font-weight:400;color:var(--muted)">{dir}</span>{_vn_span}</div>'
+            applist += f'<div class="download-item" style="flex-direction:column;align-items:stretch"><div style="display:flex;align-items:flex-start;justify-content:space-between"><div style="display:flex;min-width:0;flex:1">{_icon_html}<div style="min-width:0">{_vrow}</div></div>' + """<button class="btn btn-sm btn-success" style="flex-shrink:0;margin-left:8px" onclick="install"""+dir+"""(event)">&#x2B07; Install</button>
+<script>function install"""+dir+"""(e){_busyWait("/?install="""+dir+"""",e.currentTarget)}</script></div>""" + _vdh + '</div>'
     return applist
 
 
@@ -791,10 +839,14 @@ def _save(request):
     return (200, {}, '{"ok":true}')
 
 def _download_content():
-    free = _fmt_size(_free_space())
+    free = _free_space()
+    total = _total_space()
+    free_s = _fmt_size(free)
+    used_pct = int((total - free) * 100 // total) if total else 0
+    bar = f'<div style="margin-top:8px;height:7px;border-radius:4px;background:var(--surface3);overflow:hidden"><div style="height:100%;width:{used_pct}%;background:linear-gradient(90deg,#7c6fff,#00d4ff);border-radius:4px"></div></div><div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--muted);margin-top:4px"><span>{used_pct}% used</span><span>{free_s} free</span></div>'
     apps = list_available_apps(get_updates())
     return """<div class="logo"><h1>Apps</h1><p>Install or update apps</p></div>
-<div class="card" style="text-align:center;padding:12px"><span style="font-size:.8rem;color:var(--muted)">Available space: </span><span style="font-size:.9rem;font-weight:700;color:#fff;text-shadow:0 0 8px rgba(255,255,255,.4)">""" + free + """</span></div>
+<div class="card" style="padding:12px"><span style="font-size:.8rem;color:var(--muted)">Storage</span>""" + bar + """</div>
 <div class="card"><div class="section-title">Available</div>""" + str(apps) + """</div>"""
 
 @ampule.route('/download')
