@@ -20,36 +20,35 @@ try:
         fw_settings.update(json.loads(f.read()))
 except: pass
 
-html = """<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Fireworks</title><style>
-body{background:#0d0d12;color:#e8e8f0;font-family:system-ui,sans-serif;max-width:420px;margin:0 auto;padding:16px}
-h1{text-align:center;font-size:1.6rem;background:linear-gradient(135deg,#ff6b35,#ffd700);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.card{background:#18181f;border-radius:12px;padding:16px;margin:12px 0}
-label{display:block;font-size:.85rem;color:#888;margin:10px 0 4px;text-transform:uppercase;letter-spacing:1px}
-label:first-child{margin-top:0}
-.range-wrap{display:flex;align-items:center;gap:10px}
-input[type=range]{flex:1;accent-color:#6c63ff}
-.val{min-width:28px;text-align:center;font-weight:700;font-size:.9rem}
-.btn{display:block;width:100%;padding:12px;border:none;border-radius:10px;font-weight:700;font-size:1rem;cursor:pointer;margin-top:10px;text-align:center;text-decoration:none}
-.btn-exit{background:linear-gradient(135deg,#ff4b4b,#ff7070);color:#fff}
-</style></head><body>
-<h1>&#127878; Fireworks</h1>
-<div class="card">
-<label>Particles per burst</label><div class="range-wrap"><input type="range" min="20" max="150" step="5" value="75" oninput="s('particles',this.value);this.nextElementSibling.textContent=this.value"><span class="val">75</span></div>
-<label>Max simultaneous</label><div class="range-wrap"><input type="range" min="1" max="8" step="1" value="3" oninput="s('max_active',this.value);this.nextElementSibling.textContent=this.value"><span class="val">3</span></div>
-<label>Gravity</label><div class="range-wrap"><input type="range" min="0" max="30" step="1" value="10" oninput="s('gravity',this.value);this.nextElementSibling.textContent=this.value"><span class="val">10</span></div>
-<label>Speed</label><div class="range-wrap"><input type="range" min="5" max="50" step="1" value="20" oninput="s('speed',this.value);this.nextElementSibling.textContent=this.value"><span class="val">20</span></div>
-<label>Lifetime</label><div class="range-wrap"><input type="range" min="10" max="80" step="5" value="30" oninput="s('lifetime',this.value);this.nextElementSibling.textContent=this.value"><span class="val">30</span></div>
-<label>Launch delay</label><div class="range-wrap"><input type="range" min="1" max="30" step="1" value="10" oninput="s('delay',this.value);this.nextElementSibling.textContent=this.value"><span class="val">10</span></div>
+# Settings fragment composed into the screensaver's one settings page (see code.py)
+SETTINGS_FRAGMENT = """<div class="card">
+<div class="section-title">Fireworks</div>
+<label>Particles per burst</label>
+<div class="range-wrap"><input type="range" id="fw_particles" min="20" max="150" step="5" oninput="g('v_particles').textContent=this.value" onchange="fwSet('particles',this.value)"><span class="range-val" id="v_particles">75</span></div>
+<label>Max simultaneous</label>
+<div class="range-wrap"><input type="range" id="fw_max_active" min="1" max="8" oninput="g('v_max_active').textContent=this.value" onchange="fwSet('max_active',this.value)"><span class="range-val" id="v_max_active">3</span></div>
+<label>Gravity</label>
+<div class="range-wrap"><input type="range" id="fw_gravity" min="0" max="30" oninput="g('v_gravity').textContent=this.value" onchange="fwSet('gravity',this.value)"><span class="range-val" id="v_gravity">10</span></div>
+<label>Speed</label>
+<div class="range-wrap"><input type="range" id="fw_speed" min="5" max="50" oninput="g('v_speed').textContent=this.value" onchange="fwSet('speed',this.value)"><span class="range-val" id="v_speed">20</span></div>
+<label>Lifetime</label>
+<div class="range-wrap"><input type="range" id="fw_lifetime" min="10" max="80" step="5" oninput="g('v_lifetime').textContent=this.value" onchange="fwSet('lifetime',this.value)"><span class="range-val" id="v_lifetime">30</span></div>
+<label>Launch delay</label>
+<div class="range-wrap"><input type="range" id="fw_delay" min="1" max="30" oninput="g('v_delay').textContent=this.value" onchange="fwSet('delay',this.value)"><span class="range-val" id="v_delay">10</span></div>
 </div>
-<div style="display:flex;gap:10px"><button class="btn" style="background:linear-gradient(135deg,#6c63ff,#00bfff);color:#fff" onclick="fetch('/save').then(()=>this.textContent='\u2713 Saved!');setTimeout(()=>this.textContent='Save',1500)">Save</button></div>
-<a class="btn btn-exit" href="/exit">&#x274C; Exit</a>
-<script>function s(k,v){fetch('/set?k='+k+'&v='+v)}</script>
-</body></html>"""
+<button class="btn btn-full" id="fwSaveBtn" onclick="fwSave()">&#128190; Save Settings</button>
+<script>
+function g(id){return document.getElementById(id)}
+function fwSet(k,v){fetch('/set?k='+k+'&v='+v)}
+function fwSave(){var b=g('fwSaveBtn');b.textContent='Saved!';fetch('/save');setTimeout(function(){b.innerHTML='&#128190; Save Settings'},1500)}
+(function(){fetch('/settings/json').then(function(r){return r.json()}).then(function(d){
+['particles','max_active','gravity','speed','lifetime','delay'].forEach(function(k){
+if(d[k]!==undefined){g('fw_'+k).value=d[k];g('v_'+k).textContent=d[k]}})})})();
+</script>"""
 
-@ampule.route("/settings", method="GET")
-def fireworks_interface(request):
-    return (200, {}, html)
+@ampule.route("/settings/json", method="GET")
+def fireworks_values(request):
+    return (200, {}, json.dumps(fw_settings))
 
 
 @ampule.route("/set", method="GET")

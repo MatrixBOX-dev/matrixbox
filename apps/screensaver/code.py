@@ -4,11 +4,10 @@ import sys
 EFFECTS = []
 
 for directory in os.listdir():
-    if not "." in directory:
-        print("Found effect:", directory)
+    if "." not in directory:
         EFFECTS.append(directory)
 
-#EFFECTS = ["aquarium", "fireworks", "rain", "space", "starcloud"]
+EFFECTS.sort()
 
 # Load saved choice
 try:
@@ -27,21 +26,27 @@ def _save_sv():
 # Global switch flag (True = switch effect, False = exit app)
 _sv_switch = False
 
+_SELECT_STYLE = ("width:100%;background:var(--surface2);border:1.5px solid var(--border);"
+                 "border-radius:var(--r);padding:10px 12px;color:var(--text);"
+                 "font-size:.93rem;outline:none;-webkit-appearance:none")
+
 # Web UI
 @ampule.route("/", method="GET")
 def sv_index(request):
     try:
+        effect = _sv_cfg.get("effect", "starcloud")
         opts = ""
         for e in EFFECTS:
-            sel = " selected" if e == _sv_cfg["effect"] else ""
+            sel = " selected" if e == effect else ""
             opts += "<option value='" + e + "'" + sel + ">" + e[0].upper() + e[1:] + "</option>"
-        cur = _sv_cfg["effect"]
-        cfg_link = ("<p><a href='/settings' style='color:#aaa;font-size:.9rem'>&#9881; " + cur[0].upper() + cur[1:] + " settings</a></p>") if cur in ("aquarium", "fireworks") else ""
-        return (200, {}, """<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{background:#0d0d12;color:#eee;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:12px;margin:0;text-align:center}select{font-size:1.1rem;padding:8px 12px;border-radius:8px;background:#1a1a2e;color:#eee;border:1px solid #444;width:200px}a{color:#ff6060;text-decoration:none;font-size:.9rem}</style></head>
-<body><h2 style="color:#f0c800;margin-bottom:4px">Screensaver</h2>
-<select onchange="fetch('/?effect='+this.value,{method:'POST'}).then(()=>setTimeout(()=>location.reload(),1500))">""" + opts + """</select>
-""" + cfg_link + """<a href="/exit">&#x274C; Exit</a></body></html>""")
+        dropdown = ("<div class='card'><div class='section-title'>Effect</div>"
+                    "<select style='" + _SELECT_STYLE + "' onchange='svSwitch(this.value)'>"
+                    + opts + "</select></div>")
+        mod = sys.modules.get(effect)
+        fragment = getattr(mod, "SETTINGS_FRAGMENT", "") if mod else ""
+        script = ("<script>function svSwitch(v){fetch('/?effect='+v,{method:'POST'})"
+                  ".then(function(){setTimeout(function(){location.reload()},1500)})}</script>")
+        return (200, {}, header("Screensaver", app=True) + dropdown + fragment + script + footer())
     except Exception as e:
         return (200, {}, "ERR: " + str(e))
 
@@ -62,6 +67,10 @@ def sv_exit(request):
     load_settings.app_running = False
     return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
 
+# Manager routes only; effects append their own and we reset to this before each
+# import so a previous effect's stale routes can't shadow the live handlers.
+_base_routes = ampule.routes[:]
+
 # Run the selected effect; loop to support live switching
 while True:
     _sv_switch = False
@@ -75,6 +84,8 @@ while True:
     for _m in EFFECTS:
         if _m in sys.modules:
             del sys.modules[_m]
+
+    ampule.routes[:] = _base_routes  # drop the previous effect's routes
 
     if effect == "aquarium":
         import aquarium
