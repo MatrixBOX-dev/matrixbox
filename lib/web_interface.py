@@ -36,8 +36,12 @@ def _get_installed_apps():
 
 def _app_ver(path):
     try:
+        best = ""
         for f in os.listdir(path):
-            if f[0] == "v" and f[1:2].isdigit(): return f[1:]
+            if f[0] == "v" and f[1:2].isdigit():
+                ver = f[1:]
+                if not best or ver > best: best = ver
+        return best
     except: pass
     return ""
 
@@ -268,11 +272,13 @@ def install_app(app):
             if app == "/":
                 r_ver = r_vers.get("/", "")
                 if r_ver:
-                    # Remove old local version file, keep new one
-                    for f in os.listdir("lib"):
-                        if f[0] == "v" and f[1:2].isdigit() and f[1:] != r_ver:
-                            try: os.remove("lib/" + f)
-                            except: pass
+                    for _vdir in ("lib", "/"):
+                        try:
+                            for f in os.listdir(_vdir):
+                                if f[0] == "v" and f[1:2].isdigit() and f[1:] != r_ver:
+                                    try: os.remove((_vdir if _vdir == "/" else _vdir + "/") + f)
+                                    except: pass
+                        except: pass
             else:
                 r_ver = r_vers.get(app, "")
                 if r_ver:
