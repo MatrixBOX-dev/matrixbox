@@ -903,8 +903,6 @@ def list_mode(mini=False, half=False):
 
                 all[3] += if_not_clocktime
 
-                if not half and varinit.if_long == 128 and not mini:
-                    all[2] = all[2][:mins_cut]
                 if varinit.rotated or varinit.display.width <= 64:
                     _w = varinit.if_long if varinit.rotated else varinit.display.width
                     _max_px = _w - strlen(all[3])
@@ -917,7 +915,11 @@ def list_mode(mini=False, half=False):
                     _font = fonts[varinit.currentfont]
                     while len(all[2]) > 0 and sum(_font.get(c, _font['_'])[0] for c in all[2]) > max(0, _max_px):
                         all[2] = all[2][:-1]
-                elif not half: all[2] = all[2][:25]
+                elif not half:
+                    _line_col_w = strlen(varinit.settings["line_length"] * ("((((" if mini else "(((((("))
+                    _max_px = varinit.if_long - strlen(all[3]) - _line_col_w
+                    while len(all[2]) > 0 and strlen(all[2]) > max(0, _max_px):
+                        all[2] = all[2][:-1]
                 if half: 
                     all[2] = all[2][:15 - len(varinit.settings["mins"])]
                     if varinit.settings["clocktime"]:
