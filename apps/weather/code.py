@@ -65,8 +65,8 @@ _CONTENT = """
 <div class="card">
 <div class="section-title">Temperature Unit</div>
 <div class="action-row" style="margin-top:8px">
-<button class="btn btn-ghost" id="uc" onclick="su('C')">&#176;C Celsius</button>
-<button class="btn btn-ghost" id="uf" onclick="su('F')">&#176;F Fahrenheit</button>
+<button class="btn btn-ghost" id="uc" onclick="su('C')">°C Celsius</button>
+<button class="btn btn-ghost" id="uf" onclick="su('F')">°F Fahrenheit</button>
 </div>
 </div>
 <div class="card">
@@ -104,7 +104,7 @@ function cmh(m){document.getElementById("cm24").style.opacity=m==="24"?"1":"0.4"
 function si(n){p("interval="+n)}
 function sv(){p("save=1")}
 function rf(){p("refresh=1",function(){lw()})}
-function lw(){fetch("/weather").then(function(r){return r.json()}).then(function(d){var t=document.getElementById("wt");if(d.temp!==null&&d.temp!==undefined){var u=d.unit==="F"?"&#176;F":"&#176;C";t.textContent=d.temp.toFixed(1)+u;}else{t.textContent="--";}document.getElementById("wc").textContent=d.desc||"--";document.getElementById("wl").textContent=d.city||"";}).catch(function(){})}
+function lw(){fetch("/weather").then(function(r){return r.json()}).then(function(d){var t=document.getElementById("wt");if(d.temp!==null&&d.temp!==undefined){var u=d.unit==="F"?"°F":"°C";t.textContent=d.temp.toFixed(1)+u;}else{t.textContent="--";}document.getElementById("wc").textContent=d.desc||"--";document.getElementById("wl").textContent=d.city||"";}).catch(function(){})}
 function ls(){fetch("/settings").then(function(r){return r.json()}).then(function(d){if(d.city)document.getElementById("city").value=d.city;uh(d.unit||"C");ckh(d.clock||0);cmh(d.clockmode||"24");}).catch(function(){})}
 ls();lw();setInterval(lw,20000);
 </script>
