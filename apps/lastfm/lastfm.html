@@ -36,76 +36,71 @@
 </div>
 
 <div class="card">
-  <div class="section-title">Artist Color</div>
-  <div class="swatch-row">
+  <div class="section-title">Colors</div>
+  <div class="color-row">
+    <label for="artist_color">Artist</label>
     <input
       type="color"
       id="artist_color"
       value="#ffffff"
       class="color-swatch"
-      style="
-        padding: 0;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        cursor: pointer;
-      "
+      style="padding: 0; border: 2px solid rgba(255, 255, 255, 0.3); cursor: pointer;"
       onchange="p('artist_color=' + this.value.substring(1))"
     />
   </div>
-</div>
-
-<div class="card">
-  <div class="section-title">Song Color</div>
-  <div class="swatch-row">
+  <div class="color-row">
+    <label for="song_color">Song</label>
     <input
       type="color"
       id="song_color"
       value="#4488ff"
       class="color-swatch"
-      style="
-        padding: 0;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        cursor: pointer;
-      "
+      style="padding: 0; border: 2px solid rgba(255, 255, 255, 0.3); cursor: pointer;"
       onchange="p('song_color=' + this.value.substring(1))"
     />
   </div>
-</div>
-
-<div class="card">
-  <div class="section-title">Dash Color</div>
-  <div class="swatch-row">
+  <div class="color-row">
+    <label for="dash_color">Dash</label>
     <input
       type="color"
       id="dash_color"
       value="#ffffff"
       class="color-swatch"
-      style="
-        padding: 0;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        cursor: pointer;
-      "
+      style="padding: 0; border: 2px solid rgba(255, 255, 255, 0.3); cursor: pointer;"
       onchange="p('dash_color=' + this.value.substring(1))"
     />
   </div>
-</div>
-
-<div class="card">
-  <div class="section-title">Shadow Color</div>
-  <div class="swatch-row">
+  <div class="color-row">
+    <label for="shadow_color">Shadow</label>
     <input
       type="color"
       id="shadow_color"
       value="#000000"
       class="color-swatch"
-      style="
-        padding: 0;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        cursor: pointer;
-      "
+      style="padding: 0; border: 2px solid rgba(255, 255, 255, 0.3); cursor: pointer;"
       onchange="p('shadow_color=' + this.value.substring(1))"
     />
   </div>
 </div>
+
+<style>
+  .color-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 0;
+  }
+  .color-row + .color-row {
+    border-top: 1px solid var(--border);
+  }
+  .color-row label {
+    font-size: 0.8rem;
+    color: var(--text);
+  }
+  .color-row .color-swatch {
+    flex: 0 0 auto;
+  }
+</style>
 
 <div class="card">
   <div class="section-title">Layout</div>

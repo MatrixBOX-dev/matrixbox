@@ -23,9 +23,12 @@ from load_screen import font_large, pprint, refresh, strlen, window
 SETTINGS_FILE = "lastfm_settings.json"
 POLL_INTERVAL = 5
 
-SCROLL_GAP = 16  # px between marquee repeats
 SCROLL_SPEED = 1  # px advanced per frame while scrolling
-LINE_GAP = 2  # px between the two lines in double layout
+SCROLL_MARGIN = 4  # blank px kept before/after scrolling text
+TOP_MARGIN = 2  # px above the top line in double layout (capped at freed space)
+HOLD_START = 1.2  # seconds frozen at the start of a scroll cycle
+HOLD_END = 1.2  # seconds frozen at the end (the fetch hides in this pause)
+LINE_GAP = 0  # px between the two lines (the top line's shadow row separates them)
 
 LAYOUT_SINGLE = "single"  # one scrolling line: "artist - track"
 LAYOUT_DOUBLE = "double"  # two lines: artist / track
@@ -58,9 +61,6 @@ DISP_W = settings["width"]
 DISP_H = settings["height"]
 FONT_H = font_large["fontheight"]
 LINE_H = FONT_H + 1  # one extra row for the 1px drop shadow
-
-with open("lastfm.html") as f:
-    html_body = f.read()
 
 
 def hex_to_rgb(value: str) -> tuple:
@@ -104,9 +104,6 @@ def apply_colors() -> None:
 
 
 def fetch_now_playing() -> tuple:
-    """Return (artist, song, playing). Only a live now-playing track is playing;
-    every other state (unconfigured, no tracks, paused) reports playing=False so
-    the idle timer keeps counting."""
     if not config["username"] or not config["api_key"]:
         return ("Last.fm", "set user & key", False)
 
@@ -132,7 +129,6 @@ def fetch_now_playing() -> tuple:
 
 
 def _text_bitmap(text: str, color: int):
-    """Render text into a tight bitmap holding palette indices, return (bmp, w)."""
     w = max(strlen(text, font_large), 1) + 2
     bmp = displayio.Bitmap(w, LINE_H, 16)
     pprint(
@@ -153,7 +149,6 @@ def _text_bitmap(text: str, color: int):
 
 
 def _compose_single(artist: str, song: str):
-    """One bitmap: artist, " - ", and track each in their own color."""
     a, aw = _text_bitmap(artist, ARTIST_SLOT)
     d, dw = _text_bitmap(" - ", DASH_SLOT)
     s, sw = _text_bitmap(song, SONG_SLOT)
@@ -166,8 +161,9 @@ def _compose_single(artist: str, song: str):
 
 
 def _make_line(bmp, w: int, y: int) -> dict:
-    """Wrap a text bitmap with scroll state. Wide text gets a doubled marquee
-    source so a DISP_W viewport never needs to wrap."""
+    """Wrap a text bitmap with scroll state. Wide text gets SCROLL_MARGIN of
+    blank lead/tail baked in so the start has a left margin and the end isn't
+    flush against the right edge; `off` then runs 0 -> max_off and back."""
     if w <= DISP_W:
         return {
             "bmp": bmp,
@@ -175,12 +171,12 @@ def _make_line(bmp, w: int, y: int) -> dict:
             "y": y,
             "scroll": False,
             "off": 0,
-            "cycle": 0,
+            "max_off": 0,
         }
 
-    src = displayio.Bitmap(2 * w + SCROLL_GAP, LINE_H, 16)
-    bitmaptools.blit(src, bmp, 0, 0)
-    bitmaptools.blit(src, bmp, w + SCROLL_GAP, 0)
+    src_w = w + 2 * SCROLL_MARGIN
+    src = displayio.Bitmap(src_w, LINE_H, 16)
+    bitmaptools.blit(src, bmp, SCROLL_MARGIN, 0)
 
     return {
         "bmp": src,
@@ -188,14 +184,15 @@ def _make_line(bmp, w: int, y: int) -> dict:
         "y": y,
         "scroll": True,
         "off": 0,
-        "cycle": w + SCROLL_GAP,
+        "max_off": src_w - DISP_W,
     }
 
 
 def build_lines(artist: str, song: str) -> None:
     global lines
     if config["layout"] == LAYOUT_DOUBLE:
-        top = max((DISP_H - (2 * LINE_H + LINE_GAP)) // 2, 0)
+        block_h = 2 * LINE_H + LINE_GAP
+        top = min(TOP_MARGIN, max(DISP_H - block_h, 0))
         ab, aw = _text_bitmap(artist, ARTIST_SLOT)
         sb, sw = _text_bitmap(song, SONG_SLOT)
         lines = [
@@ -229,7 +226,7 @@ def render() -> None:
                 y2=LINE_H,
             )
         else:
-            x = 0 if left else max((DISP_W - line["w"]) // 2, 0)
+            x = SCROLL_MARGIN if left else max((DISP_W - line["w"]) // 2, 0)
             bitmaptools.blit(window, line["bmp"], x, line["y"])
 
     refresh()
@@ -239,7 +236,9 @@ config = load_config()
 apply_colors()
 lines = []
 needs_rebuild = False  # layout change -> rebuild the bitmaps
-needs_refresh = False  # color change -> repaint with the new palette
+
+with open("lastfm.html") as f:
+    html_body = f.read()
 
 
 @ampule.route("/exit", method="GET")
@@ -248,19 +247,19 @@ def exit_app(request):
     return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
 
 
-@ampule.route("/", method="GET")
-def index(request):
-    return (200, {}, header("Last.fm", app=True) + html_body + footer())
-
-
 @ampule.route("/settings", method="GET")
 def get_settings(request):
     return (200, {}, json.dumps(config))
 
 
+@ampule.route("/", method="GET")
+def index(request):
+    return (200, {}, header("Last.fm", app=True) + html_body + footer())
+
+
 @ampule.route("/", method="POST")
 def update_settings(request):
-    global needs_refresh, needs_rebuild
+    global needs_rebuild
     p = request.params
 
     if "username" in p:
@@ -269,33 +268,17 @@ def update_settings(request):
     if "api_key" in p:
         config["api_key"] = url_decoder(p["api_key"])
 
-    if "artist_color" in p:
-        config["artist_color"] = "#" + p["artist_color"]
-        apply_colors()
-        needs_refresh = True
-
-    if "song_color" in p:
-        config["song_color"] = "#" + p["song_color"]
-        apply_colors()
-        needs_refresh = True
-
-    if "dash_color" in p:
-        config["dash_color"] = "#" + p["dash_color"]
-        apply_colors()
-        needs_refresh = True
-
-    if "shadow_color" in p:
-        config["shadow_color"] = "#" + p["shadow_color"]
-        apply_colors()
-        needs_refresh = True
+    for color_type in ["artist", "song", "dash", "shadow"]:
+        color = f"{color_type}_color"
+        if color in p:
+            config[color] = f"#{p[color]}"
 
     if "align" in p:
         config["align"] = p["align"]
-        needs_refresh = True
 
     if "layout" in p:
         config["layout"] = p["layout"]
-        needs_rebuild = True
+        needs_rebuild = True  # layout swap needs new bitmaps; the loop handles it
 
     if "idle_timeout" in p:
         try:
@@ -306,14 +289,52 @@ def update_settings(request):
     if "save" in p:
         save_config(config)
 
+    # Cheap enough to just reapply the palette and repaint for any change; the
+    # loop rebuilds on the next iteration if the layout changed.
+    apply_colors()
+    render()
+
     return (200, {}, "ok")
+
+
+def poll() -> bool:
+    """Fetch now-playing; if the track changed, rebuild the lines and restart
+    the scroll cycle. Returns True when the display needs a redraw."""
+    global last_track, last_active, last_poll, scroll_phase, phase_until
+    last_poll = time.monotonic()
+    changed = False
+
+    try:
+        artist, song, playing = fetch_now_playing()
+        if playing:
+            last_active = last_poll
+
+        track = (artist, song)
+        if track != last_track:
+            last_track = track
+            build_lines(artist, song)
+            scroll_phase = "start"
+            phase_until = last_poll + HOLD_START
+            changed = True
+    except Exception as e:
+        print("lastfm fetch error:", e)
+    finally:
+        gc.collect()
+
+    return changed
 
 
 build_lines("Last.fm", "loading")
 render()
+
 last_track = ("Last.fm", "loading")
-last_poll = time.monotonic() - POLL_INTERVAL  # poll on the first iteration
 last_active = time.monotonic()  # last time a song was playing; drives auto-exit
+last_poll = time.monotonic()
+scroll_phase = "start"  # "start" hold -> "scroll" -> "end" hold -> snap back
+phase_until = last_poll + HOLD_START
+
+if poll():  # fetch real data immediately instead of waiting a cycle
+    render()
 
 while load_settings.app_running:
     ampule.listen(socket)
@@ -321,45 +342,60 @@ while load_settings.app_running:
     if check_if_button_pressed() == 2:
         sys.exit()
 
-    redraw = False
     now = time.monotonic()
+    redraw = False
 
-    if now - last_poll >= POLL_INTERVAL:
-        last_poll = now
-        try:
-            artist, song, playing = fetch_now_playing()
-            if playing:
-                last_active = now
-            track = (artist, song)
-            if track != last_track:
-                last_track = track
-                build_lines(artist, song)
-                redraw = True
-        except Exception as e:
-            print("lastfm fetch error:", e)
+    if needs_rebuild:  # layout changed in the web UI -> rebuild the bitmaps
+        needs_rebuild = False
+        build_lines(last_track[0], last_track[1])
+        scroll_phase = "start"
+        phase_until = now + HOLD_START
+        redraw = True
 
-        gc.collect()
+    scrolls = any(line["scroll"] for line in lines)
+
+    if not scrolls:
+        if now - last_poll >= POLL_INTERVAL and poll():
+            redraw = True
+    elif scroll_phase == "start":
+        if now >= phase_until:
+            scroll_phase = "scroll"
+    elif scroll_phase == "scroll":
+        # Scroll to the end, freeze there while the blocking fetch happens, then
+        # snap back. The only visible jump is the snap, not a mid-scroll stutter.
+        done = True
+        for line in lines:
+            if not line["scroll"]:
+                continue
+
+            if line["off"] < line["max_off"]:
+                line["off"] = min(line["off"] + SCROLL_SPEED, line["max_off"])
+
+            if line["off"] < line["max_off"]:
+                done = False
+
+        if done:
+            scroll_phase = "end"
+            phase_until = now + HOLD_END
+
+            render()  # show the end frame before the blocking fetch freezes us
+            redraw = poll()  # True only if the track changed (poll restarts us)
+        else:
+            redraw = True
+    else:  # "end" hold -> snap back to the start
+        if now >= phase_until:
+            for line in lines:
+                line["off"] = 0
+
+            scroll_phase = "start"
+            phase_until = now + HOLD_START
+            redraw = True
 
     timeout = config["idle_timeout"] * 60
     if timeout > 0 and now - last_active >= timeout:
         sys.exit()  # the kernel clears the screen and redraws the selector
 
-    if needs_rebuild:
-        needs_rebuild = False
-        build_lines(last_track[0], last_track[1])
-        redraw = True
-
-    if needs_refresh:
-        needs_refresh = False
-        redraw = True
-
-    scrolling = False
-    for line in lines:
-        if line["scroll"]:
-            line["off"] = (line["off"] + SCROLL_SPEED) % line["cycle"]
-            scrolling = True
-
-    if scrolling or redraw:
+    if redraw:
         render()
 
-    time.sleep(0.03 if scrolling else 0.1)
+    time.sleep(0.03 if scroll_phase == "scroll" else 0.1)
