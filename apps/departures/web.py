@@ -5,7 +5,7 @@ from dicts import language, flag as _flag_img, country_name
 
 country_and_operators = {
   "se":[["sl","SL (Stockholm)"],["vt","VT (Västtrafik)"],["otraf","Östgötatrafiken"],["vastmanland","VL (Västmanlands län)"],["dt","DT (Dalatrafik)"],["jlt","JLT (Jönköpings län)"],["krono","KRONO (Kronobergs länstrafik)"],["ul","UL (Uppsala län)"],["klt","KLT (Kalmar länstrafik)"],["orebro","Länstrafiken Örebro"],["xt","X-Trafik (Gävleborg)"],["varm","Värmlandstrafik - Karlstadsbuss"],["skane","Skånetrafiken"],["norrbotten","Norrbotten"],["fe","Trafikverkets färjor"],["sj","SJ (Trafikverket)"]],
-  "dk":[["kb","Alle operatører"]],
+  "dk":[["kb","Scheduled"],["dk_rt","Real-time (experimental)"]],
   "lu":[["all","All of Luxembourg"]],
   "no":[["no","Entur (entire Norway)"]],
   "fi":[["all","All of Finland"], ["hsl","HSL"]],
