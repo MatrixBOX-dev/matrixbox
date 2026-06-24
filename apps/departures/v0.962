@@ -1,5 +1,6 @@
 {"description":"Live public transport departures around Europe (previously known as T-Skylt)",
 "v0.96" : ["loading WIFI from underlying interface","changed button order + added blinking UI"],
 "v0.961" : ["added STIB to Belgium"],
+"v0.962" : ["added large_font to list_mode, added experimental scrolling in list_mode (needs finishing)"],
 "icon":0,
 "emoji":"🚉"}
