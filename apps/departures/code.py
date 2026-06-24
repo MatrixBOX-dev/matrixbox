@@ -68,4 +68,25 @@ while not varinit.exit:
             refresh(int(delay + varinit.settings["scroll"]) + 1 * (delay*2))
             if varinit.tg2.x < -varinit.scrollsum: scroll_mode()
             elif time.monotonic() > varinit.shared["scroll_timer"] + updatedelay and shared["loop_counter"] >= 0: scroll_mode()
+        # Dest TileGrid smooth scroll (runs every main-loop iteration in listmode)
+        if int(varinit.settings["listmode"]) and int(varinit.settings.get("dest_scroll", 0)):
+            try:
+                _nt = time.monotonic()
+                _scrolled = False
+                for _rx, _rs in varinit.dest_scroll_state.items():
+                    _ov = _rs["overflow"]
+                    if _ov <= 0: continue
+                    if _nt < _rs.get("pause_end", 0): continue
+                    _pos = _rs["pos"]
+                    if _pos >= _ov:
+                        # End of scroll: reset to start with pause
+                        _rs["pos"] = 0
+                        _rs["pause_end"] = _nt + 1.5
+                        varinit.dest_tgs[_rx].x = _rs["start_x"]
+                    else:
+                        _rs["pos"] = _pos + 1
+                        varinit.dest_tgs[_rx].x = _rs["start_x"] - _pos - 1
+                    _scrolled = True
+                if _scrolled: refresh()
+            except: pass
         

@@ -159,6 +159,12 @@ def colors():
     elif varinit.settings["color"] == 1: _color = (factor*40,factor*20,0)
     elif varinit.settings["color"] == 2: _color = (factor*20,factor*20,factor*20)
     varinit.palette[1] = _color
+    try: varinit.dest_palette[1] = _color
+    except: pass
+    try:
+        varinit.overlay_palette[1] = _color
+        varinit.overlay_palette[2] = varinit.palette[2]
+    except: pass
 
 def get_deviations():
     if not len(varinit.deviations_list):
@@ -287,6 +293,32 @@ def disp_init():
     varinit.palette[7] = (0,20,0)    # grå
     varinit.display.root_group = varinit.group
     varinit.text = load_text()
+    # Destination text smooth-scroll TileGrids (one bitmap per row, transparent background)
+    _max_rows = max(8, varinit.if_tall // 6)
+    _dest_bmp_w = max(400, varinit.if_long * 3)
+    _dest_palette = displayio.Palette(2)
+    _dest_palette[0] = 0x000000
+    _dest_palette.make_transparent(0)
+    _dest_palette[1] = 0xFF6600  # will be updated by colors()
+    varinit.dest_palette = _dest_palette
+    varinit.dest_bmps = [displayio.Bitmap(_dest_bmp_w, 13, 2) for _ in range(_max_rows)]
+    varinit.dest_tgs = [displayio.TileGrid(varinit.dest_bmps[i], pixel_shader=_dest_palette, x=0, y=0) for i in range(_max_rows)]
+    _dest_tg_group = displayio.Group()
+    for _dtg in varinit.dest_tgs:
+        _dtg.hidden = True
+        _dest_tg_group.append(_dtg)
+    varinit.group.append(_dest_tg_group)
+    # Overlay TileGrid: line ID + minutes text drawn on top of dest TileGrids (transparent bg)
+    varinit.overlay_palette = displayio.Palette(10)
+    for _i in range(10): varinit.overlay_palette[_i] = varinit.palette[_i]
+    varinit.overlay_palette.make_transparent(0)
+    varinit.overlay_bmp = displayio.Bitmap(topbottom.width, topbottom.height, 10)
+    varinit.overlay_tg = displayio.TileGrid(varinit.overlay_bmp, pixel_shader=varinit.overlay_palette, x=0, y=0)
+    varinit.overlay_tg.hidden = True
+    _overlay_group = displayio.Group()
+    _overlay_group.append(varinit.overlay_tg)
+    varinit.group.append(_overlay_group)
+    varinit.dest_scroll_state = {}  # row_x -> {"overflow": int, "pos": int, "pause_end": float, "start_x": int}
     #if varinit.if_long > 128: varinit.palette[2] = (50,30,0)      # svart
 
 
@@ -603,7 +635,7 @@ def reformat_data(trainlist):
     elif int(varinit.settings["listmode"]): return trainlist
     else: return "         ".join(["  ".join([a[1][:varinit.settings["line_length"]] + (spacing * 2), a[2] + (6 * spacing), a[3] + (varinit.settings["mins"] if not varinit.settings["clocktime"] else "") + (spacing * 10)]) for a in top_screen_filter(trainlist[0])])
 
-def renderstring(_string, screen_partition = 0, min = 0, slow = 0, invertcolor = 0, shading=False, smallfont=False, sys_msg=False, shade=False, large=False, _cls=False, _refresh=False, ontop=False, block=False, logo=False, mini=False):
+def renderstring(_string, screen_partition = 0, min = 0, slow = 0, invertcolor = 0, shading=False, smallfont=False, sys_msg=False, shade=False, large=False, _cls=False, _refresh=False, ontop=False, block=False, logo=False, mini=False, start_x=0, clip_x=None, target_bmp=None, target_offs=None):
     
     if varinit.settings["long"] == -1: 
         mini = True
@@ -623,7 +655,7 @@ def renderstring(_string, screen_partition = 0, min = 0, slow = 0, invertcolor =
     nightcheck()
     _color = False
     offs = 2
-    pixwidth = 0
+    pixwidth = start_x
     
     if not ontop and not varinit.settings["listmode"] and sys_msg:
         varinit.currentfont = 1
@@ -655,6 +687,8 @@ def renderstring(_string, screen_partition = 0, min = 0, slow = 0, invertcolor =
     if smallfont == True: font = fonts[1]
     shade = False
     shading_width = 15
+    _write_bmp = target_bmp if target_bmp is not None else screen_location[screen_partition]
+    _write_offs = target_offs if target_offs is not None else offs
     
     if not sys_msg and int(varinit.settings["listcolor"]): shade = True
     if not sys_msg and wifi.radio.connected == False: 
@@ -683,15 +717,17 @@ def renderstring(_string, screen_partition = 0, min = 0, slow = 0, invertcolor =
                     if _color:
                         if not int(color): color = _color[0]
                         else: color = _color[1]
-                    try: screen_location[screen_partition][width+pixwidth,(height)+offs] = color
-                    except: pass
+                    if clip_x is None or width + pixwidth < clip_x:
+                        try: _write_bmp[width+pixwidth,(height)+_write_offs] = color
+                        except: pass
                 else: 
                     __color = int(font[character][height+1][width])
                     if varinit.settings["long"] == 1:
                         if __color == 5: __color = 1
                     
-                    try: screen_location[screen_partition][width+pixwidth,(height)+offs] =  __color
-                    except: pass
+                    if clip_x is None or width + pixwidth < clip_x:
+                        try: _write_bmp[width+pixwidth,(height)+_write_offs] = __color
+                        except: pass
             if slow: varinit.display.refresh(minimum_frames_per_second=0)
         if isinstance(font[character][1],int):
             pixwidth += font[character][0]
@@ -802,14 +838,24 @@ def list_mode(mini=False, half=False):
 
 
     if varinit.if_long > 128: version_delay(slowdown=1)
-    large_list = varinit.matrix.height >= 64 and not mini and not half and not varinit.rotated and int(varinit.settings.get("large_list", 0))
+    large_list = not mini and not half and not varinit.rotated and int(varinit.settings.get("large_list", 0))
     xs_line_id = varinit.display.width <= 64 and not varinit.rotated and int(varinit.settings.get("xs_line_id", 0))
     varinit.currentfont = 1
     if mini: varinit.currentfont = 2
     elif large_list: varinit.currentfont = 0
-    cls(topbottom)
     extrarow = 1 if mini else 0
     varinit.tg1.y, varinit.tg2.y, varinit.tg3.y = extrarow + 0-32, extrarow + 16-32, extrarow + 0
+
+    _dest_scroll = int(varinit.settings.get("dest_scroll", 0))
+    _now = time.monotonic()
+    cls(topbottom)
+    # Hide dest TileGrids and overlay; will be shown per-row if dest_scroll active
+    try:
+        for _dtg in varinit.dest_tgs: _dtg.hidden = True
+        varinit.overlay_tg.hidden = True
+        varinit.overlay_bmp.fill(0)
+        varinit.dest_scroll_state = {}
+    except: pass
 
     if varinit.shared["startup"]:
         list_splash()
@@ -841,7 +887,7 @@ def list_mode(mini=False, half=False):
         else: _r = 1
     except: pass
     
-    for i in range(_r): 
+    for i in range(_r):
         print("Fetching: ", i+1)
         varinit.traindata[i+1] = reformat_data(get_departure(num = str(i+1)))
         if not half or i+1 == _r: break
@@ -860,6 +906,8 @@ def list_mode(mini=False, half=False):
         for record in varinit.traindata:
             print(record)
             trainlist = varinit.traindata[record]
+            if isinstance(trainlist, list):
+                trainlist = [row[:] for row in trainlist if isinstance(row, list)]
             if int(record) > _r: continue
             if not half and "str" in str(type(trainlist)): 
                 sysprint("".join(trainlist[:30]), 100)
@@ -903,6 +951,9 @@ def list_mode(mini=False, half=False):
 
                 all[3] += if_not_clocktime
 
+                _full_dest_w = 0
+                _max_px = 0
+                _line_col_w = 0
                 if varinit.rotated or varinit.display.width <= 64:
                     _w = varinit.if_long if varinit.rotated else varinit.display.width
                     _max_px = _w - strlen(all[3])
@@ -918,8 +969,10 @@ def list_mode(mini=False, half=False):
                 elif not half:
                     _line_col_w = strlen(varinit.settings["line_length"] * ("((((" if mini else "(((((("))
                     _max_px = varinit.if_long - strlen(all[3]) - _line_col_w - 2
-                    while len(all[2]) > 0 and strlen(all[2]) > max(0, _max_px):
-                        all[2] = all[2][:-1]
+                    _full_dest_w = strlen(all[2])
+                    if not (_dest_scroll and _full_dest_w > max(0, _max_px)):
+                        while len(all[2]) > 0 and strlen(all[2]) > max(0, _max_px):
+                            all[2] = all[2][:-1]
                 if half: 
                     all[2] = all[2][:15 - len(varinit.settings["mins"])]
                     if varinit.settings["clocktime"]:
@@ -980,15 +1033,41 @@ def list_mode(mini=False, half=False):
                     if not half and not varinit.rotated: renderstring(multiple_offset + line.lower(), _lpart, 0, 0, inv, sys_msg=lin_color)
                     if x > 4: continue
                 else:
-                    renderstring(multiple_offset + minsleft, 100+x, 0, 0, inv, mini=mini, sys_msg=min_color)
-                    renderstring(multiple_offset + added_space + dest, 100+x, 0, 0, inv, mini=mini)
-                    if not half and not varinit.rotated and (varinit.display.width > 64 or xs_line_id): renderstring(multiple_offset + line, 100+x, 0, 0, inv,  mini=mini, sys_msg=lin_color)
+                    _use_tg = (_dest_scroll and not half and not varinit.rotated
+                               and varinit.display.width > 64
+                               and _full_dest_w > max(0, _max_px))
+                    if _use_tg:
+                        # TileGrid smooth scroll: dest in dest_bmp, line+mins in overlay_bmp
+                        _row_step = 6 if mini else 8
+                        _overflow = _full_dest_w - _max_px
+                        varinit.dest_bmps[x].fill(0)
+                        renderstring(dest, 100+x, 0, 0, inv, mini=mini,
+                                     target_bmp=varinit.dest_bmps[x], target_offs=0)
+                        varinit.dest_tgs[x].x = _line_col_w
+                        varinit.dest_tgs[x].y = extrarow + x * _row_step
+                        varinit.dest_tgs[x].hidden = False
+                        varinit.dest_scroll_state[x] = {
+                            "overflow": _overflow, "pos": 0,
+                            "pause_end": _now + x * 0.8 + 2.0, "start_x": _line_col_w
+                        }
+                        renderstring(multiple_offset + minsleft, 100+x, 0, 0, inv, mini=mini,
+                                     sys_msg=min_color, target_bmp=varinit.overlay_bmp)
+                        if not half and not varinit.rotated and (varinit.display.width > 64 or xs_line_id):
+                            renderstring(multiple_offset + line, 100+x, 0, 0, inv, mini=mini,
+                                         sys_msg=lin_color, target_bmp=varinit.overlay_bmp)
+                        varinit.overlay_tg.y = extrarow
+                        varinit.overlay_tg.hidden = False
+                    else:
+                        renderstring(multiple_offset + minsleft, 100+x, 0, 0, inv, mini=mini, sys_msg=min_color)
+                        renderstring(multiple_offset + added_space + dest, 100+x, 0, 0, inv, mini=mini)
+                        if not half and not varinit.rotated and (varinit.display.width > 64 or xs_line_id):
+                            renderstring(multiple_offset + line, 100+x, 0, 0, inv, mini=mini, sys_msg=lin_color)
                     if x > varinit.if_tall // 8 - 1: continue
             num -= 1
             
     except Exception as e: print("ERROR ", e)
     refresh()
-    
+
     return time.monotonic()
 
 def list_splash(_settings=False):

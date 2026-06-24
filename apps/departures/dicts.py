@@ -172,6 +172,7 @@ settingstxt = {"password": "none",
             "mini":0,
             "large_list":0,
             "xs_line_id":0,
+            "dest_scroll":0,
             
             "clocktime": 0, 
 

@@ -478,6 +478,10 @@ def huvudsidan(request):
         varinit.settings["xs_line_id"] = 1 - int(varinit.settings.get("xs_line_id", 0))
         functions.switch(_screen=False)
         return (200, {}, "")
+    elif "dest_scroll" in request.params:
+        varinit.settings["dest_scroll"] = 1 - int(varinit.settings.get("dest_scroll", 0))
+        functions.switch(_screen=False)
+        return (200, {}, "")
     elif "invert" in request.params: 
         varinit.settings["invert"] = 1 - int(varinit.settings["invert"])
         functions.colors()
