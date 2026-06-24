@@ -2,8 +2,9 @@
 
 ## WIRELESS SETUP:
 1. Connect to WIFI shown on screen
-2. Select your network + password
-3. When online, the device is assigned a new IP by your router
+2. Go to: 192.168.4.1
+3. Select your network + password
+4. When online, the device is assigned a new IP by your router
 
 ## OFFLINE SETUP:
 1. To unlock the file system, press down the button while connecting the device to a computer.
