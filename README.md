@@ -2,7 +2,7 @@
 
 ## WIRELESS SETUP:
 1. Connect to WIFI shown on screen
-2. Go to: 192.168.4.1
+2. Browse to: 192.168.4.1
 3. Select your network + password
 4. When online, the device is assigned a new IP by your router
 
