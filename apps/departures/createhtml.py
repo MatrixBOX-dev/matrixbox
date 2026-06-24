@@ -465,13 +465,11 @@ def huvudsidan(request):
         functions.colors()
         functions.switch(_screen=False)
         return (200, {}, "")
-    elif "fontmini" in request.params: 
-        varinit.settings["mini"] = 1 - int(varinit.settings["mini"])
+    elif "font_size" in request.params:
+        fs = request.params.get("font_size", "small")
+        varinit.settings["mini"] = 1 if fs == "mini" else 0
+        varinit.settings["large_list"] = 1 if fs == "large" else 0
         functions.colors()
-        functions.switch(_screen=False)
-        return (200, {}, "")
-    elif "large_list" in request.params: 
-        varinit.settings["large_list"] = 1 - int(varinit.settings.get("large_list", 0))
         functions.switch(_screen=False)
         return (200, {}, "")
     elif "xs_line_id" in request.params: 

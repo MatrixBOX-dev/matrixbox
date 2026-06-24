@@ -124,12 +124,10 @@ PAGE_TPL = """<!DOCTYPE html>
 <button style="background:#f5d105;color:#111;border-color:#f5d105" type="button" data-u="/?color=1">{T_YELLOW}</button>
 {WHITE_BTN}</td></tr>
 <tr><td><b>{T_LIST_COLORS}</b></td><td>{LISTCOLOR_CHK} {LISTCOLOR_TIME_CHK}</td></tr>
-<tr><td><b>{T_FONT_MINI}</b></td><td>{FONTMINI_CHK}</td></tr>
-<tr><td><b>Large list</b></td><td>{LARGE_LIST_CHK}</td></tr>
-<tr><td><b>XS line ID</b></td><td>{XS_LINE_ID_CHK}</td></tr>
+{FONT_SIZE_ROW}
+{XS_LINE_ID_ROW}
 <tr><td><b>Scroll dest</b></td><td>{DEST_SCROLL_CHK}</td></tr>
 <tr><td><b>Timer</b></td><td><button type="button" onclick="location.href='/?timer=set'">&#8987;</button></td></tr>
-<tr><td></td><td>{INVERT_CHK}</td></tr>
 <tr><td><b>{T_ROTATION}</b></td><td><button type="button" data-u="/?rotate=1">&#128260; 90&deg;</button></td></tr>
 <tr><td><b>{T_RT_INDICATOR}</b></td><td>{RT_INDICATOR_CHK}</td></tr>
 <tr><td><b>{T_POWER}</b></td><td><input type="text" id="power" class="form-control" style="width:80px;display:inline" placeholder="{POWER_VAL}" data-p="power" data-e="blur"></td></tr>
@@ -151,6 +149,7 @@ function doSearch(){var s=document.getElementById('sstring').value;if(!s)return;
 function doScan(){fetch('/checknet').then(function(r){return r.text();}).then(function(h){var sel=document.getElementById('ssid');sel.innerHTML=h;sel.disabled=false;document.getElementById('password').disabled=false;document.getElementById('connect_wifi').disabled=false;}).catch(function(){});}
 
 var mc=document.getElementById('multiple');if(mc)mc.addEventListener('change',function(){var sb=document.getElementById('screenbtns');if(sb)sb.style.display=mc.checked?'':'none';});
+function setFont(v,el){fetch('/?font_size='+v);var bs=el.parentNode.querySelectorAll('button');bs.forEach(function(b){b.style.background='transparent';b.style.color='#aaa';});el.style.background='#e09d00';el.style.color='#111';}
 document.querySelectorAll('[data-u],[data-p]').forEach(function(el){
 el.addEventListener(el.dataset.e||'click',function(ev){
 var u=el.dataset.u;
@@ -426,18 +425,22 @@ def html():
     listcolor_html = _chk("LISTCOLOR", s["listcolor"], "/?listcolor=switch", T["list_colors_line"])
     listcolor_time_html = _chk("LISTCOLOR_TIME", s.get("listcolor_time", 0), "/?listcolor_time=switch", T["list_colors_time"])
 
-    # fontmini
-    fontmini_html = _chk("FONTMINI", s["mini"], "/?fontmini=switch", T["font_mini_line"])
-
-    # large_list
-    large_list_html = _chk("LARGE_LIST", s.get("large_list", 0), "/?large_list=switch", "USE LARGE FONT")
-    # xs_line_id
-    xs_line_id_html = _chk("XS_LINE_ID", s.get("xs_line_id", 0), "/?xs_line_id=switch", "line ID on 64px-wide")
+    # font size segmented control (mini / small / large)
+    _fs = "mini" if s["mini"] else ("large" if s.get("large_list", 0) else "small")
+    _act = "background:#e09d00;color:#111"
+    _inact = "background:transparent;color:#aaa"
+    _bs = 'border:none;cursor:pointer;font-size:.85rem;padding:3px 10px;'
+    font_size_html = (
+        '<span style="display:inline-flex;border:1px solid #555;border-radius:5px;overflow:hidden">'
+        '<button type="button" onclick="setFont(\'mini\',this)" style="' + _bs + (_act if _fs == "mini" else _inact) + '">mini</button>'
+        '<button type="button" onclick="setFont(\'small\',this)" style="' + _bs + 'border-left:1px solid #555;border-right:1px solid #555;' + (_act if _fs == "small" else _inact) + '">small</button>'
+        '<button type="button" onclick="setFont(\'large\',this)" style="' + _bs + (_act if _fs == "large" else _inact) + '">large</button>'
+        '</span>'
+    )
+    font_size_row = '<tr><td><b>' + T["font_mini"] + '</b></td><td>' + font_size_html + '</td></tr>' if if_long > 64 else ""
+    xs_line_id_row = '<tr><td><b>XS line ID</b></td><td>' + _chk("XS_LINE_ID", s.get("xs_line_id", 0), "/?xs_line_id=switch", "SHOW LINE ID") + '</td></tr>' if if_long <= 64 else ""
     # dest_scroll
     dest_scroll_html = _chk("DEST_SCROLL", s.get("dest_scroll", 0), "/?dest_scroll=switch", "Scroll long names (experimental)")
-
-    # invert
-    invert_html = _chk("INVERT", s["invert"], "/?invert=switch", T["invert"])
 
     # rt_indicator
     rt_indicator_html = _chk("RT_INDICATOR", s["rt_indicator"], "/?rt_indicator=switch", T["rt_indicator"])
@@ -512,12 +515,10 @@ def html():
         "T_LIST_COLORS": T["list_colors"],
         "LISTCOLOR_CHK": listcolor_html,
         "LISTCOLOR_TIME_CHK": listcolor_time_html,
-        "T_FONT_MINI": T["font_mini"],
-        "FONTMINI_CHK": fontmini_html,
-        "LARGE_LIST_CHK": large_list_html,
-        "XS_LINE_ID_CHK": xs_line_id_html,
+        "FONT_SIZE_ROW": font_size_row,
+        "XS_LINE_ID_ROW": xs_line_id_row,
         "DEST_SCROLL_CHK": dest_scroll_html,
-        "INVERT_CHK": invert_html, "DNS_SECTION": dns_html,
+        "DNS_SECTION": dns_html,
         "T_ROTATION": T.get("rotation", "Rotation"),
         "RT_INDICATOR_CHK": rt_indicator_html,
         "T_RT_INDICATOR": T["rt_indicator"],
