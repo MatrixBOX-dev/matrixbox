@@ -926,7 +926,7 @@ def list_mode(mini=False, half=False):
                 _max_lw = 0
                 for _a in trainlist:
                     if isinstance(_a, list) and len(_a) > 1:
-                        _w = strlen(_a[1][:varinit.settings["line_length"]].lower())
+                        _w = strlen(_a[1][:varinit.settings["line_length"]])
                         if _w > _max_lw: _max_lw = _w
                 line_col = _max_lw + 6
             else:
@@ -1030,7 +1030,7 @@ def list_mode(mini=False, half=False):
                     _dest_pad = line_col * "("
                     renderstring(multiple_offset + minsleft, _lpart, 0, 0, inv, sys_msg=min_color)
                     renderstring(multiple_offset + _dest_pad + dest, _lpart, 0, 0, inv)
-                    if not half and not varinit.rotated: renderstring(multiple_offset + line.lower(), _lpart, 0, 0, inv, sys_msg=lin_color)
+                    if not half and not varinit.rotated: renderstring(multiple_offset + line, _lpart, 0, 0, inv, sys_msg=lin_color)
                     if x > 4: continue
                 else:
                     _use_tg = (_dest_scroll and not half and not varinit.rotated
@@ -1123,11 +1123,3 @@ try:
 except:
     print("Not imported: font_mini")
     print("Attempting download...")
-    
-
-
-
-
-
-
-
