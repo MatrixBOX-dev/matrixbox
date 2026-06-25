@@ -1,4 +1,5 @@
 # MatrixBox
+![MatrixBOX](https://matrixbox.app/flash/matrixbox.png)
 
 ## WIRELESS SETUP:
 1. Connect to WIFI shown on screen
