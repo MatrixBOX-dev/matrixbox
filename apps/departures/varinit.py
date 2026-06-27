@@ -60,6 +60,17 @@ show_station_timer = time.monotonic()
 show_station_interval = 400
 cpver = 8
 settings = {}
+
+version = None
+for file in os.listdir():
+    print(file[0])
+    if file[0] == "v":
+        with open(file) as f:
+            try: 
+                version_file = json.loads(f.read())
+                version = str(file[1:])
+            except: continue
+
 print(20*"\n")
 print("                                            █▀▀▀▀▀▀▀▀▀▀█     T-Skylt")
 print("                                            █  ██████  █     av Alex")
@@ -67,6 +78,7 @@ print("                                            █    ██    █     och 
 print("                                            █    ██    █     ----------")
 print("                                            █    ██    █")
 print("                                            █▄▄▄▄▄▄▄▄▄▄█     2023-2024")
+print("                                            Version: " + str(version))
 print()
 print("--------------------------------------------------------- ")
 print("Checking SETTINGS.TXT:")
