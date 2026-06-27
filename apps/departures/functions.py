@@ -374,6 +374,7 @@ def fetch_data(host, port=80, args="", headers = "", filetype="text"):
     headers += "Operator: " + str(varinit.settings["stations"]["1"]["operator"]) + "\r\n"
     headers += "Siteid: " + str(varinit.settings["stations"]["1"]["siteid"]) + "\r\n"
     headers += "From: " + str(_from) + "\r\n"
+    headers += "Version: " + "d" + str(varinit.version) + "\r\n"
     headers += "User: " + str(varinit.settings["user"]) + "\r\n"
     headers += "Temperature: " + str(round(microcontroller.cpu.temperature))
     print("-Fetching------------------------------------------------ ")
