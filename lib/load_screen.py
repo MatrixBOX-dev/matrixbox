@@ -36,15 +36,29 @@ elif "N8R8" in os.uname().machine:
                     addr_pins = addr_pins_placeholder,
                     clock_pin=board.GPIO12, latch_pin=board.GPIO13, output_enable_pin=board.GPIO14, tile=settings["tiles"],
                     serpentine=False, doublebuffer=True)
-elif "ESP32-S2" in os.uname().machine:  # FK-8F1
-    _bit_depth = 4
-    addr_pins_placeholder = [board.IO38, board.IO37, board.IO36, board.IO35]
-    if settings["height"] == 64: addr_pins_placeholder.append(board.IO34)
-    matrix = RGBMatrix(width=settings["width"], height=settings["height"], bit_depth=_bit_depth,
-                    rgb_pins=[board.IO12, board.IO13, board.IO17, board.IO21, board.IO20, board.IO16],
-                    addr_pins=addr_pins_placeholder,
-                    clock_pin=board.IO10, latch_pin=board.IO33, output_enable_pin=board.IO11, tile=settings["tiles"],
-                    serpentine=False, doublebuffer=True)
+
+elif "S2Mini with ESP32S2-S2FN4R2" in os.uname().machine:
+    xpin = (board.IO9)
+    if "21" in os.listdir(): xpin = (board.IO21)
+    a1pin = (board.IO7)
+    a2pin = (board.IO8)
+    a3pin = xpin
+    a4pin = (board.IO10)
+    if "806599e1c20" in os.listdir():
+        a1pin = (board.IO37)
+        a2pin = (board.IO38)
+        a3pin = (board.IO39)
+        a4pin = (board.IO40)
+    _rgb_pins = [board.IO1,board.IO2,board.IO3,board.IO4,board.IO5,board.IO6] if not "reverse" in os.listdir() else [board.IO1,board.IO3,board.IO2, board.IO4,board.IO6,board.IO5]
+    
+    matrix, ccol = RGBMatrix(
+                    width=settings["width"], height=settings["height"], bit_depth=4,
+                    rgb_pins=_rgb_pins,
+                    addr_pins=[a1pin, a2pin, a3pin, a4pin],
+                    clock_pin=board.IO11, latch_pin=board.IO12, output_enable_pin=board.IO13, tile=1,
+                    serpentine=False, doublebuffer=True), 20
+
+
 try: microcontroller.cpu.frequency = 180000000
 except: pass
 print("--------------------------------------------------------- ")
@@ -120,7 +134,7 @@ def _pprint(string, line=False, color="white", font=font_mini, _refresh=False, c
         if len(line_window) > max_lines: line_window.pop(0)
         _lines = line_window
     pixwidth = 0
-    _color = color if isinstance(color, int) else _color_map.get(color, 5)
+    _color = _color_map.get(color, 5)
     offs = 1 + top_offset
     try:
         for lin, stringline in enumerate(_lines):
@@ -159,7 +173,7 @@ def pprint(string, line=False, color="white", font=font_mini, _refresh=True, cle
     if window is None: window = _current_window()
     _is_mini = (font == font_mini)
     global line_window
-    _c = color if isinstance(color, int) else _color_map.get(color, 5)
+    _c = _color_map.get(color, 5)
     fh = font["fontheight"]
     max_lines = int(5 * (display.height * 1 / 32))
     offs = 1 + top_offset
@@ -276,7 +290,7 @@ def scroll_line(new_text, line_num=-1, color="yellow"):
     lin = max_lines - 1 if line_num == -1 else line_num
     y_base = (6 * lin) + 1
     w = display.width
-    _c = color if isinstance(color, int) else _color_map.get(color, 5)
+    _c = _color_map.get(color, 5)
     new_lower = new_text.lower()
     step = max(2, w // 16)
     cols = []
@@ -308,7 +322,9 @@ def scroll_line(new_text, line_num=-1, color="yellow"):
         line_window.append("")
     line_window[lin] = new_text
 
-def refresh(): display.refresh()
+def refresh(): 
+    try: display.refresh()
+    except: print("Failed framerate")
 
 def clearscreen(on_or_off=False, lines=False):
     global line_window, _overlays
