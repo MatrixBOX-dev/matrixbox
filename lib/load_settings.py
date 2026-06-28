@@ -2,8 +2,6 @@ import json
 from __main__ import *
 
 def settings(): 
-     import os
-     
      settings = {"ssid":"T-Skylt WIFI",                                                      # Default settings:
                 "password":"dunderskurre",
                 "autostart":False,
@@ -14,11 +12,10 @@ def settings():
                 "tiles":1,
                 "repository_url":"https://raw.githubusercontent.com/MatrixBOX-dev/matrixbox/refs/heads/main/", 
                 "repository_file":"repository.txt",
-                "wifi_power":14 if "S2Mini with ESP32S2-S2FN4R2" in os.uname().machine else 20,
+                "wifi_power":20,
                 "ai_provider":"",
                 "ai_key":"",
                 "ai_model":""}
-     
 
      try: #iteration
             defaults = set(settings)
