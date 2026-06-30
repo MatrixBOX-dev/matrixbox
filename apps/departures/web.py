@@ -133,6 +133,7 @@ PAGE_TPL = """<!DOCTYPE html>
 <tr><td><b>{T_POWER}</b></td><td><input type="text" id="power" class="form-control" style="width:80px;display:inline" placeholder="{POWER_VAL}" data-p="power" data-e="blur"></td></tr>
 <tr><td><b>{T_LINE_LENGTH}</b></td><td><input type="text" id="line_length" class="form-control" style="width:80px;display:inline" placeholder="{LINE_LENGTH_VAL}" data-p="line_length" data-e="blur"></td></tr>
 <tr><td><b>{T_SHOW_LINES}</b></td><td><input type="text" id="show_lines" class="form-control" style="width:160px;display:inline" placeholder="{SHOW_LINES_VAL}" data-p="show_lines" data-e="blur"></td></tr>
+<tr><td><b>Strip from dest</b></td><td><input type="text" id="strip_dest" class="form-control" style="width:160px;display:inline" placeholder="{STRIP_DEST_VAL}" data-p="strip_dest" data-e="blur"></td></tr>
 <tr><td><b>{T_NO_MORE_DEP}</b></td><td><input type="text" id="no_more_departures" class="form-control" style="width:160px;display:inline" placeholder="{NO_MORE_DEP_VAL}" data-p="no_more_departures" data-e="blur" data-enc="1"></td></tr>
 <tr><td><b>{T_MINS}</b></td><td><input type="text" id="mins" class="form-control" style="width:100px;display:inline" placeholder="{MINS_VAL}" data-p="mins" data-e="blur" data-enc="1"></td></tr>
 </table>
@@ -528,6 +529,7 @@ def html():
         "LINE_LENGTH_VAL": str(s["line_length"]),
         "T_SHOW_LINES": T["show_lines"],
         "SHOW_LINES_VAL": ",".join(s["show_lines"]) if isinstance(s["show_lines"], list) else str(s["show_lines"]),
+        "STRIP_DEST_VAL": ",".join(s.get("strip_dest", [])) if isinstance(s.get("strip_dest"), list) else str(s.get("strip_dest", "")),
         "T_NO_MORE_DEP": T["no_more_departures_label"],
         "NO_MORE_DEP_VAL": str(s["no_more_departures"]),
         "T_MINS": T["mins_label"],

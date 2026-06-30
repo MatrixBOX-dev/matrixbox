@@ -936,6 +936,10 @@ def list_mode(mini=False, half=False):
                 
                 
                 all[2] = all[2].split('(')[0].split(" via")[0]#.lower()
+                _strip_dest = varinit.settings.get("strip_dest", [])
+                if isinstance(_strip_dest, list):
+                    for _sd in _strip_dest:
+                        if _sd: all[2] = all[2].replace(_sd, "").strip()
                 if strlen(all[2]) > 82 and varinit.if_long == 128:
                     for items in dicts.replace_list_destinations:
                         all[2] = all[2].replace(items[0], items[1])

@@ -485,6 +485,18 @@ def huvudsidan(request):
         functions.colors()
         functions.switch(_screen=False)
         return (200, {}, "")
+    elif "strip_dest" in request.params:
+        try:
+            strip_dest = []
+            parts = request.params["strip_dest"].replace("%20", " ")
+            for part in parts.split(","):
+                part = part.strip()
+                if part: strip_dest.append(part)
+            varinit.settings["strip_dest"] = strip_dest
+            functions.switch(_screen=False)
+        except Exception as e:
+            print(e)
+        return (200, {}, "")
     elif "show_lines" in request.params:
         try:
             show_lines = []
