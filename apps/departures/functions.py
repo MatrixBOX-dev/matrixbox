@@ -491,6 +491,10 @@ def traffic_parser(data, traffic_type, num="1"):
                     delay = all["deviations"][0] if rt_indicator else ""
                 except: delay = ""
                 dep = ["0", str(line["id"]), delay + all["destination"], _minsleft, str(all["direction_code"])]
+                _strip_dest = varinit.settings.get("strip_dest", [])
+                if isinstance(_strip_dest, list):
+                    for _sd in _strip_dest:
+                        if _sd: dep[2] = dep[2].replace(_sd, "").strip()
                 if traffic_type != "METRO":
                     if line["transport_mode"] == traffic_type:
                         dep[2] = dep[2].split('(')[0]
