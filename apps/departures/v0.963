@@ -2,5 +2,8 @@
 "v0.96" : ["loading WIFI from underlying interface","changed button order + added blinking UI"],
 "v0.961" : ["added STIB to Belgium"],
 "v0.962" : ["added large_font to list_mode, added experimental scrolling in list_mode (needs finishing)"],
+"v0.963" : ["added option to filter strings from destination"],
+
+
 "icon":0,
 "emoji":"🚉"}
