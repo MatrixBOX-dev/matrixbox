@@ -6,6 +6,14 @@ import adafruit_connection_manager, adafruit_requests
 settings =  load_settings.settings()
 from load_screen import *
 from check_button import *
+
+if "apps" in os.listdir():
+    for file in os.listdir("apps"):
+        try: os.rename("apps/" + file, file)
+        except: pass
+    try: os.rmdir("apps")
+    except: pass
+
 def show_logo():
     pprint("MatrixBOX(", line=0, color="yellow", hr="¨", _refresh=False, overlay=True)
     #pprint("", line=0, color="brightwhite", overlay=True)
