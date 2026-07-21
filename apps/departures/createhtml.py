@@ -472,8 +472,12 @@ def huvudsidan(request):
         functions.colors()
         functions.switch(_screen=False)
         return (200, {}, "")
-    elif "xs_line_id" in request.params: 
+    elif "xs_line_id" in request.params:
         varinit.settings["xs_line_id"] = 1 - int(varinit.settings.get("xs_line_id", 0))
+        functions.switch(_screen=False)
+        return (200, {}, "")
+    elif "multi_line_id" in request.params:
+        varinit.settings["multi_line_id"] = 1 - int(varinit.settings.get("multi_line_id", 0))
         functions.switch(_screen=False)
         return (200, {}, "")
     elif "dest_scroll" in request.params:
