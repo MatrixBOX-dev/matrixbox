@@ -179,6 +179,7 @@ settingstxt = {"password": "none",
             "clock_row_position":"bottom",
             "clock_row_align":"left",
             "clock_row_color":"white",
+            "multi_line_id":0,
             "dest_scroll":0,
             
             "clocktime": 0, 
