@@ -128,6 +128,7 @@ PAGE_TPL = """<!DOCTYPE html>
 {FONT_SIZE_ROW}
 {XS_LINE_ID_ROW}
 {CLOCK_ROW_HTML}
+{MULTI_LINE_ID_ROW}
 <tr><td><b>Scroll dest</b></td><td>{DEST_SCROLL_CHK}</td></tr>
 <tr><td><b>Timer</b></td><td><button type="button" onclick="location.href='/?timer=set'">&#8987;</button></td></tr>
 <tr><td><b>{T_ROTATION}</b></td><td><button type="button" data-u="/?rotate=1">&#128260; 90&deg;</button></td></tr>
@@ -460,6 +461,7 @@ def html():
         + _opt("blue", s.get("clock_row_color", "white"), "Blue")
         + '</select></td></tr>'
     )
+    multi_line_id_row = '<tr><td><b>Multi line ID</b></td><td>' + _chk("MULTI_LINE_ID", s.get("multi_line_id", 0), "/?multi_line_id=switch", "SHOW LINE ID") + '</td></tr>' if if_long > 64 else ""
     # dest_scroll
     dest_scroll_html = _chk("DEST_SCROLL", s.get("dest_scroll", 0), "/?dest_scroll=switch", "Scroll long names (experimental)")
 
@@ -539,6 +541,7 @@ def html():
         "FONT_SIZE_ROW": font_size_row,
         "XS_LINE_ID_ROW": xs_line_id_row,
         "CLOCK_ROW_HTML": clock_row_html,
+        "MULTI_LINE_ID_ROW": multi_line_id_row,
         "DEST_SCROLL_CHK": dest_scroll_html,
         "DNS_SECTION": dns_html,
         "T_ROTATION": T.get("rotation", "Rotation"),
