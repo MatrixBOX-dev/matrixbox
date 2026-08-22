@@ -967,7 +967,8 @@ def list_mode(mini=False, half=False):
     else:
         for i in range(_r):
             print("Fetching: ", i+1)
-            varinit.traindata[i+1] = apply_clock_row(reformat_data(get_departure(num = str(i+1))))
+            _data = reformat_data(get_departure(num = str(i+1)))
+            varinit.traindata[i+1] = apply_clock_row(_data) if i == 0 else _data
             if not half or i+1 == _r: break
         
     
@@ -1041,8 +1042,11 @@ def list_mode(mini=False, half=False):
                     if strlen(all[3]) < _mins_ref_w:
                         all[3] = (_mins_ref_w - strlen(all[3])) * "(" + all[3]
 
-                if_not_clocktime = varinit.settings["mins"] if all[3] \
-                and not varinit.settings["clocktime"] else ""
+                if_not_clocktime = (
+                    varinit.settings["mins"]
+                    if all[3] and not varinit.settings["clocktime"] and not is_clock_row
+                    else ""
+                )
 
                 all[3] += if_not_clocktime
 
@@ -1071,10 +1075,15 @@ def list_mode(mini=False, half=False):
                         all[2] = abbreviate_dest(all[2], _max_px)
                         while len(all[2]) > 0 and strlen(all[2]) > max(0, _max_px):
                             all[2] = all[2][:-1]
-                if half: 
-                    all[2] = all[2][:15 - len(varinit.settings["mins"])]
-                    if varinit.settings["clocktime"]:
-                        all[2] = all[2][:11]
+                if half:
+                    if is_clock_row:
+                        _max_px = 64 - strlen(all[3]) - 1
+                        while len(all[2]) > 0 and strlen(all[2]) > max(0, _max_px):
+                            all[2] = all[2][:-1]
+                    else:
+                        all[2] = all[2][:15 - len(varinit.settings["mins"])]
+                        if varinit.settings["clocktime"]:
+                            all[2] = all[2][:11]
                 mins = all[2]
                 if not varinit.settings["clocktime"]: all[1] = "1(1(" if all[1] == "11" else all[1]
 
