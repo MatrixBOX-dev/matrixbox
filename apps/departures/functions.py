@@ -1012,8 +1012,7 @@ def list_mode(mini=False, half=False):
                 _max_lw = 0
                 for _a in trainlist:
                     if isinstance(_a, list) and len(_a) > 1:
-                        _lid = "1(1(" if (_a[1] == "11" and not varinit.settings["clocktime"]) else _a[1]
-                        _w = strlen(_lid[:varinit.settings["line_length"]])
+                        _w = strlen(_a[1][:varinit.settings["line_length"]])
                         if _w > _max_lw: _max_lw = _w
                 if large_list: line_col = _max_lw + 6
                 else: line_col = _max_lw + 2 if _max_lw else 0
@@ -1106,7 +1105,6 @@ def list_mode(mini=False, half=False):
                         if varinit.settings["clocktime"]:
                             all[2] = all[2][:11]
                 mins = all[2]
-                if not varinit.settings["clocktime"]: all[1] = "1(1(" if all[1] == "11" else all[1]
 
                 if mini: all[2] = mins
                 all[1] = all[1][:varinit.settings["line_length"]]
