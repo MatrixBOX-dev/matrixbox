@@ -1078,7 +1078,7 @@ def list_mode(mini=False, half=False):
                     while len(all[2]) > 0 and sum(_font.get(c, _font['_'])[0] for c in all[2]) > max(0, _max_px):
                         all[2] = all[2][:-1]
                 elif not half:
-                    _line_col_w = 0 if (is_clock_row or is_msg_row) else strlen(varinit.settings["line_length"] * ("((((" if mini else "(((((("))
+                    _line_col_w = 0 if (is_clock_row or is_msg_row) else varinit.settings["line_length"] * (4 if mini else 6)
                     _max_px = varinit.if_long - strlen(all[3]) - _line_col_w - 2
                     _full_dest_w = strlen(all[2])
                     if not (_dest_scroll and _full_dest_w > max(0, _max_px)):
@@ -1121,32 +1121,28 @@ def list_mode(mini=False, half=False):
                     all[3] = all[3].replace(" " + if_not_clocktime,"")
                     offs = col_w - COL_MARGIN - strlen(all[3])
 
-                    
-
-                minsleft = offs*"(" + all[3]
-                
                 inv = 0
 
-                if half: minsleft = minsleft.replace(" " + if_not_clocktime, "")
-                
                 if half: multiple_offset = (int(record) - 1) * col_w
                 else: multiple_offset = 0
+
+                mins_start_x = multiple_offset + offs
         
                 min_color = "white" if varinit.settings.get("listcolor_time", 0) or varinit.rotated else "yellow"
                 lin_color = "yellow" if not varinit.settings["listcolor"] else "white"
                 clock_color = varinit.settings.get("clock_row_color", "white")
                 if varinit.rotated or varinit.display.width <= 64:
-                    added_space = ""
+                    added_space_w = 0
                     line = ""
                     if not varinit.rotated and xs_line_id:
                         line = all[1][:varinit.settings["line_length"]]
-                        added_space = (_xs_max_lw + 2) * "("
+                        added_space_w = _xs_max_lw + 2
                 elif mini:
-                    added_space = varinit.settings["line_length"] * "(((("
-                    if half: added_space = COL_MARGIN * "(" + (line_col * "(" if multi_station_line_id else "")
-                else: added_space = varinit.settings["line_length"] * "(((((("
+                    added_space_w = varinit.settings["line_length"] * 4
+                    if half: added_space_w = COL_MARGIN + (line_col if multi_station_line_id else 0)
+                else: added_space_w = varinit.settings["line_length"] * 6
                 if not varinit.settings["line_length"]:
-                    added_space = ""
+                    added_space_w = 0
                     line = ""
 
                 if is_clock_row:
@@ -1155,17 +1151,16 @@ def list_mode(mini=False, half=False):
                     _clock_pad = max(0, _clock_avail - strlen(dest))
                     if _clock_align == "center": _clock_pad = _clock_pad // 2
                     elif _clock_align == "left": _clock_pad = 0
-                    added_space = _clock_pad * "("
+                    added_space_w = _clock_pad
                     line = ""
                 elif is_msg_row:
-                    added_space = ""
+                    added_space_w = 0
                     line = ""
 
                 if large_list:
                     _lpart = 100 + x
-                    _dest_pad = line_col * "("
-                    renderstring(minsleft, _lpart, 0, 0, inv, sys_msg=min_color, start_x=multiple_offset)
-                    renderstring(_dest_pad + dest, _lpart, 0, 0, inv, sys_msg=(clock_color if is_clock_row else False), start_x=multiple_offset)
+                    renderstring(all[3], _lpart, 0, 0, inv, sys_msg=min_color, start_x=mins_start_x)
+                    renderstring(dest, _lpart, 0, 0, inv, sys_msg=(clock_color if is_clock_row else False), start_x=multiple_offset + line_col)
                     if not half and not varinit.rotated: renderstring(line, _lpart, 0, 0, inv, sys_msg=lin_color, start_x=multiple_offset)
                     if x > 4: continue
                 else:
@@ -1186,16 +1181,16 @@ def list_mode(mini=False, half=False):
                             "overflow": _overflow, "pos": 0,
                             "pause_end": _now + x * 0.8 + 2.0, "start_x": _line_col_w
                         }
-                        renderstring(minsleft, 100+x, 0, 0, inv, mini=mini,
-                                     sys_msg=min_color, target_bmp=varinit.overlay_bmp, start_x=multiple_offset)
+                        renderstring(all[3], 100+x, 0, 0, inv, mini=mini,
+                                     sys_msg=min_color, target_bmp=varinit.overlay_bmp, start_x=mins_start_x)
                         if _show_line:
                             renderstring(line, 100+x, 0, 0, inv, mini=mini,
                                          sys_msg=lin_color, target_bmp=varinit.overlay_bmp, start_x=multiple_offset)
                         varinit.overlay_tg.y = extrarow
                         varinit.overlay_tg.hidden = False
                     else:
-                        renderstring(minsleft, 100+x, 0, 0, inv, mini=mini, sys_msg=min_color, start_x=multiple_offset)
-                        renderstring(added_space + dest, 100+x, 0, 0, inv, mini=mini, sys_msg=(clock_color if is_clock_row else False), start_x=multiple_offset)
+                        renderstring(all[3], 100+x, 0, 0, inv, mini=mini, sys_msg=min_color, start_x=mins_start_x)
+                        renderstring(dest, 100+x, 0, 0, inv, mini=mini, sys_msg=(clock_color if is_clock_row else False), start_x=multiple_offset + added_space_w)
                         if _show_line:
                             renderstring(line, 100+x, 0, 0, inv, mini=mini, sys_msg=lin_color, start_x=multiple_offset)
                     if x > varinit.if_tall // 8 - 1: continue

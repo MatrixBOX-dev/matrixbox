@@ -157,7 +157,7 @@ def _pprint(string, line=False, color="white", font=font_mini, _refresh=False, c
     except Exception as e:
         print(e)
 
-def pprint(string, line=False, color="white", font=font_mini, _refresh=True, clear=True, top_offset=0, window=None, _clearscreen=True, hr="(", slow=False, block=False, shadow_color=0, overlay=False):
+def pprint(string, line=False, color="white", font=font_mini, _refresh=True, clear=True, top_offset=0, window=None, _clearscreen=True, hr=None, slow=False, block=False, shadow_color=0, overlay=False):
     if window is None: window = _current_window()
     _is_mini = (font == font_mini)
     global line_window
@@ -167,7 +167,7 @@ def pprint(string, line=False, color="white", font=font_mini, _refresh=True, cle
     offs = 1 + top_offset
 
     # Pad string with hr chars when hr is a visible fill character
-    if _clearscreen and hr != "(":
+    if _clearscreen and hr is not None:
         pad_char = hr.lower() if _is_mini else hr
         if pad_char in font:
             cw = font[pad_char][0]
@@ -191,7 +191,7 @@ def pprint(string, line=False, color="white", font=font_mini, _refresh=True, cle
             line_window.append("")
         line_window[lin] = string
         _draw_line(window, string, lin, _c, font, _is_mini, fh, offs, clear, block, shadow_color)
-        if _clearscreen and hr == "(":
+        if _clearscreen and hr is None:
             _clear_row_remainder(window, strlen(string, font), lin, fh, offs)
     else:
         line_window.append(string)
