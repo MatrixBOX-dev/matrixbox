@@ -978,12 +978,18 @@ def list_mode(mini=False, half=False):
     if merge_list_mode:
         print("Fetching merged stops")
         varinit.traindata[1] = apply_clock_row(reformat_data(merge_departures(("1", "2", "3"))))
+    elif half:
+        # Round-robin: fetch one station per call instead of all at once, cycling 1..N, N+1=1...
+        if not hasattr(varinit, "fetch_cycle"): varinit.fetch_cycle = 0
+        i = varinit.fetch_cycle % _r
+        print("Fetching: ", i+1)
+        _data = reformat_data(get_departure(num = str(i+1)))
+        varinit.traindata[i+1] = apply_clock_row(_data, is_clock_station=(i == 0))
+        varinit.fetch_cycle = (varinit.fetch_cycle + 1) % _r
     else:
-        for i in range(_r):
-            print("Fetching: ", i+1)
-            _data = reformat_data(get_departure(num = str(i+1)))
-            varinit.traindata[i+1] = apply_clock_row(_data, is_clock_station=(i == 0))
-            if not half or i+1 == _r: break
+        print("Fetching: ", 1)
+        _data = reformat_data(get_departure(num = "1"))
+        varinit.traindata[1] = apply_clock_row(_data, is_clock_station=True)
         
     
     
