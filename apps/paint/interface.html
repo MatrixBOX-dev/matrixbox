@@ -6,6 +6,11 @@
 .card h3{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .toolbar{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center;margin-bottom:10px}
 .toolbar button{width:36px;height:36px;border:2px solid var(--border);border-radius:8px;background:var(--surface);color:#fff;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.tool-wrap{position:relative;display:inline-flex}
+.size-menu{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:4px;gap:4px;z-index:10;box-shadow:var(--shadow)}
+.size-menu.open{display:flex}
+.size-menu button{padding:4px 8px;border:none;border-radius:6px;background:var(--surface);color:var(--text);font-size:.7rem;cursor:pointer;white-space:nowrap}
+.size-menu button:hover{background:var(--accent);color:#fff}
 .toolbar button.active{border-color:var(--accent);box-shadow:0 0 6px rgba(124,111,255,.5)}
 .canvas-wrap{display:flex;justify-content:center;overflow-x:auto;margin:10px -16px;background:#000;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
 #canvas{image-rendering:pixelated;cursor:crosshair;display:block}
@@ -36,6 +41,14 @@ code{font-family:'Cascadia Mono','Fira Code','Consolas',monospace}
 <button id="t_line" title="Line">&#9585;</button>
 <button id="t_rect" title="Rectangle">&#9645;</button>
 <button id="t_circle" title="Circle">&#9711;</button>
+<div class="tool-wrap">
+<button id="t_text" title="Text">T</button>
+<div class="size-menu" id="textSizeMenu">
+<button type="button" data-size="mini">mini</button>
+<button type="button" data-size="small">small</button>
+<button type="button" data-size="large">large</button>
+</div>
+</div>
 <input type="color" id="colorPicker" value="#ffffff" title="Color">
 </div>
 
@@ -241,16 +254,45 @@ const toolButtons={
     line:document.getElementById("t_line"),
     rect:document.getElementById("t_rect"),
     circle:document.getElementById("t_circle"),
+    text:document.getElementById("t_text"),
 };
 const SHAPE_TOOLS=["line","rect","circle"];
+
+// Text size is picked from a small popover over the T button, not re-asked
+// per click; it stays in effect until you press T again and pick a new
+// one. No default - an empty value here means "not chosen yet".
+let textFontSize="";
+const textSizeMenu=document.getElementById("textSizeMenu");
+
+function openTextSizeMenu(){textSizeMenu.classList.add("open");}
+function closeTextSizeMenu(){textSizeMenu.classList.remove("open");}
+
+textSizeMenu.querySelectorAll("button").forEach(function(btn){
+    btn.onclick=function(e){
+        e.stopPropagation();
+        textFontSize=btn.dataset.size;
+        closeTextSizeMenu();
+    };
+});
+document.addEventListener("pointerdown",function(e){
+    if(!textSizeMenu.contains(e.target)&&e.target.id!=="t_text")closeTextSizeMenu();
+});
 
 function updateToolUI(){
     for(const name in toolButtons)toolButtons[name].classList.remove("active");
     toolButtons[tool].classList.add("active");
+    closeTextSizeMenu();
+    redraw(); // clear any stale hover ghost left over from the previous tool
 }
 for(const name in toolButtons){
+    if(name==="text")continue;
     toolButtons[name].onclick=function(){tool=name;updateToolUI();};
 }
+toolButtons.text.onclick=function(){
+    tool="text";
+    updateToolUI();
+    openTextSizeMenu();
+};
 colorPicker.onchange=function(){if(tool==="eraser"){tool="brush";updateToolUI();}};
 
 function drawPixel(x,y,color){
@@ -404,9 +446,47 @@ function commitShape(e){
     // empty in between.
 }
 
+// --- Text tool: click to place, using whatever size is picked in the
+// dropdown. Approximate glyph heights, just for the hover ghost below -
+// the real bitmap fonts live server-side; these only drive a preview.
+const FONT_HEIGHTS={mini:5,small:8,large:14};
+
+function placeText(x,y){
+    if(!textFontSize){
+        alert("Pick a text size from the dropdown first.");
+        return;
+    }
+
+    const text=prompt("Text to draw:");
+    if(!text)return;
+
+    pushUndo();
+    fetch("/text",{method:"POST",body:JSON.stringify({text:text,x:x,y:y,color:currentColor(),font_size:textFontSize})});
+}
+
+function showTextGhost(e){
+    const[x,y]=getXY(e);
+    redraw();
+    if(x<0||x>=W||y<0||y>=H)return;
+
+    const fh=FONT_HEIGHTS[textFontSize]||FONT_HEIGHTS.small;
+    const boxH=Math.min(fh,H-y);
+    ctx.fillStyle="rgba(255,255,255,0.25)";
+    ctx.fillRect(x*SCALE,y*SCALE,SCALE,boxH*SCALE);
+    ctx.strokeStyle="rgba(255,255,255,0.6)";
+    ctx.lineWidth=1;
+    ctx.strokeRect(x*SCALE+0.5,y*SCALE+0.5,SCALE-1,boxH*SCALE-1);
+
+    ctx.fillStyle="rgba(255,255,255,0.5)";
+    ctx.font=Math.max(fh*SCALE,10)+"px monospace";
+    ctx.textBaseline="top";
+    ctx.fillText("A",x*SCALE+SCALE,y*SCALE);
+}
+
 canvas.addEventListener("pointerdown",function(e){
     const[x,y]=getXY(e);
     if(x<0||x>=W||y<0||y>=H)return;
+    if(tool==="text"){placeText(x,y);return;}
     if(tool==="fill"){pushUndo();paint(e);return;}
     if(SHAPE_TOOLS.includes(tool)){
         shapeStart=clampXY(x,y);
@@ -417,7 +497,10 @@ canvas.addEventListener("pointerdown",function(e){
     painting=true;paint(e);
 });
 canvas.addEventListener("pointermove",function(e){
-    if(!painting)return;
+    if(!painting){
+        if(tool==="text")showTextGhost(e);
+        return;
+    }
     if(SHAPE_TOOLS.includes(tool)){previewShape(e);return;}
     paint(e);
 });
@@ -427,7 +510,8 @@ canvas.addEventListener("pointerup",function(e){
     sendPending();
 });
 canvas.addEventListener("pointerleave",function(){
-    if(painting&&SHAPE_TOOLS.includes(tool)){shapeStart=null;redraw();}
+    if(painting&&SHAPE_TOOLS.includes(tool))shapeStart=null;
+    redraw(); // clears any in-progress shape preview or text ghost
     painting=false;
     sendPending();
 });
