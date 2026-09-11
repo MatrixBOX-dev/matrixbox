@@ -26,3 +26,7 @@ If you wish to contribute to the official repository (the system, apps, UI) drop
 Instagram: @matrixbox.app<br>
 web: matrixbox.app<br>
 e-mail: info@matrixbox.app
+
+
+## ⚠️ FLASH YOUR DEVICE
+The code can be flashed onto a MatrixBox here: https://matrixbox.app/flash/
