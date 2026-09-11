@@ -6,7 +6,7 @@ import adafruit_connection_manager, adafruit_requests
 settings =  load_settings.settings()
 from load_screen import *
 from check_button import *
-import open_patch
+import patches
 
 if "apps" in os.listdir():
     for file in os.listdir("apps"):
