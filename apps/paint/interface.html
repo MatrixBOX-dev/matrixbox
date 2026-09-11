@@ -1,106 +1,303 @@
 <style>
 *{touch-action:none}
-.page{max-width:none!important;padding:4px!important;display:flex;flex-direction:column;align-items:center;gap:8px}
-h2{font-size:.9rem;font-weight:700;letter-spacing:1px}
-.toolbar{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center}
+.page{max-width:none!important;padding:16px 14px!important;display:flex;flex-direction:column;align-items:center;gap:8px}
+.card{width:100%;max-width:420px;box-sizing:border-box}
+.canvas-card{max-width:960px}
+.card h3{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.toolbar{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center;margin-bottom:10px}
 .toolbar button{width:36px;height:36px;border:2px solid var(--border);border-radius:8px;background:var(--surface);color:#fff;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.tool-wrap{position:relative;display:inline-flex}
+.size-menu{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:4px;gap:4px;z-index:10;box-shadow:var(--shadow)}
+.size-menu.open{display:flex}
+.size-menu button{padding:4px 8px;border:none;border-radius:6px;background:var(--surface);color:var(--text);font-size:.7rem;cursor:pointer;white-space:nowrap}
+.size-menu button:hover{background:var(--accent);color:#fff}
 .toolbar button.active{border-color:var(--accent);box-shadow:0 0 6px rgba(124,111,255,.5)}
-.palette{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
-.swatch{width:28px;height:28px;border-radius:6px;border:2px solid transparent;cursor:pointer}
-.swatch.active{border-color:#fff;box-shadow:0 0 4px rgba(255,255,255,.5)}
-#canvas{border:1px solid var(--border);image-rendering:pixelated;cursor:crosshair;max-width:100%}
-.actions{display:flex;gap:6px}
-.actions button{padding:6px 14px;border:none;border-radius:8px;font-size:.8rem;font-weight:600;cursor:pointer;color:#fff}
-.btn-clear{background:#e03c3c}
-.btn-exit{background:var(--surface3)}
-.btn-save{background:var(--accent)}
-.btn-load{background:var(--accent2);color:#000}
-.file-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center}
-.file-bar input{background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);padding:5px 10px;font-size:.8rem;width:120px}
-.file-bar select{background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);padding:5px 8px;font-size:.8rem;min-width:100px}
-.btn-del{background:#e03c3c;font-size:.7rem;padding:4px 8px}
+.canvas-wrap{display:flex;justify-content:center;overflow-x:auto;margin:10px -16px;background:#000;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+#canvas{image-rendering:pixelated;cursor:crosshair;display:block}
+.file-bar{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-top:10px}
+.file-bar-row{display:contents}
+.file-bar input,.file-bar select{width:100%}
+.file-bar input,.file-bar select,.file-bar .btn{height:40px;box-sizing:border-box}
+.btn-group{display:flex;gap:8px}
+.btn-group .btn{flex:1}
+pre{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;font-size:.78rem;line-height:1.5;color:var(--text)}
+code{font-family:'Cascadia Mono','Fira Code','Consolas',monospace}
+.route{display:inline-flex;align-items:center;gap:8px;margin-bottom:8px;font-family:'Cascadia Mono','Fira Code','Consolas',monospace}
+.verb{padding:2px 7px;border-radius:5px;font-weight:700;font-size:.68rem;letter-spacing:.4px}
+.verb-get{background:rgba(0,180,255,.15);color:#4fc3f7}
+.verb-post{background:rgba(0,200,120,.15);color:#3ddc84}
+.path{font-size:.82rem;color:var(--text)}
+.api-route{margin-bottom:14px}
+.api-route:last-child{margin-bottom:0}
 </style>
-<h2>Paint</h2>
+
+<div class="card canvas-card">
+<h3>Paint</h3>
 
 <div class="toolbar">
 <button id="t_brush" class="active" title="Brush">&#9998;</button>
 <button id="t_eraser" title="Eraser">&#9003;</button>
 <button id="t_fill" title="Fill">&#9681;</button>
+<button id="t_line" title="Line">&#9585;</button>
+<button id="t_rect" title="Rectangle">&#9645;</button>
+<button id="t_circle" title="Circle">&#9711;</button>
+<div class="tool-wrap">
+<button id="t_text" title="Text">T</button>
+<div class="size-menu" id="textSizeMenu">
+<button type="button" data-size="mini">mini</button>
+<button type="button" data-size="small">small</button>
+<button type="button" data-size="large">large</button>
+</div>
+</div>
+<input type="color" id="colorPicker" value="#ffffff" title="Color">
 </div>
 
-<div class="palette" id="palette"></div>
+<div class="canvas-wrap"><canvas id="canvas"></canvas></div>
 
-<canvas id="canvas"></canvas>
+<div class="action-row" style="margin-top:10px;justify-content:center">
+<button id="undoBtn" class="btn btn-sm" onclick="undo()" disabled title="Undo">&#8617;</button>
+<button class="btn btn-danger btn-sm" onclick="clearCanvas()">Clear</button>
+</div>
+</div>
 
+<div class="card">
+<h3>Save / Load</h3>
 <div class="file-bar">
+<div class="file-bar-row">
 <input type="text" id="saveName" placeholder="name" maxlength="20">
-<button class="actions btn-save" onclick="saveProject()">&#128190; Save</button>
+<button class="btn btn-success btn-sm" onclick="saveProject()" title="Save">&#128190;</button>
+</div>
+<div class="file-bar-row">
 <select id="fileList"><option value="">-- load --</option></select>
-<button class="actions btn-load" onclick="loadProject()">&#128194; Load</button>
-<button class="actions btn-del" onclick="deleteProject()">&#128465;</button>
+<div class="btn-group">
+<button class="btn btn-sm" onclick="loadProject()" title="Load">&#128194;</button>
+<button class="btn btn-danger btn-sm" onclick="deleteProject()" title="Delete">&#128465;</button>
+</div>
+</div>
+</div>
 </div>
 
-<div class="actions">
-<button class="btn-clear" onclick="clearCanvas()">Clear</button>
+<div class="card">
+<h3>Remote API documentation
+<button type="button" class="btn btn-sm" id="api_toggle" onclick="var a=document.getElementById('api_docs');var open=a.style.display!=='none';a.style.display=open?'none':'block';document.getElementById('api_toggle').textContent=open?'Show':'Hide'">Show</button>
+</h3>
+<div id="api_docs" style="display:none">
+<p style="color:var(--muted);font-size:.82rem;margin-bottom:10px">
+This page IS the API &mdash; every button above just calls one of these
+routes. Any other device on the network can POST the same JSON to draw on
+the __WIDTH__x__HEIGHT__ matrix. Base URL: <code>http://__IP__/</code>
+</p>
+
+<div class="api-route">
+<div class="route"><span class="verb verb-get">GET</span><span class="path">/info</span></div>
+<pre>{
+  "width": __WIDTH__,
+  "height": __HEIGHT__
+}</pre>
+</div>
+
+<div class="api-route">
+<div class="route"><span class="verb verb-get">GET</span><span class="path">/grid</span></div>
+<p style="color:var(--muted);font-size:.82rem;margin-bottom:8px">Current canvas, one hex color per pixel.</p>
+<pre>{
+  "d": [["#000000", "#ffffff", ...], ...]
+}</pre>
+</div>
+
+<div class="api-route">
+<div class="route"><span class="verb verb-post">POST</span><span class="path">/background</span></div>
+<pre>{
+  "color": "#003366"
+}</pre>
+</div>
+
+<div class="api-route">
+<div class="route"><span class="verb verb-post">POST</span><span class="path">/clear</span></div>
+<p style="color:var(--muted);font-size:.82rem;margin-bottom:8px">No body needed &mdash; resets to black.</p>
+</div>
+
+<div class="api-route">
+<div class="route"><span class="verb verb-post">POST</span><span class="path">/pixel</span></div>
+<pre>{
+  "color": "#ffffff",
+  "pts": [[5, 5], [6, 5]]
+}</pre>
+</div>
+
+<div class="api-route">
+<div class="route"><span class="verb verb-post">POST</span><span class="path">/fill</span></div>
+<p style="color:var(--muted);font-size:.82rem;margin-bottom:8px">Flood fill from x/y, like the fill tool above.</p>
+<pre>{
+  "x": 5,
+  "y": 5,
+  "color": "#ffffff"
+}</pre>
+</div>
+
+<div class="api-route">
+<div class="route"><span class="verb verb-post">POST</span><span class="path">/line</span></div>
+<pre>{
+  "x0": 2,
+  "y0": 2,
+  "x1": 20,
+  "y1": 10,
+  "color": "#ffffff"
+}</pre>
+</div>
+
+<div class="api-route">
+<div class="route"><span class="verb verb-post">POST</span><span class="path">/rect</span></div>
+<p style="color:var(--muted);font-size:.82rem;margin-bottom:8px">Include either or both colors.</p>
+<pre>{
+  "x0": 2,
+  "y0": 2,
+  "x1": 20,
+  "y1": 10,
+  "border_color": "#ffffff",
+  "fill_color": "#ff0000"
+}</pre>
+</div>
+
+<div class="api-route">
+<div class="route"><span class="verb verb-post">POST</span><span class="path">/circle</span></div>
+<p style="color:var(--muted);font-size:.82rem;margin-bottom:8px">x/y is the center. Include either or both colors.</p>
+<pre>{
+  "x": 16,
+  "y": 16,
+  "radius": 8,
+  "border_color": "#ffffff",
+  "fill_color": "#ff0000"
+}</pre>
+</div>
+
+<div class="api-route">
+<div class="route"><span class="verb verb-post">POST</span><span class="path">/text</span></div>
+<p style="color:var(--muted);font-size:.82rem;margin-bottom:8px">font_size is one of "mini", "small", "large". Give x/y for an exact
+position, or align/valign with an optional padding (ignored on "center").</p>
+<pre>{
+  "text": "Hello",
+  "font_size": "small",
+  "color": "#ffffff",
+  "align": "center",
+  "valign": "center"
+}</pre>
+</div>
+
+<div class="api-route">
+<div class="route"><span class="verb verb-get">GET</span><span class="path">/saves</span></div>
+<p style="color:var(--muted);font-size:.82rem;margin-bottom:8px">List of saved names.</p>
+<pre>["mydrawing", "another"]</pre>
+</div>
+
+<div class="api-route">
+<div class="route"><span class="verb verb-post">POST</span><span class="path">/save</span></div>
+<pre>{
+  "name": "mydrawing"
+}</pre>
+</div>
+
+<div class="api-route">
+<div class="route"><span class="verb verb-post">POST</span><span class="path">/load</span></div>
+<pre>{
+  "name": "mydrawing"
+}</pre>
+</div>
+
+<div class="api-route">
+<div class="route"><span class="verb verb-post">POST</span><span class="path">/delete</span></div>
+<pre>{
+  "name": "mydrawing"
+}</pre>
+</div>
+
+<p style="color:var(--muted);font-size:.82rem">
+Colors are <code>#RRGGBB</code> hex strings. The display only holds 16 at
+once; past that, the least recently used custom color gets reassigned.
+Drawing is additive; POST <code>/background</code> or <code>/clear</code>
+first for a clean frame.
+</p>
+</div>
 </div>
 
 <script>
 const W=__WIDTH__,H=__HEIGHT__;
-const PAL=__PALETTE__;
 const canvas=document.getElementById("canvas");
 const ctx=canvas.getContext("2d");
+const colorPicker=document.getElementById("colorPicker");
 
-// Scale canvas so each pixel is large enough to tap
-const SCALE=Math.min(Math.floor((window.innerWidth-16)/W),Math.floor((window.innerHeight-200)/H),16);
+// Scale canvas so each pixel is large enough to tap. Measured from the
+// card's own layout width, not the viewport - the card caps out at 420px,
+// and if SCALE were based on the wider viewport instead, CSS's
+// max-width:100% on #canvas would shrink it on screen while its drawing
+// buffer stayed larger, throwing off every click position.
+const availW=canvas.parentElement.clientWidth||(window.innerWidth-16);
+const SCALE=Math.min(Math.floor(availW/W),Math.floor((window.innerHeight-200)/H),28);
 canvas.width=W*SCALE;
 canvas.height=H*SCALE;
 ctx.imageSmoothingEnabled=false;
 
-// Grid state
+// Grid state: one hex color string per cell
 const grid=[];
-for(let y=0;y<H;y++){grid[y]=[];for(let x=0;x<W;x++)grid[y][x]=0;}
+for(let y=0;y<H;y++){grid[y]=[];for(let x=0;x<W;x++)grid[y][x]="#000000";}
 
 let tool="brush"; // brush|eraser|fill
-let colorIdx=5; // default white (palette index 5)
 
-// Build palette swatches
-const palDiv=document.getElementById("palette");
-for(const idx in PAL){
-    const i=parseInt(idx);
-    const [r,g,b]=PAL[i];
-    const sw=document.createElement("div");
-    sw.className="swatch"+(i===colorIdx?" active":"");
-    sw.style.background="rgb("+r+","+g+","+b+")";
-    if(r===0&&g===0&&b===0) sw.style.border="2px solid #333";
-    sw.dataset.idx=i;
-    sw.onclick=function(){
-        document.querySelectorAll(".swatch").forEach(s=>s.classList.remove("active"));
-        sw.classList.add("active");
-        colorIdx=i;
-        if(tool==="eraser"){tool="brush";updateToolUI();}
-    };
-    palDiv.appendChild(sw);
+function currentColor(){
+    return tool==="eraser"?"#000000":colorPicker.value;
 }
 
 // Tool buttons
-const tBrush=document.getElementById("t_brush");
-const tEraser=document.getElementById("t_eraser");
-const tFill=document.getElementById("t_fill");
+const toolButtons={
+    brush:document.getElementById("t_brush"),
+    eraser:document.getElementById("t_eraser"),
+    fill:document.getElementById("t_fill"),
+    line:document.getElementById("t_line"),
+    rect:document.getElementById("t_rect"),
+    circle:document.getElementById("t_circle"),
+    text:document.getElementById("t_text"),
+};
+const SHAPE_TOOLS=["line","rect","circle"];
+
+// Text size is picked from a small popover over the T button, not re-asked
+// per click; it stays in effect until you press T again and pick a new
+// one. No default - an empty value here means "not chosen yet".
+let textFontSize="";
+const textSizeMenu=document.getElementById("textSizeMenu");
+
+function openTextSizeMenu(){textSizeMenu.classList.add("open");}
+function closeTextSizeMenu(){textSizeMenu.classList.remove("open");}
+
+textSizeMenu.querySelectorAll("button").forEach(function(btn){
+    btn.onclick=function(e){
+        e.stopPropagation();
+        textFontSize=btn.dataset.size;
+        closeTextSizeMenu();
+    };
+});
+document.addEventListener("pointerdown",function(e){
+    if(!textSizeMenu.contains(e.target)&&e.target.id!=="t_text")closeTextSizeMenu();
+});
 
 function updateToolUI(){
-    [tBrush,tEraser,tFill].forEach(b=>b.classList.remove("active"));
-    if(tool==="brush")tBrush.classList.add("active");
-    else if(tool==="eraser")tEraser.classList.add("active");
-    else if(tool==="fill")tFill.classList.add("active");
+    for(const name in toolButtons)toolButtons[name].classList.remove("active");
+    toolButtons[tool].classList.add("active");
+    closeTextSizeMenu();
+    redraw(); // clear any stale hover ghost left over from the previous tool
 }
-tBrush.onclick=function(){tool="brush";updateToolUI();};
-tEraser.onclick=function(){tool="eraser";updateToolUI();};
-tFill.onclick=function(){tool="fill";updateToolUI();};
+for(const name in toolButtons){
+    if(name==="text")continue;
+    toolButtons[name].onclick=function(){tool=name;updateToolUI();};
+}
+toolButtons.text.onclick=function(){
+    tool="text";
+    updateToolUI();
+    openTextSizeMenu();
+};
+colorPicker.onchange=function(){if(tool==="eraser"){tool="brush";updateToolUI();}};
 
-function drawPixel(x,y,ci){
-    grid[y][x]=ci;
-    const [r,g,b]=PAL[ci]||[0,0,0];
-    ctx.fillStyle="rgb("+r+","+g+","+b+")";
+function drawPixel(x,y,color){
+    grid[y][x]=color;
+    ctx.fillStyle=color;
     ctx.fillRect(x*SCALE,y*SCALE,SCALE,SCALE);
 }
 
@@ -108,9 +305,9 @@ function redraw(){
     ctx.fillStyle="#000";
     ctx.fillRect(0,0,canvas.width,canvas.height);
     for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-        if(grid[y][x]){
-            const [r,g,b]=PAL[grid[y][x]]||[0,0,0];
-            ctx.fillStyle="rgb("+r+","+g+","+b+")";
+        const c=grid[y][x];
+        if(c&&c!=="#000000"){
+            ctx.fillStyle=c;
             ctx.fillRect(x*SCALE,y*SCALE,SCALE,SCALE);
         }
     }
@@ -140,19 +337,42 @@ function sendPending(){
     if(!pending.length)return;
     const pts=pending.slice();
     pending=[];
-    const ci=tool==="eraser"?0:colorIdx;
-    fetch("/px",{method:"POST",body:JSON.stringify({c:ci,pts:pts})});
+    fetch("/pixel",{method:"POST",body:JSON.stringify({color:currentColor(),pts:pts})});
+}
+
+// --- Undo: one browser-tab-local history of grid snapshots, taken right
+// before each committed mutation. Restoring pops one and bulk-writes it
+// back to the device via POST /grid - it reverts "the canvas", not
+// specifically "your last stroke", so a concurrent API/script draw made
+// in between would get reverted too. Fine for a single-tab tool. ---
+const undoStack=[];
+const UNDO_LIMIT=20;
+const undoBtn=document.getElementById("undoBtn");
+
+function pushUndo(){
+    undoStack.push(grid.map(row=>row.slice()));
+    if(undoStack.length>UNDO_LIMIT)undoStack.shift();
+    undoBtn.disabled=false;
+}
+
+function undo(){
+    if(!undoStack.length)return;
+    const prev=undoStack.pop();
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++)grid[y][x]=prev[y][x];
+    redraw();
+    fetch("/grid",{method:"POST",body:JSON.stringify({d:prev})});
+    undoBtn.disabled=undoStack.length===0;
 }
 
 function paint(e){
     const[x,y]=getXY(e);
     if(x<0||x>=W||y<0||y>=H)return;
+    const color=currentColor();
 
     if(tool==="fill"){
-        const ci=colorIdx;
         // Local flood fill for instant feedback
         const target=grid[y][x];
-        if(target===ci)return;
+        if(target===color)return;
         const stack=[[x,y]];
         const seen=new Set();
         while(stack.length){
@@ -162,34 +382,158 @@ function paint(e){
             if(fx<0||fx>=W||fy<0||fy>=H)continue;
             if(grid[fy][fx]!==target)continue;
             seen.add(k);
-            grid[fy][fx]=ci;
+            grid[fy][fx]=color;
             stack.push([fx+1,fy],[fx-1,fy],[fx,fy+1],[fx,fy-1]);
         }
         redraw();
-        fetch("/fill",{method:"POST",body:JSON.stringify({x:x,y:y,c:ci})});
+        fetch("/fill",{method:"POST",body:JSON.stringify({x:x,y:y,color:color})});
         return;
     }
 
-    const ci=tool==="eraser"?0:colorIdx;
-    drawPixel(x,y,ci);
+    drawPixel(x,y,color);
     pending.push([x,y]);
     const now=Date.now();
     if(now-lastSent>80){lastSent=now;sendPending();}
 }
 
+// --- Shape tools: line/rect/circle commit once on release, but preview
+// live while dragging without touching the committed grid, so an
+// undecided drag can't pollute state or fight the /grid poll. ---
+let shapeStart=null;
+
+function clampXY(x,y){
+    return [Math.max(0,Math.min(W-1,x)),Math.max(0,Math.min(H-1,y))];
+}
+
+function previewShape(e){
+    const [cx,cy]=clampXY(...getXY(e));
+    const [sx,sy]=shapeStart;
+    redraw();
+    ctx.strokeStyle=currentColor();
+    ctx.lineWidth=Math.max(1,SCALE*0.15);
+    ctx.beginPath();
+    if(tool==="line"){
+        ctx.moveTo(sx*SCALE+SCALE/2,sy*SCALE+SCALE/2);
+        ctx.lineTo(cx*SCALE+SCALE/2,cy*SCALE+SCALE/2);
+    }else if(tool==="rect"){
+        const x0=Math.min(sx,cx),y0=Math.min(sy,cy);
+        const rw=Math.abs(cx-sx)+1,rh=Math.abs(cy-sy)+1;
+        ctx.rect(x0*SCALE,y0*SCALE,rw*SCALE,rh*SCALE);
+    }else{
+        const r=Math.round(Math.hypot(cx-sx,cy-sy));
+        ctx.arc(sx*SCALE+SCALE/2,sy*SCALE+SCALE/2,r*SCALE,0,Math.PI*2);
+    }
+    ctx.stroke();
+}
+
+function commitShape(e){
+    const [cx,cy]=clampXY(...getXY(e));
+    const [sx,sy]=shapeStart;
+    const color=currentColor();
+    let url,body;
+    if(tool==="line"){
+        url="/line";body={x0:sx,y0:sy,x1:cx,y1:cy,color:color};
+    }else if(tool==="rect"){
+        url="/rect";body={x0:sx,y0:sy,x1:cx,y1:cy,border_color:color};
+    }else{
+        url="/circle";body={x:sx,y:sy,radius:Math.round(Math.hypot(cx-sx,cy-sy)),border_color:color};
+    }
+    pushUndo();
+    fetch(url,{method:"POST",body:JSON.stringify(body)});
+    shapeStart=null;
+    // Leave the last preview frame on screen; the next /grid poll (within
+    // ~1s) replaces it with the server's exact render, so nothing flashes
+    // empty in between.
+}
+
+// --- Text tool: click to place, using whatever size is picked in the
+// dropdown. Approximate glyph heights, just for the hover ghost below -
+// the real bitmap fonts live server-side; these only drive a preview.
+const FONT_HEIGHTS={mini:5,small:8,large:14};
+
+function placeText(x,y){
+    if(!textFontSize){
+        alert("Pick a text size from the dropdown first.");
+        return;
+    }
+
+    const text=prompt("Text to draw:");
+    if(!text)return;
+
+    pushUndo();
+    fetch("/text",{method:"POST",body:JSON.stringify({text:text,x:x,y:y,color:currentColor(),font_size:textFontSize})});
+}
+
+function showTextGhost(e){
+    const[x,y]=getXY(e);
+    redraw();
+    if(x<0||x>=W||y<0||y>=H)return;
+
+    const fh=FONT_HEIGHTS[textFontSize]||FONT_HEIGHTS.small;
+    const boxH=Math.min(fh,H-y);
+    ctx.fillStyle="rgba(255,255,255,0.25)";
+    ctx.fillRect(x*SCALE,y*SCALE,SCALE,boxH*SCALE);
+    ctx.strokeStyle="rgba(255,255,255,0.6)";
+    ctx.lineWidth=1;
+    ctx.strokeRect(x*SCALE+0.5,y*SCALE+0.5,SCALE-1,boxH*SCALE-1);
+
+    ctx.fillStyle="rgba(255,255,255,0.5)";
+    ctx.font=Math.max(fh*SCALE,10)+"px monospace";
+    ctx.textBaseline="top";
+    ctx.fillText("A",x*SCALE+SCALE,y*SCALE);
+}
+
 canvas.addEventListener("pointerdown",function(e){
-    if(tool==="fill"){paint(e);return;}
+    const[x,y]=getXY(e);
+    if(x<0||x>=W||y<0||y>=H)return;
+    if(tool==="text"){placeText(x,y);return;}
+    if(tool==="fill"){pushUndo();paint(e);return;}
+    if(SHAPE_TOOLS.includes(tool)){
+        shapeStart=clampXY(x,y);
+        painting=true;
+        return;
+    }
+    pushUndo();
     painting=true;paint(e);
 });
-canvas.addEventListener("pointermove",function(e){if(painting)paint(e);});
-canvas.addEventListener("pointerup",function(){painting=false;sendPending();});
-canvas.addEventListener("pointerleave",function(){painting=false;sendPending();});
+canvas.addEventListener("pointermove",function(e){
+    if(!painting){
+        if(tool==="text")showTextGhost(e);
+        return;
+    }
+    if(SHAPE_TOOLS.includes(tool)){previewShape(e);return;}
+    paint(e);
+});
+canvas.addEventListener("pointerup",function(e){
+    if(painting&&SHAPE_TOOLS.includes(tool))commitShape(e);
+    painting=false;
+    sendPending();
+});
+canvas.addEventListener("pointerleave",function(){
+    if(painting&&SHAPE_TOOLS.includes(tool))shapeStart=null;
+    redraw(); // clears any in-progress shape preview or text ghost
+    painting=false;
+    sendPending();
+});
 
 function clearCanvas(){
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++)grid[y][x]=0;
+    pushUndo();
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++)grid[y][x]="#000000";
     redraw();
     fetch("/clear",{method:"POST"});
 }
+
+// --- Live sync: pick up draws made via the API (or another tab) ---
+let syncing=false;
+setInterval(function(){
+    if(painting||syncing)return;
+    syncing=true;
+    fetch("/grid").then(r=>r.json()).then(function(data){
+        const rows=data.d;
+        for(let y=0;y<H;y++)for(let x=0;x<W;x++)grid[y][x]=(rows[y]&&rows[y][x])||"#000000";
+        redraw();
+    }).catch(function(){}).finally(function(){syncing=false;});
+},1000);
 
 // --- Save / Load / Delete ---
 const fileList=document.getElementById("fileList");
@@ -213,9 +557,10 @@ function saveProject(){
 function loadProject(){
     const name=fileList.value;
     if(!name)return;
+    pushUndo();
     fetch("/load",{method:"POST",body:JSON.stringify({name:name})}).then(r=>r.json()).then(data=>{
         const rows=data.d;
-        for(let y=0;y<H;y++)for(let x=0;x<W;x++)grid[y][x]=(rows[y]&&rows[y][x])||0;
+        for(let y=0;y<H;y++)for(let x=0;x<W;x++)grid[y][x]=(rows[y]&&rows[y][x])||"#000000";
         redraw();
         document.getElementById("saveName").value=name;
     });
