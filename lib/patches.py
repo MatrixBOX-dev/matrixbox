@@ -38,39 +38,3 @@ def open_hook(path="/", mode="r", *args, **kwargs):
 
 builtins.open = open_hook
 
-
-
-
-
-import sys, os as _real_os
-
-_real_remove  = _real_os.remove
-_real_unlink  = _real_os.unlink
-_real_rmdir   = _real_os.rmdir
-
-def _wrap(fn, *hook_args, **hook_kw):
-    def hooked(path, *args, **kwargs):
-        try:
-            display.root_group.hidden = True
-            refresh()
-        except Exception:
-            print("Disp fail")
-        try:
-            return fn(path, *args, **kwargs)
-        finally:
-            try:
-                display.root_group.hidden = False
-                refresh()
-            except Exception:
-                print("Disp fail")
-    return hooked
-
-class OsProxy:
-    remove = staticmethod(_wrap(_real_remove))
-    unlink = staticmethod(_wrap(_real_unlink))
-    rmdir  = staticmethod(_wrap(_real_rmdir))
-
-    def __getattr__(self, name):
-        return getattr(_real_os, name)
-
-sys.modules['os'] = OsProxy()
