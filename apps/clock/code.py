@@ -112,7 +112,9 @@ def clock_webinterface_post(request):
     p = request.params
     if "save" in p:
         with open("clocksettings.txt", "w") as f:
+            display.root_group.hidden = True; refresh()
             f.write(json.dumps(clocksettings))
+        display.root_group.hidden = False
         delay = 0
     if "size" in p:
         selectfont(p["size"])
