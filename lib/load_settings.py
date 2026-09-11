@@ -1,7 +1,7 @@
 import json
 from __main__ import *
 
-def settings(): 
+def settings():
      settings = {"ssid":"T-Skylt WIFI",                                                      # Default settings:
                 "password":"dunderskurre",
                 "autostart":False,
@@ -25,16 +25,8 @@ def settings():
             for key in list(settings):
                 if key not in defaults:
                     del settings[key]
-            for setting in settings:
-                _type = str
-                try: 
-                     int(settings[setting])
-                     _type = int
-                except: pass
-                settings[setting] = _type(settings[setting])
-                
-     
-     except Exception as e: 
+
+     except Exception as e:
          print("No previous settings!")
          print(e)
 
