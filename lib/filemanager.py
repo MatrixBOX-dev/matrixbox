@@ -1,7 +1,7 @@
 import os
 import json
 import ampule
-
+from __main__ import display, refresh
 def _hide_display():
     try:
         from __main__ import display
@@ -60,9 +60,12 @@ def _fm_write(request):
     path = _norm(request.headers.get("x-path", ""))
     try:
         _hide_display()
+        
         with open(path, "w") as f:
+            display.root_group.hidden = True; refresh()
             f.write(request.body)
         _show_display("Saved: " + path.split("/")[-1])
+        display.root_group.hidden = False
         return (200, {}, json.dumps({"ok": True}))
     except Exception as e:
         _show_display(str(e), "red")
