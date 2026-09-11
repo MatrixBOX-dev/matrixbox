@@ -17,6 +17,7 @@
     "lib/font_large.py",
     "lib/ai_agent.py",
     "lib/cmd.py",
+    "lib/patches.py",
     "lib/filemanager.py"
   ]
 }
