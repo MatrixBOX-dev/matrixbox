@@ -1,5 +1,6 @@
 <style>
-*{touch-action:none}
+/* touch-action:none lives on #canvas only - on the whole page it blocked
+scrolling everywhere else too. */
 .page{max-width:none!important;padding:16px 14px!important;display:flex;flex-direction:column;align-items:center;gap:8px}
 .card{width:100%;max-width:420px;box-sizing:border-box}
 .canvas-card{max-width:960px}
@@ -12,8 +13,36 @@
 .size-menu button{padding:4px 8px;border:none;border-radius:6px;background:var(--surface);color:var(--text);font-size:.7rem;cursor:pointer;white-space:nowrap}
 .size-menu button:hover{background:var(--accent);color:#fff}
 .toolbar button.active{border-color:var(--accent);box-shadow:0 0 6px rgba(124,111,255,.5)}
-.canvas-wrap{display:flex;justify-content:center;overflow-x:auto;margin:10px -16px;background:#000;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-#canvas{image-rendering:pixelated;cursor:crosshair;display:block}
+.action-row{margin-top:10px;justify-content:center}
+/* toolbar + action-row share one .tool-rail item instead of two grid
+cells - a spanning canvas-wrap across mixed auto/fr rows kept sizing
+wrong; plain flex is predictable. */
+.tool-rail{display:flex;flex-direction:column;flex-shrink:0}
+.canvas-body{display:flex;flex-direction:column;width:100%;min-height:0}
+.canvas-wrap{display:flex;justify-content:center;align-items:center;overflow-x:auto;margin:10px -16px;padding:10px 16px;background:#000}
+#canvas{image-rendering:pixelated;cursor:crosshair;display:block;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;border:2px solid rgba(255,255,255,.4);flex-shrink:0}
+/* Fullscreen: canvas-wrap (flex:1) is anchored top-left, not centered -
+SCALE is a whole number so leftover space is usually unavoidable, and
+centering turns it into gaps on every side instead of one place.
+Landscape gets a left tool rail with internal scroll (page can't scroll
+in fullscreen, so a clipped rail would be unreachable); portrait keeps
+the top toolbar. */
+body.pt-fullscreen{overflow:hidden}
+body.pt-fullscreen .navbar,body.pt-fullscreen .card:not(.canvas-card){display:none}
+body.pt-fullscreen .page{padding:0;gap:0;max-width:none}
+/* 100vh on iOS Safari is the largest possible viewport, not what's
+visible now - can push fixed content below the real screen with no way
+to scroll to it. 100dvh fixes this; 100vh is the fallback. */
+body.pt-fullscreen .canvas-card{position:fixed;inset:0;z-index:1000;margin:0;border-radius:0;max-width:none;width:100vw;height:100vh;height:100dvh;box-sizing:border-box;display:flex;flex-direction:column}
+body.pt-fullscreen .canvas-body{flex:1;min-height:0}
+body.pt-fullscreen .canvas-wrap{flex:1;min-height:0;margin:10px 0;align-items:flex-start;justify-content:center}
+@media (orientation:landscape){
+body.pt-fullscreen .canvas-body{flex-direction:row;align-items:stretch;gap:8px}
+body.pt-fullscreen .tool-rail{overflow-y:auto;min-height:0;padding-bottom:16px}
+body.pt-fullscreen .toolbar{flex-direction:column;flex-wrap:nowrap;margin-bottom:0}
+body.pt-fullscreen .action-row{flex-direction:column;justify-content:flex-start;margin-top:6px}
+body.pt-fullscreen .canvas-wrap{flex:1;min-width:0;margin:0;align-items:flex-start;justify-content:flex-start}
+}
 .file-bar{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-top:10px}
 .file-bar-row{display:contents}
 .file-bar input,.file-bar select{width:100%}
@@ -32,8 +61,12 @@ code{font-family:'Cascadia Mono','Fira Code','Consolas',monospace}
 </style>
 
 <div class="card canvas-card">
-<h3>Paint</h3>
+<h3><span class="title-label">Paint</span>
+<button type="button" class="btn btn-sm" id="fullscreenBtn" title="Fullscreen">&#x26F6;</button>
+</h3>
 
+<div class="canvas-body">
+<div class="tool-rail">
 <div class="toolbar">
 <button id="t_brush" class="active" title="Brush">&#9998;</button>
 <button id="t_eraser" title="Eraser">&#9003;</button>
@@ -52,11 +85,13 @@ code{font-family:'Cascadia Mono','Fira Code','Consolas',monospace}
 <input type="color" id="colorPicker" value="#ffffff" title="Color">
 </div>
 
-<div class="canvas-wrap"><canvas id="canvas"></canvas></div>
-
-<div class="action-row" style="margin-top:10px;justify-content:center">
+<div class="action-row">
 <button id="undoBtn" class="btn btn-sm" onclick="undo()" disabled title="Undo">&#8617;</button>
 <button class="btn btn-danger btn-sm" onclick="clearCanvas()">Clear</button>
+</div>
+</div>
+
+<div class="canvas-wrap"><canvas id="canvas"></canvas></div>
 </div>
 </div>
 
@@ -225,16 +260,38 @@ const canvas=document.getElementById("canvas");
 const ctx=canvas.getContext("2d");
 const colorPicker=document.getElementById("colorPicker");
 
-// Scale canvas so each pixel is large enough to tap. Measured from the
-// card's own layout width, not the viewport - the card caps out at 420px,
-// and if SCALE were based on the wider viewport instead, CSS's
-// max-width:100% on #canvas would shrink it on screen while its drawing
-// buffer stayed larger, throwing off every click position.
-const availW=canvas.parentElement.clientWidth||(window.innerWidth-16);
-const SCALE=Math.min(Math.floor(availW/W),Math.floor((window.innerHeight-200)/H),28);
-canvas.width=W*SCALE;
-canvas.height=H*SCALE;
-ctx.imageSmoothingEnabled=false;
+// Scale canvas so each pixel is large enough to tap. Recomputed on
+// resize/orientation/fullscreen changes; outside fullscreen canvas-wrap
+// has no intrinsic height, so height falls back to a viewport estimate.
+let SCALE;
+
+// Reserves canvas-wrap's padding + the canvas's border (both inside
+// clientWidth/Height but outside the canvas's own box) so it can't overflow.
+const CANVAS_CHROME=40;
+
+function availSize(){
+    const wrap=canvas.parentElement;
+    const fullscreen=document.body.classList.contains("pt-fullscreen");
+    const availW=(wrap.clientWidth||(window.innerWidth-16))-CANVAS_CHROME;
+    const availH=(fullscreen?(wrap.clientHeight||window.innerHeight):(window.innerHeight-200))-CANVAS_CHROME;
+    return [availW,availH];
+}
+
+function resizeCanvas(){
+    const [availW,availH]=availSize();
+    // No hard ceiling on pixel size - availW/availH already bound it to
+    // what the container offers (a fixed cap only hurt fullscreen).
+    const newScale=Math.max(1,Math.min(Math.floor(availW/W),Math.floor(availH/H)));
+    // No-op if unchanged: resizing wipes the canvas's drawing surface,
+    // which can cancel an in-progress touch - and mobile browsers fire
+    // "resize" a lot even when nothing visible moved.
+    if(newScale===SCALE)return;
+    SCALE=newScale;
+    canvas.width=W*SCALE;
+    canvas.height=H*SCALE;
+    ctx.imageSmoothingEnabled=false;
+    redraw();
+}
 
 // Grid state: one hex color string per cell
 const grid=[];
@@ -295,6 +352,34 @@ toolButtons.text.onclick=function(){
 };
 colorPicker.onchange=function(){if(tool==="eraser"){tool="brush";updateToolUI();}};
 
+// --- Fullscreen: CSS-only maximized layout works everywhere; the real
+// Fullscreen API layers on top where supported (not iPhone Safari). Canvas
+// is re-measured after either since available space changes.
+const fullscreenBtn=document.getElementById("fullscreenBtn");
+
+function setFullscreenUI(on){
+    document.body.classList.toggle("pt-fullscreen",on);
+    fullscreenBtn.innerHTML=on?"&#10005;":"&#9974;";
+    fullscreenBtn.title=on?"Exit fullscreen":"Fullscreen";
+    requestAnimationFrame(resizeCanvas);
+}
+
+fullscreenBtn.onclick=function(){
+    const entering=!document.body.classList.contains("pt-fullscreen");
+    setFullscreenUI(entering);
+    if(entering&&document.documentElement.requestFullscreen){
+        document.documentElement.requestFullscreen().catch(function(){});
+    }else if(!entering&&document.fullscreenElement&&document.exitFullscreen){
+        document.exitFullscreen().catch(function(){});
+    }
+};
+document.addEventListener("fullscreenchange",function(){
+    // Catches exits the button didn't trigger (Esc, Android back gesture).
+    if(!document.fullscreenElement&&document.body.classList.contains("pt-fullscreen")){
+        setFullscreenUI(false);
+    }
+});
+
 function drawPixel(x,y,color){
     grid[y][x]=color;
     ctx.fillStyle=color;
@@ -313,13 +398,29 @@ function redraw(){
     }
     // Grid lines
     if(SCALE>=4){
-        ctx.strokeStyle="rgba(255,255,255,0.06)";
+        ctx.strokeStyle="rgba(255,255,255,0.22)";
         ctx.lineWidth=0.5;
         for(let x=0;x<=W;x++){ctx.beginPath();ctx.moveTo(x*SCALE,0);ctx.lineTo(x*SCALE,H*SCALE);ctx.stroke();}
         for(let y=0;y<=H;y++){ctx.beginPath();ctx.moveTo(0,y*SCALE);ctx.lineTo(W*SCALE,y*SCALE);ctx.stroke();}
     }
 }
-redraw();
+resizeCanvas();
+
+// Debounced and deferred while painting: mobile browsers fire "resize" a
+// lot (e.g. the address bar collapsing on touch), and resizing mid-stroke
+// can cancel the touch outright.
+let resizePending=false;
+let resizeTimer=null;
+
+function scheduleResize(){
+    clearTimeout(resizeTimer);
+    resizeTimer=setTimeout(function(){
+        if(painting){resizePending=true;return;}
+        resizeCanvas();
+    },150);
+}
+window.addEventListener("resize",scheduleResize);
+window.addEventListener("orientationchange",scheduleResize);
 
 // --- Drawing interaction ---
 let painting=false;
@@ -327,10 +428,10 @@ let lastSent=0;
 let pending=[];
 
 function getXY(e){
+    // changedTouches works for all touch event types; "touches" is empty by touchend.
+    const t=e.changedTouches?e.changedTouches[0]:e;
     const rect=canvas.getBoundingClientRect();
-    const cx=e.touches?e.touches[0].clientX:e.clientX;
-    const cy=e.touches?e.touches[0].clientY:e.clientY;
-    return[Math.floor((cx-rect.left)/SCALE),Math.floor((cy-rect.top)/SCALE)];
+    return[Math.floor((t.clientX-rect.left)/SCALE),Math.floor((t.clientY-rect.top)/SCALE)];
 }
 
 function sendPending(){
@@ -483,8 +584,11 @@ function showTextGhost(e){
     ctx.fillText("A",x*SCALE+SCALE,y*SCALE);
 }
 
-canvas.addEventListener("pointerdown",function(e){
-    const[x,y]=getXY(e);
+// Touch, not Pointer, events: a touch stays bound to its original target
+// for the whole gesture no matter where the finger drifts - Pointer/Mouse
+// retarget to whatever's underneath, which broke drags on small canvases
+// even with pointer capture.
+function startStroke(x,y,e){
     if(x<0||x>=W||y<0||y>=H)return;
     if(tool==="text"){placeText(x,y);return;}
     if(tool==="fill"){pushUndo();paint(e);return;}
@@ -495,25 +599,49 @@ canvas.addEventListener("pointerdown",function(e){
     }
     pushUndo();
     painting=true;paint(e);
-});
-canvas.addEventListener("pointermove",function(e){
+}
+function moveStroke(e){
     if(!painting){
         if(tool==="text")showTextGhost(e);
         return;
     }
     if(SHAPE_TOOLS.includes(tool)){previewShape(e);return;}
     paint(e);
-});
-canvas.addEventListener("pointerup",function(e){
+}
+function endStroke(e){
     if(painting&&SHAPE_TOOLS.includes(tool))commitShape(e);
     painting=false;
     sendPending();
-});
-canvas.addEventListener("pointerleave",function(){
-    if(painting&&SHAPE_TOOLS.includes(tool))shapeStart=null;
-    redraw(); // clears any in-progress shape preview or text ghost
+    if(resizePending){resizePending=false;resizeCanvas();}
+}
+function cancelStroke(){
+    // OS aborted the gesture (e.g. incoming call) - drop any in-progress shape.
+    shapeStart=null;
     painting=false;
-    sendPending();
+    redraw();
+}
+
+canvas.addEventListener("touchstart",function(e){
+    e.preventDefault();
+    startStroke(...getXY(e),e);
+},{passive:false});
+canvas.addEventListener("touchmove",function(e){
+    e.preventDefault();
+    moveStroke(e);
+},{passive:false});
+canvas.addEventListener("touchend",function(e){
+    e.preventDefault();
+    endStroke(e);
+},{passive:false});
+canvas.addEventListener("touchcancel",cancelStroke,{passive:false});
+
+canvas.addEventListener("mousedown",function(e){startStroke(...getXY(e),e);});
+canvas.addEventListener("mousemove",moveStroke);
+canvas.addEventListener("mouseup",endStroke);
+canvas.addEventListener("mouseleave",function(e){
+    // Unlike touch, a mouse leaving mid-drag is deliberate, so it ends the stroke.
+    if(painting)endStroke(e);
+    else redraw(); // clear a stale hover ghost
 });
 
 function clearCanvas(){
