@@ -89,6 +89,12 @@ def _run_button_html(app):
         setTimeout(() => { window.location.href = "/"; }, 10);
     });}</script>"""
 
+def _password_field(field_id, name, placeholder):
+    return f"""<div class="pw-wrap">
+<input type="password" id="{field_id}" name="{name}" placeholder="{placeholder}">
+<button type="button" class="pw-toggle" aria-label="Show password" onclick="var i=document.getElementById('{field_id}');i.type=i.type==='password'?'text':'password';this.innerHTML=i.type==='password'?'&#128065;':'&#128584;'">&#128065;</button>
+</div>"""
+
 def textbox(settings):
     slider_cfg = {
         "wifi_power": {"min": 7, "max": 20, "step": 1},
@@ -171,6 +177,9 @@ def textbox(settings):
                 '<input type="hidden" name="enable_button" value="0">'
                 '<input type="checkbox" id="enable_button" name="enable_button" value="1" ' + _ck + '>'
                 '<label for="enable_button">Enable button</label></div>')
+        elif setting == "password":
+            chunk = f"""<label for="{setting}">{setting}</label>
+{_password_field(setting, setting, "Enter password")}"""
         else:
             chunk = f"""<label for="{setting}">{setting}</label>
 <input type="text" id="{setting}" name="{setting}" placeholder="{str(val)}">"""
@@ -535,8 +544,11 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-ap
 .app-name{font-size:.92rem;font-weight:500;text-transform:capitalize;color:var(--text)}
 .download-name{font-size:.92rem;font-weight:500;color:var(--text)}
 label{display:block;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:.9px;margin:13px 0 5px;font-weight:600}
-input[type="text"],select{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-size:.93rem;outline:none;transition:border-color .15s,box-shadow .15s;-webkit-appearance:none}
-input[type="text"]:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,111,255,.15)}
+input[type="text"],input[type="password"],select{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-size:.93rem;outline:none;transition:border-color .15s,box-shadow .15s;-webkit-appearance:none}
+input[type="text"]:focus,input[type="password"]:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,111,255,.15)}
+.pw-wrap{position:relative}
+.pw-wrap input[type="password"],.pw-wrap input[type="text"]{padding-right:38px}
+.pw-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;padding:6px;color:var(--muted)}
 select option{background:var(--surface2)}
 .range-wrap{display:flex;align-items:center;gap:10px;margin-top:5px}
 .range-wrap input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;background:var(--surface3);outline:none}
@@ -697,7 +709,7 @@ def connect_to_wifi():
     if (_ssid.options.length) _sendSSID(_ssid);
     </script>
     <label for="password">Password</label>
-    <input type="text" id="password" name="password" placeholder="Enter password">
+    {_password_field("password", "password", "Enter password")}
     <script>
     document.getElementById("password").addEventListener("blur", function(e) {{
         var p = e.target.value.replace(/#/g, "%23");
