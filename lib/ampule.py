@@ -190,11 +190,3 @@ def listen(socket):
 
 def route(rule, method='GET'):
     return lambda func: __on_request(method, rule, func)
-
-
-def _navbar(request):
-    return (200, {}, "placeholder")
-
-system_routes.append(
-    (re.compile(r"^/navbar/?$"), {"method": "GET", "func": _navbar})
-)
