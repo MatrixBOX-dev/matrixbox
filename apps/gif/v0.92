@@ -1,0 +1,7 @@
+{
+  "description": "Plays animated GIFs, with upload and management via the web UI",
+  "v0.92": [
+    "Fix GIF upload from the web UI",
+    "List uploaded GIFs with file size, and support deleting or selecting one by clicking it"
+  ]
+}
