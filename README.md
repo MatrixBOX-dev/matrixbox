@@ -2,7 +2,7 @@
 
 This is the official source code for the [MatrixBOX][matrixbox.app] firmware,
 the OS running on the device. In addition to the firmware, this also contains
-all official apps for the device, including the [T-skylt] app (departures).
+all official apps for the device, including the "Departures" app by [T-skylt].
 
 ## Set up the device
 
