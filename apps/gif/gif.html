@@ -3,16 +3,19 @@
 .drop-zone.over{border-color:var(--accent);background:rgba(124,111,255,.06)}
 .drop-zone p{color:var(--muted);font-size:.9rem;margin-top:8px}
 .drop-icon{font-size:2.4rem}
+.gif-row{cursor:pointer;border-radius:var(--r);padding:10px 8px;margin:0 -8px;transition:background .15s}
+.gif-row:hover{background:var(--surface2)}
+.gif-row.current .name{color:var(--accent)}
 </style>
 
 <div class="card">
 <div class="section-title">Upload GIF</div>
 <div class="drop-zone" id="drop" onclick="document.getElementById('fi').click()">
 <div class="drop-icon">&#127981;</div>
-<p>Drag &amp; drop a GIF here<br>or tap to browse</p>
+<p>Drag &amp; drop a GIF here<br>or click to browse</p>
 <input type="file" id="fi" accept="image/gif" style="display:none">
 </div>
-<div id="status" style="color:var(--muted);font-size:.82rem;margin-top:10px;text-align:center"></div>
+<div id="upload-status" style="color:var(--muted);font-size:.82rem;margin-top:10px;text-align:center"></div>
 </div>
 
 <div class="card">
@@ -30,9 +33,15 @@
 </div>
 </div>
 
+<div class="card">
+<div class="section-title">Your GIFs</div>
+<p style="color:var(--muted);font-size:.78rem;margin-bottom:10px">Click a GIF to display it now.</p>
+<div id="gif-list"><p style="color:var(--muted);font-size:.85rem">Loading&hellip;</p></div>
+</div>
+
 <script>
 var drop=document.getElementById("drop");
-var status=document.getElementById("status");
+var uploadStatus=document.getElementById("upload-status");
 
 drop.addEventListener("dragover",function(e){e.preventDefault();drop.classList.add("over")});
 drop.addEventListener("dragleave",function(){drop.classList.remove("over")});
@@ -40,17 +49,53 @@ drop.addEventListener("drop",function(e){e.preventDefault();drop.classList.remov
 document.getElementById("fi").addEventListener("change",function(){if(this.files[0])handle(this.files[0])});
 
 function handle(f){
-  if(f.type!=="image/gif"){status.textContent="Please select a GIF file.";status.style.color="#ff6060";return;}
-  status.textContent="Reading file\u2026";status.style.color="var(--muted)";
+  if(f.type!=="image/gif" && !/\.gif$/i.test(f.name)){uploadStatus.textContent="Please select a GIF file.";uploadStatus.style.color="#ff6060";return;}
+  uploadStatus.textContent="Reading file…";uploadStatus.style.color="var(--muted)";
   var r=new FileReader();
   r.onload=function(){
     var b64=r.result.split(",")[1];
-    status.textContent="Uploading\u2026";
-    fetch("/?sendbase64=true",{method:"POST",headers:{"Content-Type":"text/plain"},body:b64})
-      .then(function(){status.textContent="Uploaded! Displaying now.";status.style.color="var(--accent2)"})
-      .catch(function(){status.textContent="Upload failed.";status.style.color="#ff6060"});
+    uploadStatus.textContent="Uploading…";
+    fetch("/?sendbase64=true&name="+encodeURIComponent(f.name),{method:"POST",headers:{"Content-Type":"text/plain"},body:b64})
+      .then(function(resp){return resp.text().then(function(t){return {ok:resp.ok,text:t}})})
+      .then(function(res){
+        if(!res.ok){uploadStatus.textContent="Upload failed: "+res.text;uploadStatus.style.color="#ff6060";return}
+        uploadStatus.textContent="Uploaded! Displaying now.";uploadStatus.style.color="var(--accent2)";
+        loadGifs();
+      })
+      .catch(function(){uploadStatus.textContent="Upload failed.";uploadStatus.style.color="#ff6060"});
   };
   r.readAsDataURL(f);
 }
 function pb(el,v){fetch("/?brightness="+v,{method:"POST"});document.querySelectorAll("#br-seg button").forEach(function(b){b.classList.remove("on")});el.classList.add("on")}
+
+function fmtSize(b){
+  if(b<1024)return b+" B";
+  if(b<1048576)return (b/1024).toFixed(1)+" KB";
+  return (b/1048576).toFixed(1)+" MB";
+}
+function loadGifs(){
+  fetch("/gifs").then(function(r){return r.json()}).then(function(items){
+    var el=document.getElementById("gif-list");
+    if(!items.length){el.innerHTML='<p style="color:var(--muted);font-size:.85rem">No GIFs uploaded yet.</p>';return}
+    var html="";
+    for(var i=0;i<items.length;i++){
+      var it=items[i];
+      var esc=it.n.replace(/'/g,"\\'");
+      html+='<div class="app-item gif-row" onclick="selectGif(\''+esc+'\')"><span class="name">'+it.n+'</span><span style="display:flex;align-items:center;gap:10px"><span style="color:var(--muted);font-size:.8rem">'+fmtSize(it.s)+'</span><button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();delGif(\''+esc+'\')">&#x1F5D1;</button></span></div>';
+    }
+    el.innerHTML=html;
+  }).catch(function(){});
+}
+function selectGif(name){
+  fetch("/gifs/select?name="+encodeURIComponent(name),{method:"POST"})
+    .then(function(r){return r.json()})
+    .then(function(d){if(!d.ok)alert(d.error||"Could not display GIF")})
+    .catch(function(){alert("Could not display GIF")});
+}
+function delGif(name){
+  fetch("/gifs/delete?name="+encodeURIComponent(name),{method:"POST"})
+    .then(function(r){return r.json()})
+    .then(function(d){if(!d.ok){alert(d.error||"Delete failed")}loadGifs()});
+}
+loadGifs();
 </script>
