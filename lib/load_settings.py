@@ -12,7 +12,7 @@ def settings():
                 "tiles":1,
                 "repository_url":"https://raw.githubusercontent.com/MatrixBOX-dev/matrixbox/refs/heads/main/", 
                 "repository_file":"repository.txt",
-                "wifi_power":15,
+                "wifi_power":19,
                 "ai_provider":"",
                 "ai_key":"",
                 "ai_model":"",
