@@ -2,4 +2,8 @@
   "description": "A canvas for you to paint, on web or via API",
   "emoji":"✏️",
   "v0.91" : ["Documented API for remote use"]
+  "v0.92" : [
+    "Improve web UI",
+    "Add fullscreen support"
+  ]
 }
