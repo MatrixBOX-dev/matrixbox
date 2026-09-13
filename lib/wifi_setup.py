@@ -73,7 +73,7 @@ def render_wifi_setup():
     if (_ssid.options.length) _sendSSID(_ssid);
     </script>
     <label for="password">Password</label>
-    <input type="text" id="password" name="password" placeholder="Enter password">
+    {web_interface._password_field("password", "password", "Enter password")}
     <script>
     document.getElementById("password").addEventListener("blur", function(e) {{
         var p = e.target.value.replace(/#/g, "%23");
