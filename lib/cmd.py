@@ -1,5 +1,7 @@
 import os
 import ampule
+import load_settings
+import web_interface
 
 _cmd_buf = []
 _cmd_env = None
@@ -35,31 +37,22 @@ def execute_command(request):
 
 @ampule.route("/system/cmd", method="GET")
 def _cmd(request):
-    html = """<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Console and Command</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#0c0c0c;color:#ccc;font-family:'Cascadia Mono','Fira Code','Consolas',monospace;height:100vh;display:flex;flex-direction:column;overflow:hidden}
-#toolbar{background:#1a1a2e;padding:6px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #333;flex-shrink:0}
-#toolbar span{color:#7c7cff;font-weight:700;font-size:.85rem}
-#toolbar a{color:#888;text-decoration:none;font-size:.8rem;padding:4px 10px;border-radius:6px;background:#222;border:1px solid #333}
-#toolbar a:hover{color:#fff;border-color:#7c7cff}
-#console-output{flex:1;overflow-y:auto;padding:10px 14px;font-size:.85rem;line-height:1.6;white-space:pre-wrap;word-break:break-all;cursor:text}
-#input-row{display:flex;align-items:center;padding:6px 10px;background:#111;border-top:1px solid #333;flex-shrink:0;gap:6px}
-#command-input{flex:1;background:transparent;border:none;outline:none;color:#e8e8e8;font-family:inherit;font-size:.88rem;caret-color:#7c7cff}
-#command-button{background:#7c7cff;color:#000;border:none;padding:6px 14px;border-radius:6px;font-weight:700;font-size:.82rem;cursor:pointer}
+    # Reached from the shared navbar's menu in both home and in-app
+    # contexts, same as /system/settings -- see web_interface.navbar().
+    in_app = bool(load_settings.app_running)
+    content = """<style>
+body{display:flex;flex-direction:column;height:100vh;overflow:hidden;padding-bottom:0!important}
+.page{max-width:none!important;margin:0!important;padding:0!important;flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#console-output{flex:1;overflow-y:auto;padding:14px 16px;font-size:.85rem;line-height:1.6;white-space:pre-wrap;word-break:break-all;cursor:text;font-family:'Cascadia Mono','Fira Code','Consolas',monospace;color:var(--text)}
+#input-row{display:flex;align-items:stretch;padding:10px 14px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;gap:8px}
+#command-input{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r);outline:none;color:var(--text);font-family:'Cascadia Mono','Fira Code','Consolas',monospace;font-size:.88rem;caret-color:var(--accent);padding:9px 12px}
+#command-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,111,255,.15)}
+#command-button{flex-shrink:0;padding-top:0;padding-bottom:0}
 </style>
-</head>
-<body>
-<div id="toolbar"><span>MatrixBox Terminal</span><div style="flex:1"></div><a href="/">Home</a></div>
 <div id="console-output">Welcome to the terminal. Enter Python commands to execute directly in the interpreter.\n\nRunning: """ + os.uname().version + """\n\n</div>
 <div id="input-row">
 <input id="command-input" type="text" placeholder="Enter command..." autocomplete="off" autofocus>
-<button id="command-button">Execute</button>
+<button id="command-button" class="btn btn-sm">Execute</button>
 </div>
 <script>
     let outputConsole = document.getElementById('console-output');
@@ -108,7 +101,5 @@ body{background:#0c0c0c;color:#ccc;font-family:'Cascadia Mono','Fira Code','Cons
     commandInput.addEventListener('keydown', function(ev) {
         if (ev.keyCode == 13) { commandButton.click(); }
     });
-</script>
-</body>
-</html>"""
-    return (200, {}, html)
+</script>"""
+    return (200, {}, web_interface._shell(content, "Terminal", "/system/cmd", app=in_app, back=True))

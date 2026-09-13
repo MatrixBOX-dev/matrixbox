@@ -1,6 +1,8 @@
 import os
 import json
 import ampule
+import load_settings
+import web_interface
 from __main__ import display, refresh
 def _hide_display():
     try:
@@ -113,58 +115,51 @@ def _rmdir(path):
 
 @ampule.route("/system/fm", method="GET")
 def _fm_page(request):
-    return (200, {}, """<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>File Manager</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#0c0c0c;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
-#toolbar{background:#1a1a2e;padding:6px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #333;flex-shrink:0}
-#toolbar span{color:#7c7cff;font-weight:700;font-size:.85rem}
-.tbtn{color:#888;text-decoration:none;font-size:.78rem;padding:4px 10px;border-radius:6px;background:#222;border:1px solid #333;cursor:pointer}
-.tbtn:hover{color:#fff;border-color:#7c7cff}
-#path-bar{background:#111;padding:5px 12px;border-bottom:1px solid #292929;font-size:.8rem;color:#7c7cff;display:flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap}
-#path-bar span{cursor:pointer;padding:2px 4px;border-radius:4px}
-#path-bar span:hover{background:#222}
-#listing{flex:1;overflow-y:auto;padding:0}
-.row{display:flex;align-items:center;padding:8px 14px;border-bottom:1px solid #1a1a1a;cursor:pointer;gap:10px;font-size:.88rem}
-.row:hover{background:#151528}
-.row.selected{background:#1e1e3a}
+    # Reached from the shared navbar's menu in both home and in-app
+    # contexts, same as /system/settings -- see web_interface.navbar().
+    in_app = bool(load_settings.app_running)
+    content = """<style>
+body{display:flex;flex-direction:column;height:100vh;overflow:hidden;padding-bottom:0!important}
+.page{max-width:none!important;margin:0!important;padding:12px 0 0!important;flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#toolbar{background:var(--surface);padding:8px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);flex-shrink:0}
+#toolbar span{color:var(--text);font-weight:700;font-size:.85rem}
+#path-bar{background:var(--surface);padding:6px 14px;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap}
+#path-bar span{cursor:pointer;padding:2px 6px;border-radius:6px}
+#path-bar span:hover{color:var(--text);background:var(--surface2)}
+#listing{flex:1;overflow-y:auto;padding:0;min-height:0}
+.row{display:flex;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;gap:10px;font-size:.88rem}
+.row:hover{background:var(--surface2)}
 .row .icon{width:20px;text-align:center;flex-shrink:0;font-size:1rem}
-.row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row .size{color:#666;font-size:.75rem;width:60px;text-align:right;flex-shrink:0}
+.row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.row .size{color:var(--muted);font-size:.75rem;width:60px;text-align:right;flex-shrink:0}
 .row .acts{display:flex;gap:4px;flex-shrink:0}
-.abtn{background:#222;border:1px solid #333;color:#888;font-size:.7rem;padding:3px 8px;border-radius:5px;cursor:pointer}
-.abtn:hover{color:#fff;border-color:#7c7cff}
-.abtn.del:hover{color:#ff5050;border-color:#ff5050}
-#editor{display:none;flex-direction:column;flex:1;overflow:hidden}
-#editor-bar{background:#1a1a2e;padding:6px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #333;flex-shrink:0}
-#editor-bar span{color:#e8e8e8;font-size:.82rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#editor-area{flex:1;background:#0c0c0c;color:#e0e0e0;border:none;padding:10px 14px;font-family:'Cascadia Mono','Fira Code','Consolas',monospace;font-size:.84rem;resize:none;outline:none;tab-size:4;line-height:1.5}
-#modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center}
-#modal{background:#1a1a2e;border:1px solid #333;border-radius:10px;padding:18px;width:280px}
-#modal h3{font-size:.9rem;color:#7c7cff;margin-bottom:12px}
-#modal input{width:100%;background:#111;border:1px solid #333;color:#e8e8e8;padding:8px;border-radius:6px;font-size:.85rem;outline:none;margin-bottom:10px}
-#modal input:focus{border-color:#7c7cff}
+.abtn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:.7rem;padding:4px 9px;border-radius:6px;cursor:pointer}
+.abtn:hover{color:var(--text);border-color:var(--accent)}
+.abtn.del:hover{color:#ff6060;border-color:#ff6060}
+#editor{display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0}
+#editor-bar{background:var(--surface);padding:8px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);flex-shrink:0}
+#editor-bar span{color:var(--text);font-size:.82rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#editor-area{flex:1;background:var(--bg);color:var(--text);border:none;padding:12px 14px;font-family:'Cascadia Mono','Fira Code','Consolas',monospace;font-size:.84rem;resize:none;outline:none;tab-size:4;line-height:1.5}
+#modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center}
+#modal{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;width:280px;box-shadow:var(--shadow)}
+#modal h3{font-size:.9rem;color:var(--text);margin-bottom:12px}
+#modal input{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:9px 10px;border-radius:var(--r);font-size:.85rem;outline:none;margin-bottom:10px}
+#modal input:focus{border-color:var(--accent)}
 #modal-btns{display:flex;gap:8px;justify-content:flex-end}
 </style>
-</head><body>
 <div id="toolbar">
 <span>&#x1F4C1; File Manager</span>
 <div style="flex:1"></div>
-<button class="tbtn" onclick="newFile()">&#x2795; File</button>
-<button class="tbtn" onclick="newDir()">&#x1F4C1;+ Dir</button>
-<a class="tbtn" href="/">Home</a>
+<button class="btn btn-sm" onclick="newFile()">&#x2795; File</button>
+<button class="btn btn-sm" onclick="newDir()">&#x1F4C1;+ Dir</button>
 </div>
 <div id="path-bar"></div>
 <div id="listing"></div>
 <div id="editor">
 <div id="editor-bar">
 <span id="editor-name"></span>
-<button class="tbtn" onclick="saveFile()" id="saveBtn">&#x1F4BE; Save</button>
-<button class="tbtn" onclick="closeEditor()">&#x2715; Close</button>
+<button class="btn btn-sm btn-success" onclick="saveFile()" id="saveBtn">&#x1F4BE; Save</button>
+<button class="btn btn-sm btn-ghost" onclick="closeEditor()">&#x2715; Close</button>
 </div>
 <textarea id="editor-area" spellcheck="false"></textarea>
 </div>
@@ -173,12 +168,18 @@ body{background:#0c0c0c;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;h
 <h3 id="modal-title"></h3>
 <input id="modal-input" autocomplete="off">
 <div id="modal-btns">
-<button class="tbtn" onclick="closeModal()">Cancel</button>
-<button class="tbtn" id="modal-ok" style="background:#7c7cff;color:#000;border-color:#7c7cff">OK</button>
+<button class="btn btn-sm btn-ghost" onclick="closeModal()">Cancel</button>
+<button class="btn btn-sm" id="modal-ok">OK</button>
 </div>
 </div>
 </div>
 <script>
+// Folder navigation pushes a history entry per hash change, so back/forward
+// fires popstate here -- but hashchange (below) already re-renders the
+// right view for that. Left alone, the shared shell's own popstate handler
+// (meant for the home page's SPA nav) would also fire, re-fetching this
+// full document and nesting a second navbar inside the current one.
+window.addEventListener('popstate', function(e){ e.stopImmediatePropagation(); }, true);
 var cwd="/";
 function api(ep,path,body){
  var h={"X-Path":path||"/"};
@@ -194,7 +195,7 @@ function fmtSize(b){
 function renderPath(){
  var el=document.getElementById("path-bar");
  var parts=cwd.split("/").filter(Boolean);
- var html='<span onclick="go(\\'/'+'\\')">&#x1F4C0; /</span>';
+ var html='<span onclick="go(\\'/'+'\\')">&#x1F4C0;</span>';
  var p="";
  for(var i=0;i<parts.length;i++){
   p+="/"+parts[i];
@@ -222,7 +223,7 @@ function doList(path){
    if(it.d){
     html+='<div class="row" ondblclick="go(\\''+fp+'\\')" onclick="go(\\''+fp+'\\')"><span class="icon">&#x1F4C1;</span><span class="name" style="color:#7c7cff">'+it.n+'</span><span class="size"></span><span class="acts"><button class="abtn del" onclick="event.stopPropagation();del(\\''+fp+'\\')">&#x1F5D1;</button></span></div>';
    }else{
-    html+='<div class="row" ondblclick="edit(\\''+fp+'\\')" onclick="sel(this)"><span class="icon">&#x1F4C4;</span><span class="name">'+it.n+'</span><span class="size">'+fmtSize(it.s)+'</span><span class="acts"><button class="abtn" onclick="event.stopPropagation();edit(\\''+fp+'\\')">&#x270D;</button> <button class="abtn del" onclick="event.stopPropagation();del(\\''+fp+'\\')">&#x1F5D1;</button></span></div>';
+    html+='<div class="row" onclick="edit(\\''+fp+'\\')"><span class="icon">&#x1F4C4;</span><span class="name">'+it.n+'</span><span class="size">'+fmtSize(it.s)+'</span><span class="acts"><button class="abtn del" onclick="event.stopPropagation();del(\\''+fp+'\\')">&#x1F5D1;</button></span></div>';
    }
   }
   el.innerHTML=html;
@@ -233,14 +234,10 @@ function parentDir(){
  var i=p.lastIndexOf("/");
  return i<=0?"/":p.substring(0,i);
 }
-function sel(row){
- var prev=document.querySelector(".row.selected");
- if(prev)prev.classList.remove("selected");
- row.classList.add("selected");
-}
 function edit(fp){location.hash="f:"+enc(fp);}
 function openEditor(fp){
  cwd=fp.substring(0,fp.lastIndexOf("/"))||"/";
+ renderPath();
  api("/system/fm/read",fp).then(function(d){
   if(d.error){alert(d.error);return}
   document.getElementById("listing").style.display="none";
@@ -313,5 +310,5 @@ function router(){
 }
 window.addEventListener("hashchange",router);
 if(location.hash.length>1)router();else go("/");
-</script>
-</body></html>""")
+</script>"""
+    return (200, {}, web_interface._shell(content, "File Manager", "/system/fm", app=in_app, back=True))
