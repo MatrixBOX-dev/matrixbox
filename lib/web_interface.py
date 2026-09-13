@@ -10,7 +10,7 @@ _FAVICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><def
 exitbutton = """<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><style>body{background:#08080f;color:#eeeef5;font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;margin:0}a.xbtn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:10px;background:linear-gradient(135deg,#e03c3c,#ff6060);color:#fff;font-weight:700;font-size:.95rem;text-decoration:none;box-shadow:0 2px 14px rgba(224,60,60,.35)}.lbl{color:#7070a0;font-size:.75rem;text-transform:uppercase;letter-spacing:1.5px}</style></head><body><p class="lbl">App Running</p><a class="xbtn" href="/exit">&#x2715; Exit App</a>"""
 backbutton = """<a class="back-btn" href="../">&#8592; Back</a>"""
 bootloaderbutton = """<button class="btn btn-danger" onclick="if(confirm('Enter bootloader mode?'))fetch('/bootloader',{method:'POST'})">&#x26A1; Bootloader</button>"""
-unlock = """<button class="btn btn-warning" onclick="fetch('/system/settings?unlock=true', {method: 'POST'})">&#x1F513; Unlock</button>"""
+unlock = """<button type="button" class="btn btn-full btn-warning" onclick="fetch('/system/settings?unlock=true', {method: 'POST'})">&#x1F513; Unlock</button>"""
 # -- LED on/off toggle ---------------------------------------------------------
 _led_off = False
 
@@ -93,7 +93,28 @@ def _password_field(field_id, name, placeholder):
 <button type="button" class="pw-toggle" aria-label="Show password" onclick="var i=document.getElementById('{field_id}');i.type=i.type==='password'?'text':'password';this.innerHTML=i.type==='password'?'&#128065;':'&#128584;'">&#128065;</button>
 </div>"""
 
+def checkbox(field_id, checked, label, name=None, onchange="", zero_fallback=False):
+    # Toggle-switch styling matching apps/departures' _chk(). Public: any
+    # app importing web_interface can reuse it.
+    ck = " checked" if checked else ""
+    name_attr = f' name="{name}" value="1"' if name else ""
+    onchange_attr = f' onchange="{onchange}"' if onchange else ""
+    hidden = f'<input type="hidden" name="{name}" value="0">' if zero_fallback and name else ""
+    return f"""<div class="toggle-row">
+<label for="{field_id}" class="toggle-label">{label}</label>
+{hidden}<label class="switch"><input type="checkbox" id="{field_id}"{name_attr}{ck}{onchange_attr}><span class="slider"></span></label>
+</div>"""
+
+def save_button(label="Save Settings", form_id=None, onclick=None):
+    # Fixed styling + emoji so every settings form saves with the same look.
+    if onclick:
+        return f'<button type="button" class="btn btn-full btn-success" onclick="{onclick}">&#128190; {label}</button>'
+    form_attr = f' form="{form_id}"' if form_id else ""
+    return f'<button type="submit" class="btn btn-full btn-success"{form_attr}>&#128190; {label}</button>'
+
 def textbox(settings):
+    """Builds settings fields as (main_html, app_html, adv_html) -- one
+    group per card: plain settings, app behavior, and collapsed Advanced."""
     slider_cfg = {
         "width": {"min": 64, "max": 640, "step": 64},
         "height": {"min": 32, "max": 320, "step": 32},
@@ -103,12 +124,13 @@ def textbox(settings):
     # (wifi_setup.wifi_card()) and rotation in the Quick Actions card
     # (_quick_actions_card()) -- none of them belong in this generic form.
     wifi_card_keys = {"ssid", "password", "wifi_power", "channel"}
-    advanced_keys = {"width", "height", "tiles", "repository_url", "color_correct", "enable_button"}
-    advanced_order = ["width", "height", "tiles", "repository_url", "color_correct", "enable_button"]
+    # Panel hardware -- normally auto-detected, grouped in Advanced with a warning.
+    hardware_order = ["width", "height", "tiles", "color_correct"]
+    other_advanced_order = ["repository_url", "enable_button"]
+    advanced_keys = set(hardware_order) | set(other_advanced_order)
     app_group = []
     main_html = ""
     adv_items = {}
-    settings_html = """<form onsubmit="sav(event)">"""
     for setting in settings:
         if setting in hidden_keys: continue
         if setting in wifi_card_keys: continue
@@ -119,32 +141,24 @@ def textbox(settings):
         chunk = ""
         if setting == "autostart":
             apps = _get_installed_apps()
-            checked = "checked" if val else ""
             disabled = "" if val else "disabled"
             opts = ""
             for a in apps:
                 sel = "selected" if str(val) == a else ""
                 opts += f'<option value="{a}" {sel}>{a}</option>'
             chunk = f"""<label>{setting}</label>
-<div class="toggle-row">
-<input type="checkbox" id="as_chk" {checked} onchange="var s=document.getElementById('as_sel');var h=document.getElementById('autostart');s.disabled=!this.checked;if(!this.checked){{s.value='';h.value='';}}">
-<label for="as_chk">Enable autostart</label>
-</div>
+{checkbox("as_chk", val, "Enable autostart", onchange="var s=document.getElementById('as_sel');var h=document.getElementById('autostart');s.disabled=!this.checked;if(!this.checked){{s.value='';h.value='';}}")}
 <input type="hidden" id="autostart" name="autostart" value="{val if val else ''}">
 <select id="as_sel" {disabled} onchange="document.getElementById('autostart').value=this.value"><option value="">-- none --</option>{opts}</select>"""
         elif setting == "screensaver":
             apps = _get_installed_apps()
-            checked = "checked" if val else ""
             disabled = "" if val else "disabled"
             opts = ""
             for a in apps:
                 sel = "selected" if str(val) == a else ""
                 opts += f'<option value="{a}" {sel}>{a}</option>'
             chunk = f"""<label>{setting}</label>
-<div class="toggle-row">
-<input type="checkbox" id="ss_chk" {checked} onchange="var s=document.getElementById('ss_sel');var h=document.getElementById('screensaver');s.disabled=!this.checked;if(!this.checked){{s.value='';h.value='';}}">
-<label for="ss_chk">Enable screensaver</label>
-</div>
+{checkbox("ss_chk", val, "Enable screensaver", onchange="var s=document.getElementById('ss_sel');var h=document.getElementById('screensaver');s.disabled=!this.checked;if(!this.checked){{s.value='';h.value='';}}")}
 <input type="hidden" id="screensaver" name="screensaver" value="{val if val else ''}">
 <select id="ss_sel" {disabled} onchange="document.getElementById('screensaver').value=this.value"><option value="">-- none --</option>{opts}</select>"""
         elif setting in slider_cfg:
@@ -158,19 +172,10 @@ def textbox(settings):
 </div>"""
         elif setting == "color_correct":
             _on = str(val).lower() not in ("false", "0", "", "none")
-            _ck = "checked" if _on else ""
-            chunk = ('<label>Color correct</label>'
-                '<div class="toggle-row">'
-                '<input type="checkbox" id="color_correct" ' + _ck + " onchange=\"fetch('/system/color_correct?v='+this.checked,{method:'POST'})\">"
-                '<label for="color_correct">Swap G/B LED pins</label></div>')
+            chunk = '<label>Color correct</label>' + checkbox("color_correct", _on, "Swap G/B LED pins", onchange="fetch('/system/color_correct?v='+this.checked,{method:'POST'})")
         elif setting == "enable_button":
             _on = str(val).lower() not in ("false", "0", "", "none")
-            _ck = "checked" if _on else ""
-            chunk = ('<label>Enable button</label>'
-                '<div class="toggle-row">'
-                '<input type="hidden" name="enable_button" value="0">'
-                '<input type="checkbox" id="enable_button" name="enable_button" value="1" ' + _ck + '>'
-                '<label for="enable_button">Enable button</label></div>')
+            chunk = '<label>Enable button</label>' + checkbox("enable_button", _on, "Enable button", name="enable_button", zero_fallback=True)
         else:
             chunk = f"""<label for="{setting}">{setting}</label>
 <input type="text" id="{setting}" name="{setting}" placeholder="{str(val)}">"""
@@ -180,31 +185,24 @@ def textbox(settings):
             app_group.append(chunk)
         else:
             main_html += chunk
-    app_html = ""
-    if app_group:
-        app_html = '<div class="section-title" style="margin-top:12px">App Behavior</div>' + "".join(app_group)
-    settings_html += main_html + app_html
+    app_html = "".join(app_group)
     if "color_correct" not in adv_items:
         _cv = settings.get("color_correct", False)
         _on = str(_cv).lower() not in ("false", "0", "", "none")
-        _ck = "checked" if _on else ""
-        adv_items["color_correct"] = ('<label>Color correct</label>'
-            '<div class="toggle-row">'
-            '<input type="checkbox" id="color_correct" ' + _ck + " onchange=\"fetch('/system/color_correct?v='+this.checked,{method:'POST'})\">"
-            '<label for="color_correct">Swap G/B LED pins</label></div>')
+        adv_items["color_correct"] = '<label>Color correct</label>' + checkbox("color_correct", _on, "Swap G/B LED pins", onchange="fetch('/system/color_correct?v='+this.checked,{method:'POST'})")
     if "enable_button" not in adv_items:
         _eb = settings.get("enable_button", 1)
         _on = str(_eb).lower() not in ("false", "0", "", "none")
-        _ck = "checked" if _on else ""
-        adv_items["enable_button"] = ('<label>Enable button</label>'
-            '<div class="toggle-row">'
-            '<input type="hidden" name="enable_button" value="0">'
-            '<input type="checkbox" id="enable_button" name="enable_button" value="1" ' + _ck + '>'
-            '<label for="enable_button">Enable button</label></div>')
-    adv_html = "".join(adv_items[k] for k in advanced_order if k in adv_items)
+        adv_items["enable_button"] = '<label>Enable button</label>' + checkbox("enable_button", _on, "Enable button", name="enable_button", zero_fallback=True)
+    hardware_html = "".join(adv_items[k] for k in hardware_order if k in adv_items)
+    other_html = "".join(adv_items[k] for k in other_advanced_order if k in adv_items)
+    adv_html = hardware_html + other_html
     if adv_html:
-        settings_html += """<div style="margin-top:12px"><button type="button" class="btn btn-sm" onclick="var a=document.getElementById('adv_section');a.style.display=a.style.display==='none'?'block':'none'">&#9881; Advanced</button></div><div id="adv_section" style="display:none">""" + adv_html + """</div>"""
-    return settings_html + """<button class="btn btn-full btn-success" type="submit">Save Settings</button></form>"""
+        # First thing shown on expanding, not buried after the fields it warns about.
+        adv_html = ('<div style="font-size:.75rem;color:var(--muted);margin-bottom:10px">'
+            "Panel size and color order are normally auto-detected on first boot "
+            "&mdash; only change these if you know what you're doing.</div>") + adv_html
+    return main_html, app_html, adv_html
 
 def _draw_progress(current, total, filename, error=False, label="installing"):
     from load_screen import window, pset, font_mini
@@ -545,18 +543,21 @@ select option{background:var(--surface2)}
 .range-wrap input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;background:var(--surface3);outline:none}
 .range-wrap input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,#c8a800,#f5e040);cursor:pointer;border:2px solid var(--bg);box-shadow:0 2px 8px rgba(232,150,14,.4)}
 .range-val{min-width:34px;text-align:center;font-size:.85rem;font-weight:700;color:#f0c800;background:var(--surface2);padding:3px 7px;border-radius:7px}
-.toggle-row{display:flex;align-items:center;gap:10px;margin:10px 0}
-.toggle-row input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent)}
-.toggle-row label{margin:0;font-size:.85rem;color:var(--text);text-transform:none;letter-spacing:0;font-weight:500}
-.sw{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0}
-.sw input{opacity:0;width:0;height:0;position:absolute}
-.sl{position:absolute;cursor:pointer;inset:0;background:var(--surface3);border-radius:24px;transition:.2s;border:1px solid var(--border)}
-.sl:before{content:"";position:absolute;height:18px;width:18px;left:2px;bottom:2px;background:var(--muted);border-radius:50%;transition:.2s}
-.sw input:checked+.sl{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent}
-.sw input:checked+.sl:before{transform:translateX(20px);background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
-.toggle-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
-.toggle-item:last-child{border-bottom:none}
-.toggle-item span{font-size:.9rem;color:var(--text)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-row label{margin:0}
+.toggle-row .toggle-label{font-size:.85rem;color:var(--text);text-transform:none;letter-spacing:0;font-weight:500;flex:1}
+.switch{position:relative;display:inline-block;width:42px;height:24px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0;position:absolute}
+.switch .slider{position:absolute;cursor:pointer;inset:0;background:var(--surface3);border-radius:24px;transition:.2s;border:1px solid var(--border)}
+.switch .slider:before{content:"";position:absolute;height:18px;width:18px;left:2px;top:2px;background:var(--muted);border-radius:50%;transition:.2s}
+.switch input:checked+.slider{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent}
+.switch input:checked+.slider:before{transform:translateX(18px);background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+details>summary{display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--muted);font-size:.7rem;line-height:1.2;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;list-style:none;padding:4px 0}
+details>summary::-webkit-details-marker{display:none}
+details>summary .caret{display:inline-block;font-size:.6rem;transition:transform .15s}
+details[open]>summary{margin-bottom:8px;color:var(--text)}
+details[open]>summary .caret{transform:rotate(90deg)}
 .swatch-row{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
 .color-swatch{width:26px;height:26px;border-radius:7px;border:2px solid var(--border);cursor:pointer;transition:transform .1s,border-color .1s}
 .color-swatch:hover,.color-swatch.active{transform:scale(1.15);border-color:rgba(255,255,255,.6)}
@@ -901,11 +902,19 @@ def rotate(request):
 
 def _settings_content():
     global settings
+    main_html, app_html, adv_html = textbox(settings)
+    # Skip a card with no fields -- otherwise just a title over dead space.
+    main_card =f'<div class="card"><div class="section-title">Device Settings</div>{main_html}</div>' if main_html else ""
+    app_card = f'<div class="card"><div class="section-title">App Behavior</div>{app_html}</div>' if app_html else ""
+    adv_card = f'<div class="card"><details><summary><span class="caret">&#9656;</span>&#9881; Advanced</summary>{adv_html}</details></div>' if adv_html else ""
     return """<div class="logo"><h1>Settings</h1><p>Configure your device</p></div>
-""" + _quick_actions_card() + wifi_setup.wifi_card() + """
-<div class="card"><div class="section-title">Device Settings</div>""" + f"""{textbox(settings)}</div>
-
-<div class="card action-row">""" + unlock + """</div>"""
+""" + _quick_actions_card() + wifi_setup.wifi_card() + f"""
+<form id="settingsform" onsubmit="sav(event)">
+{main_card}
+{app_card}
+{adv_card}
+</form>
+""" + unlock + save_button(form_id="settingsform")
 
 @ampule.route("/system/settings", method="GET")
 def settings_page(request):

@@ -60,9 +60,10 @@ def show_setup_on_led():
 
 
 def _scan_options(current_ssid=""):
-    """<option> tags from a scan, plus "Enter manually...". Returns
-    (options_html, manual_selected) -- manual_selected is True when
-    current_ssid wasn't found, so the caller knows to reveal that field."""
+    """<option> tags from a scan, plus "Enter manually...". If current_ssid
+    isn't in range, it's added as its own selected option instead of
+    falling back to manual entry -- a poor first-boot experience for a
+    device that ships with an ssid already configured."""
     networks = ""
     matched_current = False
     for network in wifi.radio.start_scanning_networks(start_channel=1, stop_channel=14):
@@ -73,25 +74,25 @@ def _scan_options(current_ssid=""):
         networks += f"<option value='{network.ssid}' data-ch='{network.channel}' {selected}>{network.ssid} (ch {network.channel})</option>"
     wifi.radio.stop_scanning_networks()
 
-    manual_selected = bool(current_ssid) and not matched_current
-    networks += f"<option value='__manual__' {'selected' if manual_selected else ''}>Enter manually&hellip;</option>"
-    return networks, manual_selected
+    if current_ssid and not matched_current:
+        networks = f"<option value='{current_ssid}' selected>{current_ssid} (not found)</option>" + networks
+
+    networks += "<option value='__manual__'>Enter manually&hellip;</option>"
+    return networks
 
 
 def wifi_fields(current_ssid=""):
     """Network picker + password field, shared by the AP-setup page and
     /system/settings. current_ssid is pre-selected/pre-filled so just
     viewing the page never overwrites a working network with scan results."""
-    options, manual_selected = _scan_options(current_ssid)
-    manual_display = "block" if manual_selected else "none"
-    manual_value = current_ssid if manual_selected else ""
+    options = _scan_options(current_ssid)
 
     return f"""<label for="ssid">Network</label>
 <div class="pw-wrap">
 <select id="ssid" name="ssid">{options}</select>
 <button type="button" class="pw-toggle" id="ssid_rescan" title="Rescan for networks" aria-label="Rescan for networks">&#x21bb;</button>
 </div>
-<input type="text" id="ssid_manual" placeholder="Network name" value="{manual_value}" style="display:{manual_display};margin-top:6px">
+<input type="text" id="ssid_manual" placeholder="Network name" value="" style="display:none;margin-top:6px">
 <script>
 (function() {{
     var _ssid = document.getElementById("ssid");
@@ -211,7 +212,7 @@ def page(title="WiFi Setup"):
 @ampule.route("/system/wifi/scan", method="GET")
 def _scan(request):
     current = web_interface.url_decoder(request.params.get("current", ""))
-    options, _ = _scan_options(current)
+    options = _scan_options(current)
     return (200, {}, options)
 
 
