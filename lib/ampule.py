@@ -10,6 +10,14 @@ routes = []
 system_routes = []
 variable_re = re.compile("^<([a-zA-Z]+)>$")
 
+# listen() runs every loop iteration in every context (home + apps), so
+# timing entry-to-entry here captures full iteration cost from one place.
+_last_loop_ts = None
+_loop_ms = 0
+
+def loop_time_ms():
+    return round(_loop_ms, 1)
+
 class Request:
     def __init__(self, method, full_path):
         self.method = method
@@ -158,6 +166,13 @@ def __match_route(path, method):
     return None
 
 def listen(socket):
+    global _last_loop_ts, _loop_ms
+    now = time.monotonic_ns()
+    if _last_loop_ts is not None:
+        elapsed_ms = (now - _last_loop_ts) / 1_000_000
+        _loop_ms = elapsed_ms if _loop_ms == 0 else _loop_ms * 0.8 + elapsed_ms * 0.2
+    _last_loop_ts = now
+
     try:
         client, _ = socket.accept()
     except OSError as e:
