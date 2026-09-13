@@ -122,7 +122,11 @@ def initialize_app():
         pprint(f"Starting {load_settings.app_running}...")
         os.chdir(load_settings.app_running)
         time.sleep(0.5)
-        ampule.routes.clear()  # apps start with a clean route table
+
+        # apps start with a clean route table except for system routes
+        # (settings, filemanager, terminal etc.)
+        ampule.routes.clear()
+
         import __init__
     except Exception as e:
         print(f"{e}")
