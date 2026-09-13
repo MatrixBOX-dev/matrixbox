@@ -627,10 +627,10 @@ def navbar(title=None, app=False, back=False):
 <div class="nav-menu">
 <button class="nav-x{burger_cls}" onclick="var m=this.nextElementSibling;var willOpen=!m.classList.contains('open');document.querySelectorAll('.nav-menu-list.open').forEach(function(e){{e.classList.remove('open')}});if(willOpen)m.classList.add('open');event.stopPropagation();" title="Menu">{_nav_icon("menu")}</button>
 <div class="nav-menu-list">
-<a class="nav-menu-item" href="/system/fm">{_nav_icon("folder")} File Manager</a>
 <a class="nav-menu-item" href="/system/settings">{_nav_icon("settings")} Settings</a>
-<a class="nav-menu-item" href="/system/cmd">{_nav_icon("terminal")} Terminal</a>
 {led_item}
+<a class="nav-menu-item" href="/system/fm">{_nav_icon("folder")} File Manager</a>
+<a class="nav-menu-item" href="/system/cmd">{_nav_icon("terminal")} Terminal</a>
 {action_item}
 </div>
 </div>
