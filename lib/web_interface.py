@@ -10,9 +10,7 @@ _FAVICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><def
 exitbutton = """<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><style>body{background:#08080f;color:#eeeef5;font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;margin:0}a.xbtn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:10px;background:linear-gradient(135deg,#e03c3c,#ff6060);color:#fff;font-weight:700;font-size:.95rem;text-decoration:none;box-shadow:0 2px 14px rgba(224,60,60,.35)}.lbl{color:#7070a0;font-size:.75rem;text-transform:uppercase;letter-spacing:1.5px}</style></head><body><p class="lbl">App Running</p><a class="xbtn" href="/exit">&#x2715; Exit App</a>"""
 backbutton = """<a class="back-btn" href="../">&#8592; Back</a>"""
 bootloaderbutton = """<button class="btn btn-danger" onclick="if(confirm('Enter bootloader mode?'))fetch('/bootloader',{method:'POST'})">&#x26A1; Bootloader</button>"""
-#unlock = """<button class="center" onclick="window.location.href='/unlock'" style='background-color:yellow'> &#128275; </button>"""
-unlock = """<button class="btn btn-warning" onclick="fetch('/?unlock=true', {method: 'POST'})">&#x1F513; Unlock</button>"""
-
+unlock = """<button class="btn btn-warning" onclick="fetch('/system/settings?unlock=true', {method: 'POST'})">&#x1F513; Unlock</button>"""
 # -- LED on/off toggle ---------------------------------------------------------
 _led_off = False
 
@@ -97,21 +95,24 @@ def _password_field(field_id, name, placeholder):
 
 def textbox(settings):
     slider_cfg = {
-        "wifi_power": {"min": 7, "max": 20, "step": 1},
-        "rotation": {"min": 0, "max": 270, "step": 90},
         "width": {"min": 64, "max": 640, "step": 64},
         "height": {"min": 32, "max": 320, "step": 32},
     }
     hidden_keys = {"ai_provider", "ai_key", "ai_model", "repository_file"}
+    # ssid/password/wifi_power/channel live in their own WiFi card
+    # (wifi_setup.wifi_card()) and rotation in the Quick Actions card
+    # (_quick_actions_card()) -- none of them belong in this generic form.
+    wifi_card_keys = {"ssid", "password", "wifi_power", "channel"}
     advanced_keys = {"width", "height", "tiles", "repository_url", "color_correct", "enable_button"}
     advanced_order = ["width", "height", "tiles", "repository_url", "color_correct", "enable_button"]
-    wifi_group = {}
     app_group = []
     main_html = ""
     adv_items = {}
     settings_html = """<form onsubmit="sav(event)">"""
     for setting in settings:
         if setting in hidden_keys: continue
+        if setting in wifi_card_keys: continue
+        if setting == "rotation": continue
         print("Setting: ", setting)
         val = settings[setting]
         is_adv = setting in advanced_keys
@@ -150,14 +151,7 @@ def textbox(settings):
             c = slider_cfg[setting]
             try: cur = int(float(val))
             except: cur = c["min"]
-            if setting == "rotation":
-                chunk = f"""<label>{setting}</label>
-<div class="range-wrap">
-<input type="range" id="{setting}" name="{setting}" min="{c['min']}" max="{c['max']}" step="{c['step']}" value="{cur}" oninput="document.getElementById('v_{setting}').textContent=this.value" onchange="fetch('/rotate?v='+this.value,{{method:'POST'}})">
-<span class="range-val" id="v_{setting}">{cur}</span>
-</div>"""
-            else:
-                chunk = f"""<label>{setting}</label>
+            chunk = f"""<label>{setting}</label>
 <div class="range-wrap">
 <input type="range" id="{setting}" name="{setting}" min="{c['min']}" max="{c['max']}" step="{c['step']}" value="{cur}" oninput="document.getElementById('v_{setting}').textContent=this.value">
 <span class="range-val" id="v_{setting}">{cur}</span>
@@ -167,7 +161,7 @@ def textbox(settings):
             _ck = "checked" if _on else ""
             chunk = ('<label>Color correct</label>'
                 '<div class="toggle-row">'
-                '<input type="checkbox" id="color_correct" ' + _ck + " onchange=\"fetch('/color_correct?v='+this.checked,{method:'POST'})\">"
+                '<input type="checkbox" id="color_correct" ' + _ck + " onchange=\"fetch('/system/color_correct?v='+this.checked,{method:'POST'})\">"
                 '<label for="color_correct">Swap G/B LED pins</label></div>')
         elif setting == "enable_button":
             _on = str(val).lower() not in ("false", "0", "", "none")
@@ -177,35 +171,26 @@ def textbox(settings):
                 '<input type="hidden" name="enable_button" value="0">'
                 '<input type="checkbox" id="enable_button" name="enable_button" value="1" ' + _ck + '>'
                 '<label for="enable_button">Enable button</label></div>')
-        elif setting == "password":
-            chunk = f"""<label for="{setting}">{setting}</label>
-{_password_field(setting, setting, "Enter password")}"""
         else:
             chunk = f"""<label for="{setting}">{setting}</label>
 <input type="text" id="{setting}" name="{setting}" placeholder="{str(val)}">"""
         if is_adv:
             adv_items[setting] = chunk
-        elif setting in ("ssid", "password"):
-            wifi_group[setting] = chunk
         elif setting in ("autostart", "screensaver"):
             app_group.append(chunk)
         else:
             main_html += chunk
-    wifi_html = ""
-    if wifi_group:
-        ordered = "".join(wifi_group.get(k, "") for k in ["ssid", "password"])
-        wifi_html = '<div class="section-title" style="margin-top:12px">Wi-Fi</div>' + ordered
     app_html = ""
     if app_group:
         app_html = '<div class="section-title" style="margin-top:12px">App Behavior</div>' + "".join(app_group)
-    settings_html += wifi_html + main_html + app_html
+    settings_html += main_html + app_html
     if "color_correct" not in adv_items:
         _cv = settings.get("color_correct", False)
         _on = str(_cv).lower() not in ("false", "0", "", "none")
         _ck = "checked" if _on else ""
         adv_items["color_correct"] = ('<label>Color correct</label>'
             '<div class="toggle-row">'
-            '<input type="checkbox" id="color_correct" ' + _ck + " onchange=\"fetch('/color_correct?v='+this.checked,{method:'POST'})\">"
+            '<input type="checkbox" id="color_correct" ' + _ck + " onchange=\"fetch('/system/color_correct?v='+this.checked,{method:'POST'})\">"
             '<label for="color_correct">Swap G/B LED pins</label></div>')
     if "enable_button" not in adv_items:
         _eb = settings.get("enable_button", 1)
@@ -220,7 +205,7 @@ def textbox(settings):
     if adv_html:
         settings_html += """<div style="margin-top:12px"><button type="button" class="btn btn-sm" onclick="var a=document.getElementById('adv_section');a.style.display=a.style.display==='none'?'block':'none'">&#9881; Advanced</button></div><div id="adv_section" style="display:none">""" + adv_html + """</div>"""
     return settings_html + """<button class="btn btn-full btn-success" type="submit">Save Settings</button></form>"""
-    
+
 def _draw_progress(current, total, filename, error=False, label="installing"):
     from load_screen import window, pset, font_mini
     w = display.width
@@ -509,9 +494,6 @@ function del"""+dir+"""(e){_busyWait("/?delete="""+dir+"""",e.currentTarget)}</s
     return applist
 
 
-def latest_wifi_error():
-    return str(__main__.wifi_status)
-
 def css():
     return """
 :root{--bg:#08080f;--surface:#111118;--surface2:#1c1c2a;--surface3:#26263a;--accent:#7c6fff;--accent2:#00d4ff;--text:#eeeef5;--muted:#7070a0;--border:rgba(120,120,255,.1);--r:10px;--r-lg:16px;--shadow:0 4px 24px rgba(0,0,0,.5)}
@@ -520,6 +502,8 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-ap
 .navbar{position:sticky;top:0;z-index:100;background:rgba(8,8,15,.85);border-bottom:1px solid var(--border);padding:0 14px;display:flex;align-items:center;height:46px;gap:4px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .nav-brand{font-weight:800;font-size:.9rem;color:#fff;margin-right:6px;text-decoration:none;letter-spacing:-.2px}
 .nav-title{font-weight:600;font-size:.9rem;color:var(--text);flex:1;padding-left:4px}
+.nav-back{font-weight:600;font-size:.9rem;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:4px;margin-left:-6px;padding:6px;border-radius:8px}
+.nav-back:hover{background:var(--surface2)}
 .nav-link{color:var(--muted);text-decoration:none;font-size:.76rem;padding:5px 9px;border-radius:7px;transition:color .15s,background .15s;font-weight:500}
 .nav-link:hover{color:var(--text);background:var(--surface2)}
 .nav-spacer{flex:1}
@@ -528,11 +512,16 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-ap
 .sig{display:flex;align-items:center;gap:2px;margin:0 6px}
 .sig i{display:block;width:5px;height:5px;background:rgba(112,112,160,.3);border-radius:1px}
 .sig i.on{background:#00c853}
-.nav-x{color:var(--muted);font-size:1rem;font-weight:700;text-decoration:none;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--border);transition:color .15s,border-color .15s,background .15s;margin-left:4px}
+.nav-x{color:var(--muted);font-size:1rem;font-weight:700;text-decoration:none;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--border);background:none;cursor:pointer;transition:color .15s,border-color .15s,background .15s;margin-left:4px}
 .nav-x:hover{color:#ff6060;border-color:rgba(255,96,96,.4);background:rgba(255,96,96,.08)}
-.nav-led{color:var(--muted);font-size:.85rem;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--border);transition:color .15s,border-color .15s,background .15s;margin-left:4px;cursor:pointer;background:none}
-.nav-led:hover{color:#ffd060;border-color:rgba(255,208,96,.4);background:rgba(255,208,96,.08)}
-.nav-led.led-off{color:#ff4040;border-color:rgba(255,64,64,.35);background:rgba(255,64,64,.06)}
+.nav-menu{position:relative}
+.nav-menu-list{display:none;position:absolute;top:40px;right:0;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);min-width:170px;padding:6px;flex-direction:column;gap:2px;z-index:101}
+.nav-menu-list.open{display:flex}
+.nav-menu-item{color:var(--text);text-decoration:none;font-size:.8rem;padding:8px 10px;border-radius:7px;display:flex;align-items:center;gap:8px;background:none;border:none;width:100%;text-align:left;cursor:pointer;font-family:inherit}
+.nav-menu-item:hover{background:var(--surface3)}
+.nav-menu-item.led-off{color:#ff4040}
+.nav-menu-item.reboot-needed{animation:reboot-blink 1s ease-in-out infinite}
+.nav-icon{width:18px;height:18px;flex-shrink:0;display:block}
 .page{max-width:480px;margin:0 auto;padding:16px 14px}
 .logo{text-align:center;padding:26px 0 18px}
 .logo h1{font-size:1.8rem;font-weight:800;color:#fff;letter-spacing:-.5px}
@@ -547,8 +536,10 @@ label{display:block;font-size:.67rem;color:var(--muted);text-transform:uppercase
 input[type="text"],input[type="password"],select{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-size:.93rem;outline:none;transition:border-color .15s,box-shadow .15s;-webkit-appearance:none}
 input[type="text"]:focus,input[type="password"]:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,111,255,.15)}
 .pw-wrap{position:relative}
-.pw-wrap input[type="password"],.pw-wrap input[type="text"]{padding-right:38px}
+.pw-wrap input[type="password"],.pw-wrap input[type="text"],.pw-wrap select{padding-right:38px}
 .pw-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;padding:6px;color:var(--muted)}
+.pw-toggle.spinning{animation:spin-centered .6s linear infinite}
+@keyframes spin-centered{to{transform:translateY(-50%) rotate(360deg)}}
 select option{background:var(--surface2)}
 .range-wrap{display:flex;align-items:center;gap:10px;margin-top:5px}
 .range-wrap input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;background:var(--surface3);outline:none}
@@ -608,42 +599,71 @@ def _sig_bars(rssi):
     bars = ''.join(f'<i class="{"on" if i < n else ""}"></i>' for i in range(5))
     return f'<span class="sig" id="sig" title="{rssi} dBm">{bars}</span>'
 
-def navbar():
-    ip = str(wifi.radio.ipv4_address) if wifi.radio.ipv4_address else "OFFLINE"
-    rssi = _rssi()
-    try:
-        with open("reboot_required"): _reboot_cls = " reboot-needed"
-    except OSError: _reboot_cls = ""
-    return f"""<nav class="navbar">
-<a class="nav-brand" href="/" onclick="nav('/f/apps');return false">Matrix<span style="color:#f0c800;font-weight:900">BOX</span></a>
-<a class="nav-link" href="/download" onclick="nav('/f/download');return false">Store</a>
-<a class="nav-link" href="/settings" onclick="nav('/f/settings');return false">Settings</a>
-<div class="nav-spacer"></div>
-<div class="nav-info"><span id="clk"></span><span>{ip}</span></div>
-{_sig_bars(rssi)}
-<button class="nav-led{' led-off' if _led_off else ''}" id="ledbtn" onclick="fetch('/led',{{method:'POST'}}).then(function(r){{return r.json()}}).then(function(j){{var b=document.getElementById('ledbtn');if(j.off){{b.classList.add('led-off')}}else{{b.classList.remove('led-off')}}}})" title="Toggle LED">&#x1F4A1;</button>
-<button class="nav-x{_reboot_cls}" onclick="if(confirm('Restart?'))fetch('/reset',{{method:'POST'}})" title="Restart">&#x2715;</button>
-</nav>
-<script>function _ck(){{var d=new Date(),h=d.getHours(),m=d.getMinutes();document.getElementById('clk').textContent=(h<10?'0':'')+h+':'+(m<10?'0':'')+m;}}_ck();setInterval(_ck,15000);
-function _rs(){{fetch('/f/rssi').then(function(r){{return r.text()}}).then(function(v){{var s=document.getElementById('sig');if(!s)return;var r=parseInt(v),n=r>-45?5:r>-55?4:r>-65?3:r>-75?2:r>-85?1:0;s.title=r+' dBm';var b=s.querySelectorAll('i');for(var i=0;i<b.length;i++){{if(i<n)b[i].classList.add('on');else b[i].classList.remove('on');}}}}).catch(function(){{}});}}_rs();setInterval(_rs,30000);</script>"""
+# One matched set of outline icons (same stroke weight/size) for the navbar
+# menu, so nothing there mixes emoji glyphs with line icons -- stroke uses
+# currentColor so hover/off-state color changes apply to icons for free.
+_NAV_ICON_PATHS = {
+    "menu": '<path d="M4 6h16M4 12h16M4 18h16"/>',
+    "back": '<path d="M15 18l-6-6 6-6"/>',
+    "folder": '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    "settings": '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+    "bulb": '<path d="M9 21h6"/><path d="M10 17h4"/><path d="M12 3a6 6 0 0 0-3.2 11.1c.7.5 1.2 1.3 1.2 2.2v.2h4v-.2c0-.9.5-1.7 1.2-2.2A6 6 0 0 0 12 3z"/>',
+    "refresh": '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>',
+    "x": '<path d="M18 6 6 18M6 6l12 12"/>',
+    "terminal": '<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>',
+}
 
-def app_navbar(title):
+def _nav_icon(name):
+    return f'<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{_NAV_ICON_PATHS[name]}</svg>'
+
+def navbar(title=None, app=False, back=False):
+    # One shared navbar for home, app, and settings contexts: only the left
+    # slot and the burger menu's last item differ (brand + Restart Device at
+    # home, title + Exit App inside an app); File Manager, Settings and the
+    # LED toggle live in the menu identically either way. `back` overrides
+    # the left slot with a link to / -- wherever that resolves to in the
+    # currently active route table (home's index, or the running app's) --
+    # for pages like settings that are reached from either context.
     ip = str(wifi.radio.ipv4_address) if wifi.radio.ipv4_address else "OFFLINE"
     rssi = _rssi()
+    led_item = f'<button class="nav-menu-item{" led-off" if _led_off else ""}" id="ledbtn" onclick="fetch(\'/system/led\',{{method:\'POST\'}}).then(function(r){{return r.json()}}).then(function(j){{var b=document.getElementById(\'ledbtn\');if(j.off){{b.classList.add(\'led-off\')}}else{{b.classList.remove(\'led-off\')}}}})">{_nav_icon("bulb")} LED</button>'
+    if app:
+        action_item = f'<a class="nav-menu-item" href="/exit">{_nav_icon("x")} Exit App</a>'
+        burger_cls = ""
+    else:
+        try:
+            with open("reboot_required"): _reboot_cls = " reboot-needed"
+        except OSError: _reboot_cls = ""
+        action_item = f'<button class="nav-menu-item{_reboot_cls}" onclick="if(confirm(\'Restart?\'))fetch(\'/reset\',{{method:\'POST\'}})">{_nav_icon("refresh")} Restart Device</button>'
+        burger_cls = _reboot_cls
+    if back:
+        left = f'<a class="nav-back" href="/">{_nav_icon("back")}{title or "Back"}</a>'
+    elif app:
+        left = f'<span class="nav-title">{title}</span>'
+    else:
+        left = '<a class="nav-brand" href="/" onclick="nav(\'/f/apps\');return false">Matrix<span style="color:#f0c800;font-weight:900">BOX</span></a>'
     return f"""<nav class="navbar">
-<a class="nav-x" href="/exit" title="Exit" style="margin-left:0;margin-right:4px">&#8592;</a>
-<span class="nav-title">{title}</span>
+{left}
 <div class="nav-spacer"></div>
 <div class="nav-info"><span id="clk"></span><span>{ip}</span></div>
 {_sig_bars(rssi)}
-<button class="nav-led{' led-off' if _led_off else ''}" id="ledbtn" onclick="fetch('/led',{{method:'POST'}}).then(function(r){{return r.json()}}).then(function(j){{var b=document.getElementById('ledbtn');if(j.off){{b.classList.add('led-off')}}else{{b.classList.remove('led-off')}}}})" title="Toggle LED">&#x1F4A1;</button>
-<a class="nav-x" href="/exit" title="Exit">&#x2715;</a>
+<div class="nav-menu">
+<button class="nav-x{burger_cls}" onclick="var m=this.nextElementSibling;var willOpen=!m.classList.contains('open');document.querySelectorAll('.nav-menu-list.open').forEach(function(e){{e.classList.remove('open')}});if(willOpen)m.classList.add('open');event.stopPropagation();" title="Menu">{_nav_icon("menu")}</button>
+<div class="nav-menu-list">
+<a class="nav-menu-item" href="/system/fm">{_nav_icon("folder")} File Manager</a>
+<a class="nav-menu-item" href="/system/settings">{_nav_icon("settings")} Settings</a>
+<a class="nav-menu-item" href="/system/cmd">{_nav_icon("terminal")} Terminal</a>
+{led_item}
+{action_item}
+</div>
+</div>
 </nav>
 <script>function _ck(){{var d=new Date(),h=d.getHours(),m=d.getMinutes();document.getElementById('clk').textContent=(h<10?'0':'')+h+':'+(m<10?'0':'')+m;}}_ck();setInterval(_ck,15000);
-function _rs(){{fetch('/f/rssi').then(function(r){{return r.text()}}).then(function(v){{var s=document.getElementById('sig');if(!s)return;var r=parseInt(v),n=r>-45?5:r>-55?4:r>-65?3:r>-75?2:r>-85?1:0;s.title=r+' dBm';var b=s.querySelectorAll('i');for(var i=0;i<b.length;i++){{if(i<n)b[i].classList.add('on');else b[i].classList.remove('on');}}}}).catch(function(){{}});}}_rs();setInterval(_rs,30000);</script>"""
+function _rs(){{fetch('/system/rssi').then(function(r){{return r.text()}}).then(function(v){{var s=document.getElementById('sig');if(!s)return;var r=parseInt(v),n=r>-45?5:r>-55?4:r>-65?3:r>-75?2:r>-85?1:0;s.title=r+' dBm';var b=s.querySelectorAll('i');for(var i=0;i<b.length;i++){{if(i<n)b[i].classList.add('on');else b[i].classList.remove('on');}}}}).catch(function(){{}});}}_rs();setInterval(_rs,30000);
+document.addEventListener('click',function(){{document.querySelectorAll('.nav-menu-list.open').forEach(function(e){{e.classList.remove('open')}})}});</script>"""
 
 def header(title="Settings", app=False):
-    nav = app_navbar(title) if app else navbar()
+    nav = navbar(title, app)
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -659,8 +679,8 @@ def footer(back=False):
     back_html = backbutton if back else ""
     return f"""{back_html}</div></body></html>"""
 
-def _shell(content, title="MatrixBox", frag="/f/apps"):
-    nav = navbar()
+def _shell(content, title="MatrixBox", frag="/f/apps", app=False, back=False):
+    nav = navbar(title, app, back)
     return f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8">
@@ -675,55 +695,13 @@ function _run(c){{var sc=c.querySelectorAll('script');for(var i=0;i<sc.length;i+
 function nav(u){{var c=document.getElementById('content');c.innerHTML='<div style="display:flex;justify-content:center;padding:60px 0"><span style="display:inline-block;width:28px;height:28px;border:3px solid var(--surface3);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite"></span></div>';fetch(u).then(function(r){{return r.text()}}).then(function(h){{c.innerHTML=h;_run(c);var p=u.replace('/f/apps','/').replace('/f/','/');history.pushState({{f:u}},'',p);window.scrollTo(0,0)}})}}
 window.addEventListener('popstate',function(e){{var u=e.state&&e.state.f||'{frag}';fetch(u).then(function(r){{return r.text()}}).then(function(h){{var c=document.getElementById('content');c.innerHTML=h;_run(c)}})}});
 history.replaceState({{f:'{frag}'}},'');
-function sav(e){{e.preventDefault();var b=new URLSearchParams(new FormData(e.target)).toString();fetch('/',{{method:'POST',body:b,headers:{{'Content-Type':'application/x-www-form-urlencoded'}}}}).then(function(){{nav('/f/apps')}})}}
+function sav(e){{e.preventDefault();var b=new URLSearchParams(new FormData(e.target)).toString();fetch('/system/settings',{{method:'POST',body:b,headers:{{'Content-Type':'application/x-www-form-urlencoded'}}}}).then(function(){{nav('/f/apps')}})}}
 </script></body></html>"""
-
-def connect_to_wifi():
-    def scan():
-        networks = ""
-        for network in wifi.radio.start_scanning_networks(start_channel=1, stop_channel=14):
-            networks += f"<option value='{network.ssid}' data-ch='{network.channel}'>{network.ssid} (ch {network.channel})</option>"
-            print(network.ssid, "ch", network.channel)
-        wifi.radio.stop_scanning_networks()
-        return networks
-    networks = scan()
-    wifi_error = latest_wifi_error()
-    error_html = f'<p class="error-msg">{wifi_error}</p>' if wifi_error else ""
-    return f"""<div class="logo">
-    <h1>WiFi Setup</h1>
-    <p>Connect to a wireless network</p>
-</div>
-<div class="card">
-    <label for="ssid">Network</label>
-    <select id="ssid" name="ssid">{networks}</select>
-    <script>
-    var _ssid = document.getElementById("ssid");
-    function _sendSSID(el) {{
-        var opt = el.options[el.selectedIndex];
-        var v = opt.value.replace(/#/g, "%23");
-        var ch = opt.getAttribute("data-ch") || "";
-        fetch("/?ssid=" + v + "&channel=" + ch, {{ method: "POST" }});
-    }}
-    _ssid.addEventListener("change", function() {{ _sendSSID(_ssid); }});
-    _ssid.addEventListener("click",  function() {{ _sendSSID(_ssid); }});
-    if (_ssid.options.length) _sendSSID(_ssid);
-    </script>
-    <label for="password">Password</label>
-    {_password_field("password", "password", "Enter password")}
-    <script>
-    document.getElementById("password").addEventListener("blur", function(e) {{
-        var p = e.target.value.replace(/#/g, "%23");
-        fetch("/?password=" + encodeURIComponent(p), {{ method: "POST" }});
-    }});
-    </script>
-    <button class="btn btn-full" onclick="fetch('/connect').then(function(){{location.reload()}})">Connect</button>
-    {error_html}
-</div>"""
 
 def _preset_buttons():
     def _pbtn(label, s, w, h, svg, rot=None):
         rot_js = f"var _r=document.getElementById('rotation');if(_r){{_r.value={rot};var _rv=document.getElementById('v_rotation');if(_rv)_rv.textContent={rot};}}" if rot is not None else ""
-        return f'<button class="btn btn-sm" onclick="if(confirm(\'Switch to {label} ({w}x{h})? Device will reboot.\')){{var _ew=document.getElementById(\'width\');if(_ew){{_ew.value={w};var _vw=document.getElementById(\'v_width\');if(_vw)_vw.textContent={w};}}var _eh=document.getElementById(\'height\');if(_eh){{_eh.value={h};var _vh=document.getElementById(\'v_height\');if(_vh)_vh.textContent={h};}}{rot_js}fetch(\'/preset?s={s}\',{{method:\'POST\'}})}}" title="{label} {w}x{h}">{svg}<br><span style="font-size:.6rem">{label}</span></button>'
+        return f'<button class="btn btn-sm" onclick="if(confirm(\'Switch to {label} ({w}x{h})? Device will reboot.\')){{var _ew=document.getElementById(\'width\');if(_ew){{_ew.value={w};var _vw=document.getElementById(\'v_width\');if(_vw)_vw.textContent={w};}}var _eh=document.getElementById(\'height\');if(_eh){{_eh.value={h};var _vh=document.getElementById(\'v_height\');if(_vh)_vh.textContent={h};}}{rot_js}fetch(\'/system/preset?s={s}\',{{method:\'POST\'}})}}" title="{label} {w}x{h}">{svg}<br><span style="font-size:.6rem">{label}</span></button>'
     return ''.join([
         _pbtn('XS','xs',64,32,'<svg width="20" height="16" viewBox="0 0 20 16"><rect x="4" y="4" width="12" height="8" rx="1" fill="black" stroke="currentColor" stroke-width="1.5"/></svg>'),
         _pbtn('X','x',128,32,'<svg width="28" height="16" viewBox="0 0 28 16"><rect x="2" y="4" width="24" height="8" rx="1" fill="black" stroke="currentColor" stroke-width="1.5"/></svg>'),
@@ -731,14 +709,28 @@ def _preset_buttons():
         _pbtn('2X','2x',128,64,'<svg width="24" height="18" viewBox="0 0 24 18"><rect x="2" y="1" width="20" height="16" rx="1" fill="black" stroke="currentColor" stroke-width="1.5"/></svg>'),
     ])
 
-_showed_wifi = False
+def _quick_actions_card():
+    # Rotate + screen-size presets, shared between the home page's
+    # disconnected-state card and /system/settings' own -- previously
+    # duplicated with different headings ("Screen Size" vs "Quick
+    # Actions") and home missing the rotate button entirely.
+    rotate_btn = '<button class="btn btn-sm" onclick="fetch(\'/system/rotate\',{method:\'POST\'}).then(()=>{{var v=document.getElementById(\'v_rotation\');if(v){{var c=parseInt(v.textContent)||0;c=(c+90)%360;v.textContent=c;var s=document.getElementById(\'rotation\');if(s)s.value=c;}}}});">&#128260; 90&deg;</button>'
+    return '<div class="card"><div class="section-title">Quick Actions</div><div class="action-row action-row-fill">' + rotate_btn + _preset_buttons() + '</div></div>'
 
 def _apps_content():
-    global _showed_wifi
-    wifi_html = ""
+    # Same Quick Actions + WiFi cards as /system/settings (not the separate
+    # "WiFi Setup" wizard render_wifi_setup() used to be) -- one experience
+    # for configuring the device regardless of which page you land on.
     if not wifi.radio.connected:
-        wifi_html = connect_to_wifi()
-        _showed_wifi = True
+        top_html = _quick_actions_card() + wifi_setup.wifi_card()
+    else:
+        # The full card only makes sense while disconnected, but a
+        # lingering wifi_status (e.g. a failed post-connect settings
+        # save) still needs to surface somewhere -- this is the page the
+        # AP setup flow lands back on after connecting, so it's the one
+        # place that's guaranteed to be seen even if the user never
+        # visits /system/settings afterward.
+        top_html = wifi_setup.status_banner()
     installed_apps = ""
     for app in os.listdir("/"):
         if app == "LICENSE": continue
@@ -751,8 +743,7 @@ def _apps_content():
             installed_apps += f'<div class="app-item"><div><span class="app-name">{app}</span>{ver_html}</div>' + _run_button_html(app) + """</div>"""
     if not installed_apps:
         installed_apps = '<p style="color:var(--muted);text-align:center;padding:16px 0 8px;font-size:.9rem">No apps installed yet</p><div style="text-align:center;padding-bottom:8px"><button class="btn btn-sm btn-success" style="animation:store-pulse 2.5s ease-in-out infinite" onclick="nav(\'/f/download\')">&#x2B07; Visit the Store</button></div>'
-    preset_html = '<div class="card" style="margin-top:10px"><div class="section-title">Screen Size</div><div class="action-row">' + _preset_buttons() + '</div></div>' if _showed_wifi else ''
-    return wifi_html + preset_html + """<div class="logo">
+    return top_html + """<div class="logo">
     <h1><span style="color:#fff">Matrix</span><span style="color:#f0c800;font-weight:900">BOX</span></h1>
     <p>Select an app to launch</p>
 </div>
@@ -761,12 +752,6 @@ def _apps_content():
     """ + installed_apps + """
 </div>
 <button class="btn btn-full btn-success" onclick="nav('/f/download')">&#x2B07; Download Apps</button>
-<button class="btn btn-full btn-ghost" onclick="nav('/f/settings')">&#9881; Settings</button>
-<div class="card" style="margin-top:10px;border:1px dashed var(--muted)">
-    <div class="section-title" style="color:var(--muted)">Built-in Tools</div>
-    <div class="app-item"><span class="app-name" style="color:var(--muted)">&#x1F4BB; Terminal</span><button class="btn btn-sm" style="background:var(--muted);color:var(--bg)" onclick="window.location.href='/cmd'">Open</button></div>
-    <div class="app-item"><span class="app-name" style="color:var(--muted)">&#x1F4C1; File Manager</span><button class="btn btn-sm" style="background:var(--muted);color:var(--bg)" onclick="window.location.href='/fm'">Open</button></div>
-</div>
 """
 
 def select_app():
@@ -777,16 +762,6 @@ def _settings(request):
     global settings
     print(__main__.settings)
     return (200, {}, str(settings))
-
-@ampule.route('/connect')
-def _connect(request):
-    clearscreen()
-    print(connect_to_network())
-    return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
-
-@ampule.route('/connectx')
-def _connectx(request):
-    return (200, {}, select_app() + connect_to_wifi())
 
 @ampule.route('/', method="POST")
 def webinterface_post(request):
@@ -810,12 +785,14 @@ def webinterface_post(request):
                     settings[setting] = val
                 except: pass
         clearscreen(True)
-        savesettings(settings)
+        if not savesettings(settings):
+            __main__.wifi_status = "Couldn't save settings (read-only filesystem)"
         clearscreen(False)
         __main__.autostart = settings.get("autostart", False)
         __main__.screensaver_app = settings.get("screensaver", "")
         try: apply_display_settings()
         except Exception as e: print("apply_display_settings:", e)
+        render_home_screen()
         return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
     except: pass
 
@@ -825,14 +802,6 @@ def webinterface_post(request):
                 with open("unlock","w") as f: f.write("")
             except: pass
             import safemode
-        if "ssid" in request.params:
-            __main__.settings["ssid"] = url_decoder(request.params["ssid"])
-        if "channel" in request.params:
-            try: __main__.settings["channel"] = int(request.params["channel"])
-            except: pass
-        if "password" in request.params:
-            __main__.settings["password"] = url_decoder(request.params["password"])
-            #wifi.radio.connect(settings["ssid"], settings["password"])
         if "delete" in request.params:
             dir = request.params["delete"]
             error_color = "white"
@@ -892,8 +861,8 @@ def bootloader(request):
     microcontroller.reset()
     return (200, {}, "None")
 
-@ampule.route("/preset", method='POST')
-def _preset(request):
+@ampule.route("/system/preset", method='POST')
+def preset(request):
     presets = {"xs": (64, 32), "x": (128, 32), "xl": (192, 32), "2x": (128, 64)}
     if request.params and "s" in request.params:
         p = request.params["s"]
@@ -907,16 +876,16 @@ def _preset(request):
             microcontroller.reset()
     return (200, {}, "")
 
-@ampule.route("/color_correct", method='POST')
-def _color_correct(request):
+@ampule.route("/system/color_correct", method='POST')
+def color_correct(request):
     if request.params and "v" in request.params:
         settings["color_correct"] = request.params["v"] == "true"
         savesettings(settings)
         microcontroller.reset()
     return (200, {}, "")
 
-@ampule.route("/rotate", method='POST')
-def _rotate(request):
+@ampule.route("/system/rotate", method='POST')
+def rotate(request):
     if request.params and "v" in request.params:
         new_r = int(request.params["v"])
     else:
@@ -932,17 +901,28 @@ def _rotate(request):
 
 def _settings_content():
     global settings
-    rotate_btn = '<button class="btn btn-sm" onclick="fetch(\'/rotate\',{method:\'POST\'}).then(()=>{{var v=document.getElementById(\'v_rotation\');if(v){{var c=parseInt(v.textContent)||0;c=(c+90)%360;v.textContent=c;var s=document.getElementById(\'rotation\');if(s)s.value=c;}}}});">&#128260; 90&deg;</button>'
-    preset_btns = _preset_buttons()
     return """<div class="logo"><h1>Settings</h1><p>Configure your device</p></div>
-<div class="card"><div class="section-title">Quick Actions</div><div class="action-row action-row-fill">""" + rotate_btn + preset_btns + """</div></div>
+""" + _quick_actions_card() + wifi_setup.wifi_card() + """
 <div class="card"><div class="section-title">Device Settings</div>""" + f"""{textbox(settings)}</div>
 
 <div class="card action-row">""" + unlock + """</div>"""
 
-@ampule.route("/settings")
-def _settings_route(request):
-    return (200, {}, _shell(_settings_content(), "Settings", "/f/settings"))
+@ampule.route("/system/settings", method="GET")
+def settings_page(request):
+    # Rendered from inside a running app too, so the navbar must reflect
+    # that: otherwise the shared home shell always shows "Restart Device"
+    # here, even when what the user actually wants from this screen is to
+    # get back out of the app they were in.
+    in_app = bool(load_settings.app_running)
+    return (200, {}, _shell(_settings_content(), "Settings", "/system/settings", app=in_app, back=True))
+
+@ampule.route("/system/settings", method="POST")
+def _system_settings_save(request):
+    # webinterface_post is not settings-only -- it also handles wifi
+    # connect, unlock, and app delete/install, all chained as a fallback
+    # when the settings-body parse at its top fails -- so it stays whole,
+    # reused here rather than duplicated.
+    return webinterface_post(request)
 
 @ampule.route("/save", method='POST')
 def _save(request):
@@ -969,16 +949,14 @@ def download(request):
 def _f_apps(request):
     return (200, {}, _apps_content())
 
-@ampule.route("/f/settings")
-def _f_settings(request):
-    return (200, {}, _settings_content())
-
 @ampule.route("/f/download")
 def _f_download(request):
     return (200, {}, _download_content())
 
-@ampule.route("/f/rssi")
-def _f_rssi(request):
+# Under /system/, so it stays reachable from every navbar, app or not --
+# polled every 30s.
+@ampule.route("/system/rssi")
+def _system_rssi(request):
     try:
         ai = wifi.radio.ap_info
         rssi = ai.rssi if ai else -100
@@ -993,6 +971,7 @@ def _f_rssi(request):
 
 import cmd
 import filemanager
+import wifi_setup
 
 
 @ampule.route('/favicon.svg')
@@ -1009,17 +988,10 @@ def reset(request):
     except OSError: pass
     microcontroller.reset()
 
-@ampule.route('/led', method='POST')
+@ampule.route('/system/led', method='POST')
 def led_toggle(request):
     off = _led_toggle()
     return (200, {}, json.dumps({"off": off}))
-
-# Move /led to system_routes so it survives app route clearing
-for _r in ampule.routes:
-    if _r[0].match("/led"):
-        ampule.system_routes.append(_r)
-        ampule.routes.remove(_r)
-        break
 
 
 def url_decoder(url):

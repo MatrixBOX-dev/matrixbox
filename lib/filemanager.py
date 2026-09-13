@@ -38,7 +38,7 @@ def _norm(p):
             parts.append(seg)
     return "/" + "/".join(parts)
 
-@ampule.route("/fm/ls", method="POST")
+@ampule.route("/system/fm/ls", method="POST")
 def _fm_ls(request):
     path = _norm(request.headers.get("x-path", "/"))
     try:
@@ -46,7 +46,7 @@ def _fm_ls(request):
     except Exception as e:
         return (200, {}, json.dumps({"error": str(e)}))
 
-@ampule.route("/fm/read", method="POST")
+@ampule.route("/system/fm/read", method="POST")
 def _fm_read(request):
     path = _norm(request.headers.get("x-path", ""))
     try:
@@ -55,7 +55,7 @@ def _fm_read(request):
     except Exception as e:
         return (200, {}, json.dumps({"error": str(e)}))
 
-@ampule.route("/fm/write", method="POST")
+@ampule.route("/system/fm/write", method="POST")
 def _fm_write(request):
     path = _norm(request.headers.get("x-path", ""))
     try:
@@ -71,7 +71,7 @@ def _fm_write(request):
         _show_display(str(e), "red")
         return (200, {}, json.dumps({"error": str(e)}))
 
-@ampule.route("/fm/mkdir", method="POST")
+@ampule.route("/system/fm/mkdir", method="POST")
 def _fm_mkdir(request):
     path = _norm(request.headers.get("x-path", ""))
     try:
@@ -83,7 +83,7 @@ def _fm_mkdir(request):
         _show_display(str(e), "red")
         return (200, {}, json.dumps({"error": str(e)}))
 
-@ampule.route("/fm/del", method="POST")
+@ampule.route("/system/fm/del", method="POST")
 def _fm_del(request):
     path = _norm(request.headers.get("x-path", ""))
     if path == "/":
@@ -111,7 +111,7 @@ def _rmdir(path):
             os.remove(fp)
     os.rmdir(path)
 
-@ampule.route("/fm", method="GET")
+@ampule.route("/system/fm", method="GET")
 def _fm_page(request):
     return (200, {}, """<!DOCTYPE html>
 <html lang="en"><head>
@@ -209,7 +209,7 @@ function doList(path){
  document.getElementById("editor").style.display="none";
  document.getElementById("listing").style.display="block";
  renderPath();
- api("/fm/ls",cwd).then(function(d){
+ api("/system/fm/ls",cwd).then(function(d){
   if(d.error){alert(d.error);return}
   var el=document.getElementById("listing");
   var html="";
@@ -241,7 +241,7 @@ function sel(row){
 function edit(fp){location.hash="f:"+enc(fp);}
 function openEditor(fp){
  cwd=fp.substring(0,fp.lastIndexOf("/"))||"/";
- api("/fm/read",fp).then(function(d){
+ api("/system/fm/read",fp).then(function(d){
   if(d.error){alert(d.error);return}
   document.getElementById("listing").style.display="none";
   document.getElementById("editor").style.display="flex";
@@ -254,7 +254,7 @@ function saveFile(){
  var ta=document.getElementById("editor-area");
  var btn=document.getElementById("saveBtn");
  btn.textContent="Saving...";
- api("/fm/write",ta.dataset.path,ta.value).then(function(d){
+ api("/system/fm/write",ta.dataset.path,ta.value).then(function(d){
   if(d.error){alert(d.error);btn.textContent="\\u1F4BE Save";}
   else{btn.textContent="\\u2705 Saved";setTimeout(function(){btn.innerHTML="&#x1F4BE; Save"},1500);}
  });
@@ -263,7 +263,7 @@ function closeEditor(){go(cwd);}
 function del(fp){
  var name=fp.split("/").pop();
  if(!confirm("Delete "+name+"?"))return;
- api("/fm/del",fp).then(function(d){
+ api("/system/fm/del",fp).then(function(d){
   if(d.error)alert(d.error);
   else doList(cwd);
  });
@@ -285,7 +285,7 @@ function closeModal(){document.getElementById("modal-bg").style.display="none"}
 function newFile(){
  showModal("New file name:",function(name){
   var fp=cwd.replace(/\\/$/,"")+"/"+name;
-  api("/fm/write",fp,"").then(function(d){
+  api("/system/fm/write",fp,"").then(function(d){
    if(d.error)alert(d.error);
    else{edit(fp);}
   });
@@ -294,7 +294,7 @@ function newFile(){
 function newDir(){
  showModal("New directory name:",function(name){
   var fp=cwd.replace(/\\/$/,"")+"/"+name;
-  api("/fm/mkdir",fp).then(function(d){
+  api("/system/fm/mkdir",fp).then(function(d){
    if(d.error)alert(d.error);
    else doList(cwd);
   });

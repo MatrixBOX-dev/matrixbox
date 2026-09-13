@@ -148,6 +148,7 @@ def __on_request(method, rule, request_handler):
     routes.append(
         (re.compile(regex), {"method": method, "func": request_handler})
     )
+    return request_handler
 
 def __match_route(path, method):
     for matcher, route in system_routes + routes:
@@ -189,4 +190,18 @@ def listen(socket):
         client.close()
 
 def route(rule, method='GET'):
-    return lambda func: __on_request(method, rule, func)
+    """Anything under /system/... is also promoted to system_route"""
+    def decorator(func):
+        __on_request(method, rule, func)
+        if rule.startswith("/system/"):
+            promote_to_system_route(rule)
+        return func
+    return decorator
+
+def promote_to_system_route(path):
+    """Move every already-registered route at `path` (every method on it)
+    from `routes` into `system_routes`."""
+    for r in list(routes):
+        if r[0].match(path):
+            system_routes.append(r)
+            routes.remove(r)

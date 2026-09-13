@@ -10,7 +10,7 @@ def _cmd_print(*args, **kwargs):
     _cmd_buf.append(text)
     print(text)
 
-@ampule.route('/cmd', method='POST')
+@ampule.route('/system/cmd', method='POST')
 def execute_command(request):
     global _cmd_buf, _cmd_env
     if _cmd_env is None:
@@ -33,7 +33,7 @@ def execute_command(request):
     return (200, {}, "\n".join(_cmd_buf))
 
 
-@ampule.route("/cmd", method="GET")
+@ampule.route("/system/cmd", method="GET")
 def _cmd(request):
     html = """<!DOCTYPE html>
 <html lang="en">
