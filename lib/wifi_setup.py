@@ -1,5 +1,6 @@
 import ampule
 import web_interface
+import web_components
 
 import __main__
 from __main__ import (
@@ -138,7 +139,7 @@ def wifi_fields(current_ssid=""):
 }})();
 </script>
 <label for="password">Password</label>
-{web_interface._password_field("password", "password", "Enter password")}
+{web_components.password_field("password", "password", "Enter password")}
 <script>
 document.getElementById("password").addEventListener("blur", function(e) {{
     var p = e.target.value.replace(/#/g, "%23");
