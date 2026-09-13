@@ -8,6 +8,8 @@
 .gif-row.current .name{color:var(--accent)}
 </style>
 
+<div id="settings-warn" style="display:none;color:#ff6060;font-size:.82rem;margin-bottom:12px;padding:10px 12px;border:1px solid #ff6060;border-radius:var(--r)"></div>
+
 <div class="card">
 <div class="section-title">Upload GIF</div>
 <div class="drop-zone" id="drop" onclick="document.getElementById('fi').click()">
@@ -20,16 +22,16 @@
 
 <div class="card">
 <div class="section-title">Playback</div>
-<button class="btn btn-full btn-ghost" onclick="fetch('/?next=true',{method:'POST'})">&#9654; Next GIF</button>
+<button class="btn btn-full btn-ghost" onclick="nextGif()">&#9654; Next GIF</button>
 </div>
 
 <div class="card">
 <div class="section-title">Brightness</div>
 <div class="seg" id="br-seg">
-<button onclick="pb(this,'1.0')">Full</button>
-<button onclick="pb(this,'0.5')">1/2</button>
-<button class="on" onclick="pb(this,'0.25')">1/4</button>
-<button onclick="pb(this,'0.125')">1/8</button>
+<button data-v="1.0" onclick="pb(this,'1.0')">Full</button>
+<button data-v="0.5" onclick="pb(this,'0.5')">1/2</button>
+<button data-v="0.25" onclick="pb(this,'0.25')">1/4</button>
+<button data-v="0.125" onclick="pb(this,'0.125')">1/8</button>
 </div>
 </div>
 
@@ -60,13 +62,31 @@ function handle(f){
       .then(function(res){
         if(!res.ok){uploadStatus.textContent="Upload failed: "+res.text;uploadStatus.style.color="#ff6060";return}
         uploadStatus.textContent="Uploaded! Displaying now.";uploadStatus.style.color="var(--accent2)";
+        try{showSettingsWarning(JSON.parse(res.text).warning)}catch(e){}
         loadGifs();
       })
       .catch(function(){uploadStatus.textContent="Upload failed.";uploadStatus.style.color="#ff6060"});
   };
   r.readAsDataURL(f);
 }
-function pb(el,v){fetch("/?brightness="+v,{method:"POST"});document.querySelectorAll("#br-seg button").forEach(function(b){b.classList.remove("on")});el.classList.add("on")}
+function showSettingsWarning(msg){
+  var w=document.getElementById("settings-warn");
+  if(msg){w.textContent=msg;w.style.display="block"}
+  else{w.style.display="none"}
+}
+function nextGif(){
+  fetch("/?next=true",{method:"POST"}).then(function(r){return r.json()}).then(function(d){showSettingsWarning(d.warning)}).catch(function(){});
+}
+function pb(el,v){
+  fetch("/?brightness="+v,{method:"POST"}).then(function(r){return r.json()}).then(function(d){showSettingsWarning(d.warning)}).catch(function(){});
+  document.querySelectorAll("#br-seg button").forEach(function(b){b.classList.remove("on")});el.classList.add("on")
+}
+function markBrightness(v){
+  document.querySelectorAll("#br-seg button").forEach(function(b){
+    b.classList.toggle("on", parseFloat(b.dataset.v) === v);
+  });
+}
+fetch("/state").then(function(r){return r.json()}).then(function(d){markBrightness(d.brightness)}).catch(function(){});
 
 function fmtSize(b){
   if(b<1024)return b+" B";
@@ -89,7 +109,10 @@ function loadGifs(){
 function selectGif(name){
   fetch("/gifs/select?name="+encodeURIComponent(name),{method:"POST"})
     .then(function(r){return r.json()})
-    .then(function(d){if(!d.ok)alert(d.error||"Could not display GIF")})
+    .then(function(d){
+      if(!d.ok){alert(d.error||"Could not display GIF");return}
+      showSettingsWarning(d.warning);
+    })
     .catch(function(){alert("Could not display GIF")});
 }
 function delGif(name){
