@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Push a local file to a running MatrixBox over Wi-Fi — "scp for the device".
 
-Text files go through the file manager (/fm/write). Binary files (e.g. .mpy)
+Text files go through the file manager (/system/fm/write). Binary files (e.g. .mpy)
 go through /repl + base64, because the device's HTTP transport is text-only and
 truncates at the first null byte. Format is auto-detected (override with
 --binary / --text).
@@ -53,7 +53,7 @@ def repl(host: str, snippet: str) -> str:
 
 
 def push_text(host: str, device_path: str, data: bytes) -> None:
-    res = json.loads(post(f"http://{host}/fm/write", data, {"x-path": device_path}))
+    res = json.loads(post(f"http://{host}/system/fm/write", data, {"x-path": device_path}))
     if not res.get("ok"):
         sys.exit(f"device error: {res.get('error', res)}")
 
@@ -91,7 +91,7 @@ def main() -> None:
         data = f.read()
 
     binary = args.binary or (not args.text and not looks_text(data))
-    route = "/repl (base64)" if binary else "/fm/write"
+    route = "/repl (base64)" if binary else "/system/fm/write"
     print(f"{args.local} -> {host}:{args.device_path}  [{route}, {len(data)} B]")
 
     if binary:
