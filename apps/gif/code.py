@@ -8,6 +8,7 @@ from check_button import check_if_button_pressed
 
 exit = False
 brightness = 0.25  # 0.0-1.0
+selected_gif = None
 black_bmp = None
 dim_bmp = None
 clock_window = displayio.TileGrid(window, pixel_shader=palette)
@@ -59,21 +60,31 @@ try:
     with open("gif.html") as f: html_body = f.read()
 except: html_body = ""
 
+settings_error = None
+
 def save_settings():
+    global settings_error
     try:
         with open("gif_settings.json", "w") as f:
-            json.dump({"brightness": brightness}, f)
-    except: pass
+            f.write(json.dumps({"brightness": brightness, "selected_gif": selected_gif}))
+        settings_error = None
+    except Exception as e:
+        print("Could not save gif settings:", e)
+        settings_error = "Settings not saved: " + str(e)
 
 def load_settings():
-    global brightness
+    global brightness, selected_gif
     try:
         with open("gif_settings.json") as f:
-            s = json.load(f)
+            s = json.loads(f.read())
         brightness = s.get("brightness", 0.25)
+        selected_gif = s.get("selected_gif")
     except: pass
 
 load_settings()
+
+if selected_gif and selected_gif in files:
+    _index = files.index(selected_gif)
 
 @ampule.route("/exit", method="GET")
 def webinterface(request):
@@ -84,6 +95,10 @@ def webinterface(request):
 @ampule.route("/", method="GET")
 def gif_webinterface(request):
     return (200, {}, header("GIF Player", app=True) + html_body + footer())
+
+@ampule.route("/state", method="GET")
+def webinterface_state(request):
+    return (200, {}, json.dumps({"brightness": brightness}))
 
 @ampule.route("/gifs", method="GET")
 def webinterface_list_gifs(request):
@@ -115,7 +130,10 @@ def webinterface_select_gif(request):
         files = list_gifs()
         if name in files:
             _index = files.index(name)
-        return (200, {}, json.dumps({"ok": True}))
+        resp = {"ok": True}
+        if settings_error:
+            resp["warning"] = settings_error
+        return (200, {}, json.dumps(resp))
     except Exception as e:
         return (200, {}, json.dumps({"ok": False, "error": str(e)}))
 
@@ -132,7 +150,10 @@ def webinterface_post(request):
             odg = load_img()
         except Exception as e:
             print("next failed:", e)
-        return (200, {}, "OK")
+        resp = {"ok": True}
+        if settings_error:
+            resp["warning"] = settings_error
+        return (200, {}, json.dumps(resp))
 
     if "brightness" in request.params:
         try:
@@ -141,7 +162,10 @@ def webinterface_post(request):
             if brightness > 1.0: brightness = 1.0
         except: pass
         save_settings()
-        return (200, {}, "OK")
+        resp = {"ok": True}
+        if settings_error:
+            resp["warning"] = settings_error
+        return (200, {}, json.dumps(resp))
 
     if "sendbase64" in request.params:
         name = safe_gif_name(request.params.get("name", ""))
@@ -149,7 +173,10 @@ def webinterface_post(request):
         try:
             save_base64_gif(request.body, path)
             odg = load_img(path)
-            return (200, {}, "OK")
+            resp = {"ok": True}
+            if settings_error:
+                resp["warning"] = settings_error
+            return (200, {}, json.dumps(resp))
         except Exception as e:
             print("Upload failed:", e)
             return (500, {}, "Upload failed: " + str(e))
@@ -157,8 +184,20 @@ def webinterface_post(request):
     return (200, {}, """<meta http-equiv="refresh" content="0; url=./" />""")
 
 
+def apply_brightness(dim_bmp, src_bmp, black_bmp, brightness):
+    # bitmaptools.blit() reading from an on-disk-backed bitmap source (as
+    # gifio.OnDiskGif.bitmap is) hard-crashes the board with no Python
+    # exception raised (see adafruit/circuitpython#5916), so always go
+    # through alphablend -- factor_1=1.0 gives the same full-weight copy
+    # without that crash.
+    bitmaptools.alphablend(
+        dim_bmp, src_bmp, black_bmp,
+        displayio.Colorspace.RGB565_SWAPPED,
+        factor_1=brightness,
+    )
+
 def load_img(file=False):
-    global black_bmp, dim_bmp, files
+    global black_bmp, dim_bmp, files, selected_gif
     if file:
         pass
     else:
@@ -166,6 +205,12 @@ def load_img(file=False):
         if not files:
             raise RuntimeError("No GIFs in images/")
         file = "images/" + files[_index % len(files)]
+
+    name = file.split("/")[-1]
+    if name != selected_gif:
+        selected_gif = name
+        save_settings()
+
     odg = gifio.OnDiskGif(file)
     w = odg.bitmap.width
     h = odg.bitmap.height
@@ -176,11 +221,10 @@ def load_img(file=False):
     end = time.monotonic()
     overhead = end - start
     # Copy first frame into writable dim_bmp
-    bitmaptools.alphablend(
-        dim_bmp, odg.bitmap, black_bmp,
-        displayio.Colorspace.RGB565_SWAPPED,
-        factor_1=brightness,
-    )
+    try:
+        apply_brightness(dim_bmp, odg.bitmap, black_bmp, brightness)
+    except Exception as e:
+        print("apply_brightness error:", e)
     # Remove old face TileGrids (keep clock_window at index 0)
     while len(splash) > 1:
         splash.pop()
@@ -201,17 +245,16 @@ time.sleep(0.5)
 while not exit:
     ampule.listen(socket)
     time.sleep(0.01)
-    odg.next_frame()
     try:
-        bitmaptools.alphablend(
-            dim_bmp, odg.bitmap, black_bmp,
-            displayio.Colorspace.RGB565_SWAPPED,
-            factor_1=brightness,
-        )
+        odg.next_frame()
     except Exception as e:
-        print("alphablend error:", e)
+        print("next_frame error:", e)
+    try:
+        apply_brightness(dim_bmp, odg.bitmap, black_bmp, brightness)
+    except Exception as e:
+        print("apply_brightness error:", e)
     refresh()
-    
+
     b = check_if_button_pressed()
     #print(b)
     if b == 1:
