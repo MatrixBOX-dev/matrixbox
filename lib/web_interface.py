@@ -95,21 +95,24 @@ def _password_field(field_id, name, placeholder):
 
 def textbox(settings):
     slider_cfg = {
-        "wifi_power": {"min": 7, "max": 20, "step": 1},
-        "rotation": {"min": 0, "max": 270, "step": 90},
         "width": {"min": 64, "max": 640, "step": 64},
         "height": {"min": 32, "max": 320, "step": 32},
     }
     hidden_keys = {"ai_provider", "ai_key", "ai_model", "repository_file"}
+    # ssid/password/wifi_power/channel live in their own WiFi card
+    # (wifi_setup.wifi_card()) and rotation in the Quick Actions card
+    # (_quick_actions_card()) -- none of them belong in this generic form.
+    wifi_card_keys = {"ssid", "password", "wifi_power", "channel"}
     advanced_keys = {"width", "height", "tiles", "repository_url", "color_correct", "enable_button"}
     advanced_order = ["width", "height", "tiles", "repository_url", "color_correct", "enable_button"]
-    wifi_group = {}
     app_group = []
     main_html = ""
     adv_items = {}
     settings_html = """<form onsubmit="sav(event)">"""
     for setting in settings:
         if setting in hidden_keys: continue
+        if setting in wifi_card_keys: continue
+        if setting == "rotation": continue
         print("Setting: ", setting)
         val = settings[setting]
         is_adv = setting in advanced_keys
@@ -148,14 +151,7 @@ def textbox(settings):
             c = slider_cfg[setting]
             try: cur = int(float(val))
             except: cur = c["min"]
-            if setting == "rotation":
-                chunk = f"""<label>{setting}</label>
-<div class="range-wrap">
-<input type="range" id="{setting}" name="{setting}" min="{c['min']}" max="{c['max']}" step="{c['step']}" value="{cur}" oninput="document.getElementById('v_{setting}').textContent=this.value" onchange="fetch('/system/rotate?v='+this.value,{{method:'POST'}})">
-<span class="range-val" id="v_{setting}">{cur}</span>
-</div>"""
-            else:
-                chunk = f"""<label>{setting}</label>
+            chunk = f"""<label>{setting}</label>
 <div class="range-wrap">
 <input type="range" id="{setting}" name="{setting}" min="{c['min']}" max="{c['max']}" step="{c['step']}" value="{cur}" oninput="document.getElementById('v_{setting}').textContent=this.value">
 <span class="range-val" id="v_{setting}">{cur}</span>
@@ -175,28 +171,19 @@ def textbox(settings):
                 '<input type="hidden" name="enable_button" value="0">'
                 '<input type="checkbox" id="enable_button" name="enable_button" value="1" ' + _ck + '>'
                 '<label for="enable_button">Enable button</label></div>')
-        elif setting == "password":
-            chunk = f"""<label for="{setting}">{setting}</label>
-{_password_field(setting, setting, "Enter password")}"""
         else:
             chunk = f"""<label for="{setting}">{setting}</label>
 <input type="text" id="{setting}" name="{setting}" placeholder="{str(val)}">"""
         if is_adv:
             adv_items[setting] = chunk
-        elif setting in ("ssid", "password"):
-            wifi_group[setting] = chunk
         elif setting in ("autostart", "screensaver"):
             app_group.append(chunk)
         else:
             main_html += chunk
-    wifi_html = ""
-    if wifi_group:
-        ordered = "".join(wifi_group.get(k, "") for k in ["ssid", "password"])
-        wifi_html = '<div class="section-title" style="margin-top:12px">Wi-Fi</div>' + ordered
     app_html = ""
     if app_group:
         app_html = '<div class="section-title" style="margin-top:12px">App Behavior</div>' + "".join(app_group)
-    settings_html += wifi_html + main_html + app_html
+    settings_html += main_html + app_html
     if "color_correct" not in adv_items:
         _cv = settings.get("color_correct", False)
         _on = str(_cv).lower() not in ("false", "0", "", "none")
@@ -549,8 +536,10 @@ label{display:block;font-size:.67rem;color:var(--muted);text-transform:uppercase
 input[type="text"],input[type="password"],select{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-size:.93rem;outline:none;transition:border-color .15s,box-shadow .15s;-webkit-appearance:none}
 input[type="text"]:focus,input[type="password"]:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,111,255,.15)}
 .pw-wrap{position:relative}
-.pw-wrap input[type="password"],.pw-wrap input[type="text"]{padding-right:38px}
+.pw-wrap input[type="password"],.pw-wrap input[type="text"],.pw-wrap select{padding-right:38px}
 .pw-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;padding:6px;color:var(--muted)}
+.pw-toggle.spinning{animation:spin-centered .6s linear infinite}
+@keyframes spin-centered{to{transform:translateY(-50%) rotate(360deg)}}
 select option{background:var(--surface2)}
 .range-wrap{display:flex;align-items:center;gap:10px;margin-top:5px}
 .range-wrap input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;background:var(--surface3);outline:none}
@@ -720,14 +709,28 @@ def _preset_buttons():
         _pbtn('2X','2x',128,64,'<svg width="24" height="18" viewBox="0 0 24 18"><rect x="2" y="1" width="20" height="16" rx="1" fill="black" stroke="currentColor" stroke-width="1.5"/></svg>'),
     ])
 
-_showed_wifi = False
+def _quick_actions_card():
+    # Rotate + screen-size presets, shared between the home page's
+    # disconnected-state card and /system/settings' own -- previously
+    # duplicated with different headings ("Screen Size" vs "Quick
+    # Actions") and home missing the rotate button entirely.
+    rotate_btn = '<button class="btn btn-sm" onclick="fetch(\'/system/rotate\',{method:\'POST\'}).then(()=>{{var v=document.getElementById(\'v_rotation\');if(v){{var c=parseInt(v.textContent)||0;c=(c+90)%360;v.textContent=c;var s=document.getElementById(\'rotation\');if(s)s.value=c;}}}});">&#128260; 90&deg;</button>'
+    return '<div class="card"><div class="section-title">Quick Actions</div><div class="action-row action-row-fill">' + rotate_btn + _preset_buttons() + '</div></div>'
 
 def _apps_content():
-    global _showed_wifi
-    wifi_html = ""
+    # Same Quick Actions + WiFi cards as /system/settings (not the separate
+    # "WiFi Setup" wizard render_wifi_setup() used to be) -- one experience
+    # for configuring the device regardless of which page you land on.
     if not wifi.radio.connected:
-        wifi_html = wifi_setup.render_wifi_setup()
-        _showed_wifi = True
+        top_html = _quick_actions_card() + wifi_setup.wifi_card()
+    else:
+        # The full card only makes sense while disconnected, but a
+        # lingering wifi_status (e.g. a failed post-connect settings
+        # save) still needs to surface somewhere -- this is the page the
+        # AP setup flow lands back on after connecting, so it's the one
+        # place that's guaranteed to be seen even if the user never
+        # visits /system/settings afterward.
+        top_html = wifi_setup.status_banner()
     installed_apps = ""
     for app in os.listdir("/"):
         if app == "LICENSE": continue
@@ -740,8 +743,7 @@ def _apps_content():
             installed_apps += f'<div class="app-item"><div><span class="app-name">{app}</span>{ver_html}</div>' + _run_button_html(app) + """</div>"""
     if not installed_apps:
         installed_apps = '<p style="color:var(--muted);text-align:center;padding:16px 0 8px;font-size:.9rem">No apps installed yet</p><div style="text-align:center;padding-bottom:8px"><button class="btn btn-sm btn-success" style="animation:store-pulse 2.5s ease-in-out infinite" onclick="nav(\'/f/download\')">&#x2B07; Visit the Store</button></div>'
-    preset_html = '<div class="card" style="margin-top:10px"><div class="section-title">Screen Size</div><div class="action-row">' + _preset_buttons() + '</div></div>' if _showed_wifi else ''
-    return wifi_html + preset_html + """<div class="logo">
+    return top_html + """<div class="logo">
     <h1><span style="color:#fff">Matrix</span><span style="color:#f0c800;font-weight:900">BOX</span></h1>
     <p>Select an app to launch</p>
 </div>
@@ -783,12 +785,14 @@ def webinterface_post(request):
                     settings[setting] = val
                 except: pass
         clearscreen(True)
-        savesettings(settings)
+        if not savesettings(settings):
+            __main__.wifi_status = "Couldn't save settings (read-only filesystem)"
         clearscreen(False)
         __main__.autostart = settings.get("autostart", False)
         __main__.screensaver_app = settings.get("screensaver", "")
         try: apply_display_settings()
         except Exception as e: print("apply_display_settings:", e)
+        render_home_screen()
         return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
     except: pass
 
@@ -897,10 +901,8 @@ def rotate(request):
 
 def _settings_content():
     global settings
-    rotate_btn = '<button class="btn btn-sm" onclick="fetch(\'/system/rotate\',{method:\'POST\'}).then(()=>{{var v=document.getElementById(\'v_rotation\');if(v){{var c=parseInt(v.textContent)||0;c=(c+90)%360;v.textContent=c;var s=document.getElementById(\'rotation\');if(s)s.value=c;}}}});">&#128260; 90&deg;</button>'
-    preset_btns = _preset_buttons()
     return """<div class="logo"><h1>Settings</h1><p>Configure your device</p></div>
-<div class="card"><div class="section-title">Quick Actions</div><div class="action-row action-row-fill">""" + rotate_btn + preset_btns + """</div></div>
+""" + _quick_actions_card() + wifi_setup.wifi_card() + """
 <div class="card"><div class="section-title">Device Settings</div>""" + f"""{textbox(settings)}</div>
 
 <div class="card action-row">""" + unlock + """</div>"""

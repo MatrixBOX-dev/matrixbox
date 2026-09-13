@@ -2,55 +2,187 @@ import ampule
 import web_interface
 
 import __main__
-from __main__ import connect_to_network, settings, wifi
+from __main__ import (
+    connect_to_network,
+    macid,
+    pprint,
+    render_home_screen,
+    settings,
+    wifi,
+)
 
-# Shared "this device isn't on WiFi yet" UI + connect flow. Any route,
-# home or app, can do:
+
+# Shared "this device isn't on WiFi yet" UI + connect flow, usable from any
+# app or route via wifi_setup.needs_setup() / render_wifi_setup() / page().
+# Routes live under /system/wifi/... so they're auto-promoted (see
+# ampule.py) and reachable from inside any app.
+#
+# Expected usage from an app:
 #
 #     import wifi_setup
-#     if wifi_setup.needs_setup():
-#         return (200, {}, header("WiFi Setup", app=True) + wifi_setup.render_wifi_setup() + footer())
 #
-# (or wifi_setup.page() for the common case of wrapping render_wifi_setup()
-# in web_interface's own header()/footer()). Starting the device's own AP
-# hotspot needs no app-facing equivalent -- main.py's boot loop already
-# does that unconditionally, before any app can run, whenever the device
-# isn't connected. This module only covers what happens once someone is
-# actually browsing the resulting page: pick a network, enter a password,
-# connect.
+#     def main_loop():
+#         while True:
+#             if wifi_setup.needs_setup():
+#                 wifi_setup.show_setup_on_led()
+#                 continue
 #
-# The three actions below live under /system/wifi/..., so route()'s
-# /system/ auto-promotion (see ampule.py) makes them reachable from inside
-# any app with no per-app registration -- the same mechanism /system/fm,
-# /system/cmd and /system/settings already rely on.
+#             ...  # normal app behavior
 #
-# web_interface.py's own home screen now uses this (see _apps_content());
-# apps/departures' separate implementation is untouched and still has its
-# own copy, left alone until this gets tried out on an app.
+#     @ampule.route('/', method='GET')
+#     def index(request):
+#         if wifi_setup.needs_setup():
+#             return (200, {}, header("WiFi Setup", app=True) + wifi_setup.render_wifi_setup() + footer())
 #
-# web_interface is imported eagerly (not lazily inside each function)
-# because this module is only ever imported from inside web_interface.py's
-# own execution (its `import wifi_setup` line), so the name resolves to
-# that in-progress module object immediately; the attributes used below
-# (header, footer, url_decoder) are only actually looked up when a request
-# comes in, long after web_interface.py has finished executing.
+#         return (200, {}, normal_app_page())
+#
+# wifi_card() is the full picker+power+channel card shared by the home
+# page and /system/settings; wifi_fields() is just the network/password
+# part, reused by render_wifi_setup()'s standalone page.
+#
+# apps/departures has its own separate copy, untouched for now.
+#
+# web_interface is imported eagerly since this module is only ever
+# imported from inside web_interface.py's own execution.
 
 
 def needs_setup():
     return not wifi.radio.connected
 
 
-def render_wifi_setup():
-    def scan():
-        networks = ""
-        for network in wifi.radio.start_scanning_networks(
-            start_channel=1, stop_channel=14
-        ):
-            networks += f"<option value='{network.ssid}' data-ch='{network.channel}'>{network.ssid} (ch {network.channel})</option>"
-        wifi.radio.stop_scanning_networks()
-        return networks
+def show_setup_on_led():
+    # Show wifi name and device IP for setup instructions.
+    # One space per pixel so name and IP align.
+    pprint("1. Connect to WiFi", line=1)
+    pprint(f"       {macid}", line=2, color="yellow")
+    pprint("2. Go to", line=3)
+    pprint(f"       http://{wifi.radio.ipv4_address_ap!s}", line=4)
 
-    networks = scan()
+
+def _scan_options(current_ssid=""):
+    """<option> tags from a scan, plus "Enter manually...". Returns
+    (options_html, manual_selected) -- manual_selected is True when
+    current_ssid wasn't found, so the caller knows to reveal that field."""
+    networks = ""
+    matched_current = False
+    for network in wifi.radio.start_scanning_networks(start_channel=1, stop_channel=14):
+        selected = ""
+        if network.ssid == current_ssid:
+            selected = "selected"
+            matched_current = True
+        networks += f"<option value='{network.ssid}' data-ch='{network.channel}' {selected}>{network.ssid} (ch {network.channel})</option>"
+    wifi.radio.stop_scanning_networks()
+
+    manual_selected = bool(current_ssid) and not matched_current
+    networks += f"<option value='__manual__' {'selected' if manual_selected else ''}>Enter manually&hellip;</option>"
+    return networks, manual_selected
+
+
+def wifi_fields(current_ssid=""):
+    """Network picker + password field, shared by the AP-setup page and
+    /system/settings. current_ssid is pre-selected/pre-filled so just
+    viewing the page never overwrites a working network with scan results."""
+    options, manual_selected = _scan_options(current_ssid)
+    manual_display = "block" if manual_selected else "none"
+    manual_value = current_ssid if manual_selected else ""
+
+    return f"""<label for="ssid">Network</label>
+<div class="pw-wrap">
+<select id="ssid" name="ssid">{options}</select>
+<button type="button" class="pw-toggle" id="ssid_rescan" title="Rescan for networks" aria-label="Rescan for networks">&#x21bb;</button>
+</div>
+<input type="text" id="ssid_manual" placeholder="Network name" value="{manual_value}" style="display:{manual_display};margin-top:6px">
+<script>
+(function() {{
+    var _ssid = document.getElementById("ssid");
+    var _manual = document.getElementById("ssid_manual");
+    var _rescanBtn = document.getElementById("ssid_rescan");
+    function _sendSSID(v, ch) {{
+        v = v.replace(/#/g, "%23");
+        fetch("/system/wifi/ssid?v=" + v + "&channel=" + (ch || ""), {{ method: "POST" }});
+    }}
+    function _applySelection(focusManual) {{
+        var opt = _ssid.options[_ssid.selectedIndex];
+        if (opt.value === "__manual__") {{
+            _manual.style.display = "block";
+            // only steal focus on "change" -- "click" also fires on reopen and would block re-selecting
+            if (focusManual) _manual.focus();
+            return;
+        }}
+        _manual.style.display = "none";
+        _sendSSID(opt.value, opt.getAttribute("data-ch") || "");
+    }}
+    _ssid.addEventListener("change", function() {{ _applySelection(true); }});
+    _ssid.addEventListener("click", function() {{ _applySelection(false); }});
+    _manual.addEventListener("blur", function() {{
+        if (_manual.value) _sendSSID(_manual.value, "");
+    }});
+    _rescanBtn.addEventListener("click", function() {{
+        var current = _ssid.options[_ssid.selectedIndex].value;
+        if (current === "__manual__") current = _manual.value;
+        _rescanBtn.disabled = true;
+        _rescanBtn.classList.add("spinning");
+        fetch("/system/wifi/scan?current=" + encodeURIComponent(current))
+            .then(function(r) {{ return r.text(); }})
+            .then(function(html) {{
+                _ssid.innerHTML = html;
+                _applySelection(false);
+            }})
+            .finally(function() {{
+                _rescanBtn.disabled = false;
+                _rescanBtn.classList.remove("spinning");
+            }});
+    }});
+    if (_ssid.options[_ssid.selectedIndex].value !== "__manual__") _applySelection(false);
+}})();
+</script>
+<label for="password">Password</label>
+{web_interface._password_field("password", "password", "Enter password")}
+<script>
+document.getElementById("password").addEventListener("blur", function(e) {{
+    var p = e.target.value.replace(/#/g, "%23");
+    fetch("/system/wifi/password?v=" + encodeURIComponent(p), {{ method: "POST" }});
+}});
+</script>"""
+
+
+def status_banner():
+    """Last wifi_status error on its own, for pages that don't show the full wifi_card()."""
+    wifi_error = str(__main__.wifi_status)
+    return f'<p class="error-msg">{wifi_error}</p>' if wifi_error else ""
+
+
+def wifi_card():
+    """Full WiFi card (picker, power, channel, connect, error) shared by home and /system/settings."""
+    try:
+        power = int(float(settings.get("wifi_power", 9)))
+    except:
+        power = 9
+    try:
+        channel = int(settings.get("channel", 0))
+    except:
+        channel = 0
+    channel_label = "Auto" if channel == 0 else str(channel)
+    error_html = status_banner()
+    return f"""<div class="card"><div class="section-title">WiFi</div>
+{wifi_fields(settings.get("ssid", ""))}
+<label for="wifi_power">WiFi Power</label>
+<div class="range-wrap">
+<input type="range" id="wifi_power" min="7" max="20" step="1" value="{power}" oninput="document.getElementById('v_wifi_power').textContent=this.value" onchange="fetch('/system/wifi/power?v='+this.value,{{method:'POST'}})">
+<span class="range-val" id="v_wifi_power">{power}</span>
+</div>
+<label for="channel">Channel</label>
+<div class="range-wrap">
+<input type="range" id="channel" min="0" max="13" step="1" value="{channel}" title="0 = auto-detect" oninput="var v=parseInt(this.value);document.getElementById('v_channel').textContent=v===0?'Auto':v;" onchange="fetch('/system/wifi/ssid?channel='+this.value,{{method:'POST'}})">
+<span class="range-val" id="v_channel">{channel_label}</span>
+</div>
+<div style="font-size:.75rem;color:var(--muted);margin-top:3px">2.4GHz only &mdash; valid channels are 1&ndash;13 (1&ndash;11 in North America). Leave on Auto unless you're connecting to a hidden network or want a faster reconnect by skipping the scan.</div>
+<button class="btn btn-full" style="margin-top:10px" onclick="fetch('/system/wifi/connect').then(function(){{location.reload()}})">Connect</button>
+{error_html}
+</div>"""
+
+
+def render_wifi_setup():
     wifi_error = str(__main__.wifi_status)
     error_html = f'<p class="error-msg">{wifi_error}</p>' if wifi_error else ""
     return f"""<div class="logo">
@@ -58,28 +190,7 @@ def render_wifi_setup():
     <p>Connect to a wireless network</p>
 </div>
 <div class="card">
-    <label for="ssid">Network</label>
-    <select id="ssid" name="ssid">{networks}</select>
-    <script>
-    var _ssid = document.getElementById("ssid");
-    function _sendSSID(el) {{
-        var opt = el.options[el.selectedIndex];
-        var v = opt.value.replace(/#/g, "%23");
-        var ch = opt.getAttribute("data-ch") || "";
-        fetch("/system/wifi/ssid?v=" + v + "&channel=" + ch, {{ method: "POST" }});
-    }}
-    _ssid.addEventListener("change", function() {{ _sendSSID(_ssid); }});
-    _ssid.addEventListener("click",  function() {{ _sendSSID(_ssid); }});
-    if (_ssid.options.length) _sendSSID(_ssid);
-    </script>
-    <label for="password">Password</label>
-    {web_interface._password_field("password", "password", "Enter password")}
-    <script>
-    document.getElementById("password").addEventListener("blur", function(e) {{
-        var p = e.target.value.replace(/#/g, "%23");
-        fetch("/system/wifi/password?v=" + encodeURIComponent(p), {{ method: "POST" }});
-    }});
-    </script>
+    {wifi_fields(settings.get("ssid", ""))}
     <button class="btn btn-full" onclick="fetch('/system/wifi/connect').then(function(){{location.reload()}})">Connect</button>
     {error_html}
 </div>"""
@@ -97,6 +208,13 @@ def page(title="WiFi Setup"):
     )
 
 
+@ampule.route("/system/wifi/scan", method="GET")
+def _scan(request):
+    current = web_interface.url_decoder(request.params.get("current", ""))
+    options, _ = _scan_options(current)
+    return (200, {}, options)
+
+
 @ampule.route("/system/wifi/ssid", method="POST")
 def _set_ssid(request):
     if request.params and "v" in request.params:
@@ -109,6 +227,14 @@ def _set_ssid(request):
     return (200, {}, "")
 
 
+@ampule.route("/system/wifi/power", method="POST")
+def _set_power(request):
+    if request.params and "v" in request.params:
+        settings["wifi_power"] = float(request.params["v"])
+        wifi.radio.tx_power = settings["wifi_power"]
+    return (200, {}, "")
+
+
 @ampule.route("/system/wifi/password", method="POST")
 def _set_password(request):
     if request.params and "v" in request.params:
@@ -118,5 +244,6 @@ def _set_password(request):
 
 @ampule.route("/system/wifi/connect", method="GET")
 def _connect(_):
-    connect_to_network()
+    connect_to_network(save=True)
+    render_home_screen()
     return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")

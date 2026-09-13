@@ -61,40 +61,37 @@ macid = "matrixbox-" + "".join([hex(i) for i in wifi.radio.mac_address]).replace
 wifi_status = ""
 ssl_context = adafruit_connection_manager.get_radio_ssl_context(wifi.radio)
 requests = adafruit_requests.Session(pool, ssl_context)
-first_start = True
 screensaver = time.monotonic()
 
 def start_hotspot():
     try:
         wifi.radio.start_ap(ssid=macid)
-        #wifi.radio.start_dhcp_ap() # Removed (maybe causing connection error http://None )
-        pprint("Started WIFI: ")
-        pprint(str(macid))
-        pprint(str(wifi.radio.ipv4_address_ap))
+        render_home_screen()
     except Exception as e: pprint(str(e))
 
-def connect_to_network(timeout=False, silent=False):
+def connect_to_network(timeout=False, silent=False, save=False):
+    # Never draws. save=True only for an explicit user-initiated connect --
+    # boot/retry reuse stored settings and have nothing new to persist.
     global wifi_status
+    if silent and wifi.radio.connected:
+        return time.monotonic()
     wifi_status = ""
     print("Connecting...")
-    try: 
-        if not silent: pprint(str(settings["ssid"]))
+    try:
         channel = settings.get("channel", 0)
         if channel:
             wifi.radio.connect(str(settings["ssid"]), str(settings["password"]), channel=int(channel), timeout=timeout)
         else:
             wifi.radio.connect(str(settings["ssid"]), str(settings["password"]), timeout=timeout)
-        pprint(str(wifi.radio.ipv4_address))
-        savesettings(settings)
-    except Exception as e: 
-        if not silent: 
-            if "unknown failure" in str(e).lower(): e = "Router distance!"
-            if "no network with" in str(e).lower(): e = "Wrong WIFI name"
-            if "authentication failure" in str(e).lower(): e = "Wrong password"
-            print(e)
-            pprint(str(e), color="red")
-        wifi_status = str(e)
+        if save and wifi.radio.connected:
+            if not savesettings(settings):
+                wifi_status = "Connected, but couldn't save settings (read-only filesystem)"
+    except Exception as e:
+        if "unknown failure" in str(e).lower(): e = "Router distance!"
+        if "no network with" in str(e).lower(): e = "Wrong WIFI name"
+        if "authentication failure" in str(e).lower(): e = "Wrong password"
         print(e)
+        wifi_status = str(e)
     return time.monotonic()
 
 @ampule.route("/exit", method="GET")
@@ -146,23 +143,22 @@ def initialize_app():
         gc.collect()  # reclaim the exited app's bitmaps so the next launch is clean
         display.root_group = rf_group
         os.chdir("/")
-        clearscreen(lines=True)  # zero the window so a buggy app leaves no artifacts
-        show_logo()
-        _wifi_address = f"IP: {wifi.radio.ipv4_address}" if wifi.radio.ipv4_address else "OFFLINE"
-        pprint(_wifi_address, line=1)
-        pprint("Select app:", line=2)
-        show_first_app()
+        render_home_screen()
         return False
 
 def savesettings(settings):
     print("Saving...")
     clearscreen(True)
+    saved = True
     try:
         with open("settings.txt","w") as f:
             f.write(json.dumps(settings))
-    except:
-         print("Read only!")
+    except Exception as e:
+        # USB-connected boards are often read-only to their own code (see boot.py)
+        print("Read only!", e)
+        saved = False
     clearscreen(False)
+    return saved
 
 def installed_apps():
     installed_apps = []
@@ -179,6 +175,24 @@ def show_first_app():
     try: load_settings.installed_apps_list[1]
     except: load_settings.installed_apps_list = installed_apps()
     pprint(load_settings.installed_apps_list[0], line=-1, color="yellow", clear=True, _refresh=True)
+
+def render_home_screen():
+    # Single place that draws the persistent LED screen -- other functions
+    # call this instead of drawing their own version.
+    clearscreen(lines=True)
+    show_logo()  # clearscreen(lines=True) above also wipes the logo overlay -- redraw it
+    if wifi.radio.connected:
+        _wifi_address = f"IP: {wifi.radio.ipv4_address}" if wifi.radio.ipv4_address else "OFFLINE"
+        pprint(_wifi_address, line=1)
+        if wifi_status:
+            # Full message is in the Settings error box; screen is too narrow for it.
+            pprint("Read-only filesystem", line=2, color="red")
+            pprint("Unlock in settings", line=3, color="red")
+        else:
+            pprint("Select app:", line=2)
+        show_first_app()
+    elif wifi.radio.ap_active:
+        wifi_setup.show_setup_on_led()
 
 def next_program_in_list(run=False):
     try: load_settings.installed_apps_list[1]
@@ -206,8 +220,8 @@ screensaver_app = settings.get("screensaver", "starcloud")
 wifi.radio.tx_power = float(settings["wifi_power"])
 
 from web_interface import *
+import wifi_setup
 connect_to_network()
-#first_start = False
 
 while 1:
     print("Entered main loop")
@@ -226,14 +240,12 @@ while 1:
             wifi.radio.tx_power += 1
             if wifi.radio.tx_power == 21: wifi.radio.tx_power = 18
             check_network_again_timer = connect_to_network(timeout=3, silent=True)
-        if first_start == False and wifi.radio.connected: wifi.radio.stop_ap()
+        if wifi.radio.connected: wifi.radio.stop_ap()
         
     while wifi.radio.connected or wifi.radio.ap_active:
         settings["wifi_power"] = wifi.radio.tx_power
-        pprint("Select app:")
-        show_first_app()
+        render_home_screen()
         while wifi.radio.connected:# or wifi.radio.ap_active:
-            first_start = False
             if autostart:
                 print(ampule.listen(socket))
                 load_settings.app_running = autostart
