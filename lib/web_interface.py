@@ -8,7 +8,7 @@ from web_components import checkbox, save_button, password_field
 #print(dir(__main__))
 
 _FAVICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><defs><filter id="led-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="0.7" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><rect width="32" height="32" rx="5" fill="#0d0d0d"/><rect x="0.5" y="0.5" width="31" height="31" rx="4.5" fill="none" stroke="#2a2a2a" stroke-width="1"/><circle cx="6" cy="6" r="1.8" fill="#1c1c1c"/><circle cx="11" cy="6" r="1.8" fill="#1c1c1c"/><circle cx="16" cy="6" r="1.8" fill="#1c1c1c"/><circle cx="21" cy="6" r="1.8" fill="#1c1c1c"/><circle cx="26" cy="6" r="1.8" fill="#1c1c1c"/><circle cx="6" cy="11" r="1.8" fill="#1c1c1c"/><circle cx="11" cy="11" r="1.8" fill="#1c1c1c"/><circle cx="16" cy="11" r="1.8" fill="#1c1c1c"/><circle cx="21" cy="11" r="1.8" fill="#1c1c1c"/><circle cx="26" cy="11" r="1.8" fill="#1c1c1c"/><circle cx="6" cy="16" r="1.8" fill="#1c1c1c"/><circle cx="11" cy="16" r="1.8" fill="#1c1c1c"/><circle cx="16" cy="16" r="1.8" fill="#1c1c1c"/><circle cx="21" cy="16" r="1.8" fill="#1c1c1c"/><circle cx="26" cy="16" r="1.8" fill="#1c1c1c"/><circle cx="6" cy="21" r="1.8" fill="#1c1c1c"/><circle cx="11" cy="21" r="1.8" fill="#1c1c1c"/><circle cx="16" cy="21" r="1.8" fill="#1c1c1c"/><circle cx="21" cy="21" r="1.8" fill="#1c1c1c"/><circle cx="26" cy="21" r="1.8" fill="#1c1c1c"/><circle cx="6" cy="26" r="1.8" fill="#1c1c1c"/><circle cx="11" cy="26" r="1.8" fill="#1c1c1c"/><circle cx="16" cy="26" r="1.8" fill="#1c1c1c"/><circle cx="21" cy="26" r="1.8" fill="#1c1c1c"/><circle cx="26" cy="26" r="1.8" fill="#1c1c1c"/><circle cx="6" cy="6" r="1.8" fill="#ffc800" filter="url(#led-glow)"/><circle cx="26" cy="6" r="1.8" fill="#ffc800" filter="url(#led-glow)"/><circle cx="6" cy="11" r="1.8" fill="#ffc800" filter="url(#led-glow)"/><circle cx="11" cy="11" r="1.8" fill="#ffc800" filter="url(#led-glow)"/><circle cx="21" cy="11" r="1.8" fill="#ffc800" filter="url(#led-glow)"/><circle cx="26" cy="11" r="1.8" fill="#ffc800" filter="url(#led-glow)"/><circle cx="6" cy="16" r="1.8" fill="#ffc800" filter="url(#led-glow)"/><circle cx="16" cy="16" r="1.8" fill="#ffc800" filter="url(#led-glow)"/><circle cx="26" cy="16" r="1.8" fill="#ffc800" filter="url(#led-glow)"/><circle cx="6" cy="21" r="1.8" fill="#ffc800" filter="url(#led-glow)"/><circle cx="26" cy="21" r="1.8" fill="#ffc800" filter="url(#led-glow)"/><circle cx="6" cy="26" r="1.8" fill="#ffc800" filter="url(#led-glow)"/><circle cx="26" cy="26" r="1.8" fill="#ffc800" filter="url(#led-glow)"/></svg>'
-exitbutton = """<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><style>body{background:#08080f;color:#eeeef5;font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;margin:0}a.xbtn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:10px;background:linear-gradient(135deg,#e03c3c,#ff6060);color:#fff;font-weight:700;font-size:.95rem;text-decoration:none;box-shadow:0 2px 14px rgba(224,60,60,.35)}.lbl{color:#7070a0;font-size:.75rem;text-transform:uppercase;letter-spacing:1.5px}</style></head><body><p class="lbl">App Running</p><a class="xbtn" href="/exit">&#x2715; Exit App</a>"""
+exitbutton = """<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><link rel="icon" type="image/svg+xml" href="/system/favicon.svg"><style>body{background:#08080f;color:#eeeef5;font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;margin:0}a.xbtn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:10px;background:linear-gradient(135deg,#e03c3c,#ff6060);color:#fff;font-weight:700;font-size:.95rem;text-decoration:none;box-shadow:0 2px 14px rgba(224,60,60,.35)}.lbl{color:#7070a0;font-size:.75rem;text-transform:uppercase;letter-spacing:1.5px}</style></head><body><p class="lbl">App Running</p><a class="xbtn" href="/exit">&#x2715; Exit App</a>"""
 backbutton = """<a class="back-btn" href="../">&#8592; Back</a>"""
 bootloaderbutton = """<button class="btn btn-danger" onclick="if(confirm('Enter bootloader mode?'))fetch('/bootloader',{method:'POST'})">&#x26A1; Bootloader</button>"""
 unlock = """<button type="button" class="btn btn-full btn-warning" onclick="fetch('/system/settings?unlock=true', {method: 'POST'})">&#x1F513; Unlock</button>"""
@@ -646,7 +646,7 @@ def header(title="Settings", app=False):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/system/favicon.svg">
     <title>{title}</title>
     <style>{css()}</style>
 </head>
@@ -662,7 +662,7 @@ def _shell(content, title="MatrixBox", frag="/f/apps", app=False, back=False):
 <html lang="en"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/svg+xml" href="/system/favicon.svg">
 <title>{title}</title>
 <style>{css()}</style>
 </head>
@@ -959,7 +959,7 @@ import filemanager
 import wifi_setup
 
 
-@ampule.route('/favicon.svg')
+@ampule.route('/system/favicon.svg')
 def _favicon(request):
     return (200, {'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=86400'}, _FAVICON_SVG)
 
