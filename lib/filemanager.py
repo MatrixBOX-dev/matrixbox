@@ -311,4 +311,4 @@ function router(){
 window.addEventListener("hashchange",router);
 if(location.hash.length>1)router();else go("/");
 </script>"""
-    return (200, {}, web_interface._shell(content, "File Manager", "/system/fm", app=in_app, back=True))
+    return (200, {}, web_interface._shell(content, "File Manager", "/system/fm", app=in_app))

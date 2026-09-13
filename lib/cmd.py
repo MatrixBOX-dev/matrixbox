@@ -102,4 +102,4 @@ body{display:flex;flex-direction:column;height:100vh;overflow:hidden;padding-bot
         if (ev.keyCode == 13) { commandButton.click(); }
     });
 </script>"""
-    return (200, {}, web_interface._shell(content, "Terminal", "/system/cmd", app=in_app, back=True))
+    return (200, {}, web_interface._shell(content, "Terminal", "/system/cmd", app=in_app))

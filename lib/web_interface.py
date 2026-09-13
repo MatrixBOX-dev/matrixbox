@@ -475,9 +475,8 @@ def css():
 body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;min-height:100vh;padding-bottom:40px}
 .navbar{position:sticky;top:0;z-index:100;background:rgba(8,8,15,.85);border-bottom:1px solid var(--border);padding:0 14px;display:flex;align-items:center;height:46px;gap:4px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .nav-brand{font-weight:800;font-size:.9rem;color:#fff;margin-right:6px;text-decoration:none;letter-spacing:-.2px}
-.nav-title{font-weight:600;font-size:.9rem;color:var(--text);flex:1;padding-left:4px}
-.nav-back{font-weight:600;font-size:.9rem;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:4px;margin-left:-6px;padding:6px;border-radius:8px}
-.nav-back:hover{background:var(--surface2)}
+.nav-sep{color:var(--muted);opacity:.5;margin-right:6px;font-size:.85rem}
+.nav-title{font-weight:600;font-size:.9rem;color:var(--muted)}
 .nav-link{color:var(--muted);text-decoration:none;font-size:.76rem;padding:5px 9px;border-radius:7px;transition:color .15s,background .15s;font-weight:500}
 .nav-link:hover{color:var(--text);background:var(--surface2)}
 .nav-spacer{flex:1}
@@ -591,26 +590,22 @@ def _sig_bars(rssi):
 # currentColor so hover/off-state color changes apply to icons for free.
 _NAV_ICON_PATHS = {
     "menu": '<path d="M4 6h16M4 12h16M4 18h16"/>',
-    "back": '<path d="M15 18l-6-6 6-6"/>',
+    "home": '<path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/>',
     "folder": '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     "settings": '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
     "bulb": '<path d="M9 21h6"/><path d="M10 17h4"/><path d="M12 3a6 6 0 0 0-3.2 11.1c.7.5 1.2 1.3 1.2 2.2v.2h4v-.2c0-.9.5-1.7 1.2-2.2A6 6 0 0 0 12 3z"/>',
     "refresh": '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>',
     "x": '<path d="M18 6 6 18M6 6l12 12"/>',
     "terminal": '<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>',
+    "download": '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/>',
 }
 
 def _nav_icon(name):
     return f'<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{_NAV_ICON_PATHS[name]}</svg>'
 
-def navbar(title=None, app=False, back=False):
-    # One shared navbar for home, app, and settings contexts: only the left
-    # slot and the burger menu's last item differ (brand + Restart Device at
-    # home, title + Exit App inside an app); File Manager, Settings and the
-    # LED toggle live in the menu identically either way. `back` overrides
-    # the left slot with a link to / -- wherever that resolves to in the
-    # currently active route table (home's index, or the running app's) --
-    # for pages like settings that are reached from either context.
+def navbar(title=None, app=False):
+    # Shared navbar: logo always top-left (doubles as back/home), only the
+    # title and the menu's last item (Restart Device vs Exit App) vary.
     ip = str(wifi.radio.ipv4_address) if wifi.radio.ipv4_address else "OFFLINE"
     rssi = _rssi()
     perf = _perf()
@@ -624,12 +619,13 @@ def navbar(title=None, app=False, back=False):
         except OSError: _reboot_cls = ""
         action_item = f'<button class="nav-menu-item{_reboot_cls}" onclick="if(confirm(\'Restart?\'))fetch(\'/reset\',{{method:\'POST\'}})">{_nav_icon("refresh")} Restart Device</button>'
         burger_cls = _reboot_cls
-    if back:
-        left = f'<a class="nav-back" href="/">{_nav_icon("back")}{title or "Back"}</a>'
-    elif app:
-        left = f'<span class="nav-title">{title}</span>'
-    else:
-        left = '<a class="nav-brand" href="/" onclick="nav(\'/f/apps\');return false">Matrix<span style="color:#f0c800;font-weight:900">BOX</span></a>'
+    has_page_title = title and title != "MatrixBox"
+    # Home item only when idle on a system page -- in-app has Exit App, home is already home.
+    home_item = f'<a class="nav-menu-item" href="/">{_nav_icon("home")} Home</a>' if (not app and has_page_title) else ""
+    download_item = f'<a class="nav-menu-item" href="/download">{_nav_icon("download")} Apps</a>' if not app else ""
+    # Plain link, not SPA nav() -- that only swaps #content, leaving this navbar stale.
+    logo = '<a class="nav-brand" href="/">Matrix<span style="color:#f0c800;font-weight:900">BOX</span></a>'
+    left = f'{logo}<span class="nav-sep">/</span><span class="nav-title">{title}</span>' if has_page_title else logo
     return f"""<nav class="navbar">
 {left}
 <div class="nav-spacer"></div>
@@ -642,10 +638,12 @@ def navbar(title=None, app=False, back=False):
 <div class="nav-menu">
 <button class="nav-x{burger_cls}" onclick="var m=this.nextElementSibling;var willOpen=!m.classList.contains('open');document.querySelectorAll('.nav-menu-list.open').forEach(function(e){{e.classList.remove('open')}});if(willOpen)m.classList.add('open');event.stopPropagation();" title="Menu">{_nav_icon("menu")}</button>
 <div class="nav-menu-list">
+{home_item}
 <a class="nav-menu-item" href="/system/settings">{_nav_icon("settings")} Settings</a>
 {led_item}
 <a class="nav-menu-item" href="/system/fm">{_nav_icon("folder")} File Manager</a>
 <a class="nav-menu-item" href="/system/cmd">{_nav_icon("terminal")} Terminal</a>
+{download_item}
 {action_item}
 </div>
 </div>
@@ -672,8 +670,8 @@ def footer(back=False):
     back_html = backbutton if back else ""
     return f"""{back_html}</div></body></html>"""
 
-def _shell(content, title="MatrixBox", frag="/f/apps", app=False, back=False):
-    nav = navbar(title, app, back)
+def _shell(content, title="MatrixBox", frag="/f/apps", app=False):
+    nav = navbar(title, app)
     return f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8">
@@ -915,7 +913,7 @@ def settings_page(request):
     # here, even when what the user actually wants from this screen is to
     # get back out of the app they were in.
     in_app = bool(load_settings.app_running)
-    return (200, {}, _shell(_settings_content(), "Settings", "/system/settings", app=in_app, back=True))
+    return (200, {}, _shell(_settings_content(), "Settings", "/system/settings", app=in_app))
 
 @ampule.route("/system/settings", method="POST")
 def _system_settings_save(request):
