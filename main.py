@@ -187,7 +187,7 @@ def render_home_screen():
         if wifi_status:
             # Full message is in the Settings error box; screen is too narrow for it.
             pprint("Read-only filesystem", line=2, color="red")
-            pprint("Unlock in settings", line=3, color="red")
+            pprint("Restart to fix", line=3, color="red")
         else:
             pprint("Select app:", line=2)
         show_first_app()
