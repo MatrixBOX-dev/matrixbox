@@ -60,11 +60,19 @@ def show_setup_on_led():
     pprint(f"       http://{wifi.radio.ipv4_address_ap!s}", line=4)
 
 
+def _current_options(current_ssid=""):
+    """No-scan option list: stored ssid (if any) plus "Enter manually..."."""
+    if current_ssid:
+        return (
+            f"<option value='{current_ssid}' selected>{current_ssid}</option>"
+            "<option value='__manual__'>Enter manually&hellip;</option>"
+        )
+    return "<option value='__manual__' selected>Enter manually&hellip;</option>"
+
+
 def _scan_options(current_ssid=""):
-    """<option> tags from a scan, plus "Enter manually...". If current_ssid
-    isn't in range, it's added as its own selected option instead of
-    falling back to manual entry -- a poor first-boot experience for a
-    device that ships with an ssid already configured."""
+    """<option> tags from a live scan, plus "Enter manually...". Keeps
+    current_ssid as its own selected option if not found in range."""
     networks = ""
     matched_current = False
     for network in wifi.radio.start_scanning_networks(start_channel=1, stop_channel=14):
@@ -84,9 +92,10 @@ def _scan_options(current_ssid=""):
 
 def wifi_fields(current_ssid=""):
     """Network picker + password field, shared by the AP-setup page and
-    /system/settings. current_ssid is pre-selected/pre-filled so just
-    viewing the page never overwrites a working network with scan results."""
-    options = _scan_options(current_ssid)
+    /system/settings. Only auto-scans while disconnected -- scanning while
+    connected can drop the radio off its own AP, so once connected only
+    the rescan button (⟳) scans."""
+    options = _scan_options(current_ssid) if not wifi.radio.connected else _current_options(current_ssid)
 
     return f"""<label for="ssid">Network</label>
 <div class="pw-wrap">
