@@ -483,7 +483,10 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-ap
 .nav-spacer{flex:1}
 .nav-info{color:var(--muted);font-size:.68rem;letter-spacing:.2px;text-align:right;line-height:1.4}
 .nav-info span{display:block}
-.sig{display:flex;align-items:center;gap:2px;margin:0 6px}
+.nav-perf{color:var(--muted);font-size:.68rem;letter-spacing:.2px;line-height:1.4}
+.nav-perf-row{display:flex;gap:6px}
+.nav-perf-label{opacity:.6;min-width:30px}
+.sig{display:flex;flex-direction:column-reverse;align-items:center;justify-content:center;gap:3px;margin:0 12px}
 .sig i{display:block;width:5px;height:5px;background:rgba(112,112,160,.3);border-radius:1px}
 .sig i.on{background:#00c853}
 .nav-x{color:var(--muted);font-size:1rem;font-weight:700;text-decoration:none;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--border);background:none;cursor:pointer;transition:color .15s,border-color .15s,background .15s;margin-left:4px}
@@ -571,6 +574,13 @@ def _rssi():
     except:
         return -100
 
+def _perf():
+    free = gc.mem_free()
+    alloc = gc.mem_alloc()
+    total = free + alloc
+    mem_pct = int(alloc * 100 // total) if total else 0
+    return {"loop_ms": ampule.loop_time_ms(), "mem_pct": mem_pct, "mem_free": _fmt_size(free)}
+
 def _sig_bars(rssi):
     n = 5 if rssi > -45 else 4 if rssi > -55 else 3 if rssi > -65 else 2 if rssi > -75 else 1 if rssi > -85 else 0
     bars = ''.join(f'<i class="{"on" if i < n else ""}"></i>' for i in range(5))
@@ -603,6 +613,7 @@ def navbar(title=None, app=False, back=False):
     # for pages like settings that are reached from either context.
     ip = str(wifi.radio.ipv4_address) if wifi.radio.ipv4_address else "OFFLINE"
     rssi = _rssi()
+    perf = _perf()
     led_item = f'<button class="nav-menu-item{" led-off" if _led_off else ""}" id="ledbtn" onclick="fetch(\'/system/led\',{{method:\'POST\'}}).then(function(r){{return r.json()}}).then(function(j){{var b=document.getElementById(\'ledbtn\');if(j.off){{b.classList.add(\'led-off\')}}else{{b.classList.remove(\'led-off\')}}}})">{_nav_icon("bulb")} LED</button>'
     if app:
         action_item = f'<a class="nav-menu-item" href="/exit">{_nav_icon("x")} Exit App</a>'
@@ -624,6 +635,10 @@ def navbar(title=None, app=False, back=False):
 <div class="nav-spacer"></div>
 <div class="nav-info"><span id="clk"></span><span>{ip}</span></div>
 {_sig_bars(rssi)}
+<div class="nav-perf" id="perf" title="Main loop time / free memory">
+<div class="nav-perf-row"><span class="nav-perf-label">LOOP</span><span id="perf-loop">{perf['loop_ms']}ms</span></div>
+<div class="nav-perf-row"><span class="nav-perf-label">MEM</span><span id="perf-mem">{perf['mem_pct']}% ({perf['mem_free']} free)</span></div>
+</div>
 <div class="nav-menu">
 <button class="nav-x{burger_cls}" onclick="var m=this.nextElementSibling;var willOpen=!m.classList.contains('open');document.querySelectorAll('.nav-menu-list.open').forEach(function(e){{e.classList.remove('open')}});if(willOpen)m.classList.add('open');event.stopPropagation();" title="Menu">{_nav_icon("menu")}</button>
 <div class="nav-menu-list">
@@ -637,6 +652,7 @@ def navbar(title=None, app=False, back=False):
 </nav>
 <script>function _ck(){{var d=new Date(),h=d.getHours(),m=d.getMinutes();document.getElementById('clk').textContent=(h<10?'0':'')+h+':'+(m<10?'0':'')+m;}}_ck();setInterval(_ck,15000);
 function _rs(){{fetch('/system/rssi').then(function(r){{return r.text()}}).then(function(v){{var s=document.getElementById('sig');if(!s)return;var r=parseInt(v),n=r>-45?5:r>-55?4:r>-65?3:r>-75?2:r>-85?1:0;s.title=r+' dBm';var b=s.querySelectorAll('i');for(var i=0;i<b.length;i++){{if(i<n)b[i].classList.add('on');else b[i].classList.remove('on');}}}}).catch(function(){{}});}}_rs();setInterval(_rs,30000);
+function _pf(){{fetch('/system/perf').then(function(r){{return r.json()}}).then(function(j){{var l=document.getElementById('perf-loop'),m=document.getElementById('perf-mem');if(l)l.textContent=j.loop_ms+'ms';if(m)m.textContent=j.mem_pct+'% ('+j.mem_free+' free)';}}).catch(function(){{}});}}_pf();setInterval(_pf,3000);
 document.addEventListener('click',function(){{document.querySelectorAll('.nav-menu-list.open').forEach(function(e){{e.classList.remove('open')}})}});</script>"""
 
 def header(title="Settings", app=False):
@@ -948,6 +964,11 @@ def _system_rssi(request):
     except:
         rssi = -100
     return (200, {"Content-Type": "text/plain"}, str(rssi))
+
+# Polled every few seconds so a slow app's loop time shows up live.
+@ampule.route("/system/perf")
+def _system_perf(request):
+    return (200, {}, json.dumps(_perf()))
 
 
 ####################################################
