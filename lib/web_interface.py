@@ -473,31 +473,37 @@ def css():
 :root{--bg:#08080f;--surface:#111118;--surface2:#1c1c2a;--surface3:#26263a;--accent:#7c6fff;--accent2:#00d4ff;--text:#eeeef5;--muted:#7070a0;--border:rgba(120,120,255,.1);--r:10px;--r-lg:16px;--shadow:0 4px 24px rgba(0,0,0,.5)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;min-height:100vh;padding-bottom:40px}
-.navbar{position:sticky;top:0;z-index:100;background:rgba(8,8,15,.85);border-bottom:1px solid var(--border);padding:0 14px;display:flex;align-items:center;height:46px;gap:4px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
-.nav-brand{font-weight:800;font-size:.9rem;color:#fff;margin-right:6px;text-decoration:none;letter-spacing:-.2px}
-.nav-sep{color:var(--muted);opacity:.5;margin-right:6px;font-size:.85rem}
-.nav-title{font-weight:600;font-size:.9rem;color:var(--muted)}
+.navbar{position:sticky;top:0;z-index:100;background:rgba(8,8,15,.85);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;height:52px;gap:6px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.nav-brand{font-weight:800;font-size:.9rem;color:#fff;margin-right:6px;text-decoration:none;letter-spacing:-.2px;flex-shrink:0}
+.nav-sep{color:var(--muted);opacity:.5;margin-right:6px;font-size:.85rem;flex-shrink:0}
+.nav-title{font-weight:600;font-size:.9rem;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav-link{color:var(--muted);text-decoration:none;font-size:.76rem;padding:5px 9px;border-radius:7px;transition:color .15s,background .15s;font-weight:500}
 .nav-link:hover{color:var(--text);background:var(--surface2)}
 .nav-spacer{flex:1}
-.nav-info{color:var(--muted);font-size:.68rem;letter-spacing:.2px;text-align:right;line-height:1.4}
+.nav-info{color:var(--muted);font-size:.68rem;letter-spacing:.2px;text-align:right;line-height:1.4;flex-shrink:0}
 .nav-info span{display:block}
-.nav-perf{color:var(--muted);font-size:.68rem;letter-spacing:.2px;line-height:1.4}
+.nav-perf{color:var(--muted);font-size:.68rem;letter-spacing:.2px;line-height:1.4;min-height:32px;display:flex;flex-direction:column;justify-content:center;flex-shrink:0}
 .nav-perf-row{display:flex;gap:6px}
 .nav-perf-label{opacity:.6;min-width:30px}
-.sig{display:flex;flex-direction:column-reverse;align-items:center;justify-content:center;gap:3px;margin:0 12px}
+.sig{display:flex;flex-direction:column-reverse;align-items:center;justify-content:center;gap:3px;margin:0 14px;height:32px;flex-shrink:0}
 .sig i{display:block;width:5px;height:5px;background:rgba(112,112,160,.3);border-radius:1px}
 .sig i.on{background:#00c853}
-.nav-x{color:var(--muted);font-size:1rem;font-weight:700;text-decoration:none;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--border);background:none;cursor:pointer;transition:color .15s,border-color .15s,background .15s;margin-left:4px}
+.nav-x{color:var(--muted);font-size:1rem;font-weight:700;text-decoration:none;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--border);background:none;cursor:pointer;transition:color .15s,border-color .15s,background .15s;margin-left:4px;flex-shrink:0}
 .nav-x:hover{color:#ff6060;border-color:rgba(255,96,96,.4);background:rgba(255,96,96,.08)}
-.nav-menu{position:relative}
-.nav-menu-list{display:none;position:absolute;top:40px;right:0;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);min-width:170px;padding:6px;flex-direction:column;gap:2px;z-index:101}
+.nav-menu{position:relative;flex-shrink:0}
+.nav-menu-list{display:none;position:absolute;top:46px;right:0;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);min-width:170px;padding:6px;flex-direction:column;gap:2px;z-index:101}
 .nav-menu-list.open{display:flex}
 .nav-menu-item{color:var(--text);text-decoration:none;font-size:.8rem;padding:8px 10px;border-radius:7px;display:flex;align-items:center;gap:8px;background:none;border:none;width:100%;text-align:left;cursor:pointer;font-family:inherit}
 .nav-menu-item:hover{background:var(--surface3)}
 .nav-menu-item.led-off{color:#ff4040}
 .nav-menu-item.reboot-needed{animation:reboot-blink 1s ease-in-out infinite}
 .nav-icon{width:18px;height:18px;flex-shrink:0;display:block}
+.nav-menu-info{display:none;padding:6px 10px 10px;margin-bottom:4px;border-bottom:1px solid var(--border);color:var(--muted);font-size:.68rem;letter-spacing:.2px;line-height:1.6}
+.nav-menu-info>span{display:block}
+@media (max-width:480px){
+.nav-info,.nav-perf{display:none}
+.nav-menu-info{display:block}
+}
 .page{max-width:480px;margin:0 auto;padding:16px 14px}
 .logo{text-align:center;padding:26px 0 18px}
 .logo h1{font-size:1.8rem;font-weight:800;color:#fff;letter-spacing:-.5px}
@@ -563,7 +569,7 @@ input[type="color"]::-webkit-color-swatch{border:none;border-radius:5px}
 @keyframes store-pulse{0%,100%{box-shadow:0 2px 12px rgba(0,176,80,.3),0 0 0 0 rgba(220,220,255,0)}60%{box-shadow:0 2px 12px rgba(0,176,80,.3),0 0 0 5px rgba(220,220,255,.22)}}
 @keyframes reboot-blink{0%,100%{color:#ff6060;border-color:rgba(255,96,96,.7);background:rgba(255,96,96,.15)}50%{color:var(--muted);border-color:var(--border);background:transparent}}
 .nav-x.reboot-needed{animation:reboot-blink 1s ease-in-out infinite}
-.busy-warn{position:fixed;top:46px;left:0;right:0;background:linear-gradient(90deg,#c8a800,#f5e040);color:#111;text-align:center;font-weight:700;font-size:.86rem;padding:10px;z-index:200;letter-spacing:.3px}
+.busy-warn{position:fixed;top:52px;left:0;right:0;background:linear-gradient(90deg,#c8a800,#f5e040);color:#111;text-align:center;font-weight:700;font-size:.86rem;padding:10px;z-index:200;letter-spacing:.3px}
 """
 
 def _rssi():
@@ -620,8 +626,10 @@ def navbar(title=None, app=False):
         action_item = f'<button class="nav-menu-item{_reboot_cls}" onclick="if(confirm(\'Restart?\'))fetch(\'/reset\',{{method:\'POST\'}})">{_nav_icon("refresh")} Restart Device</button>'
         burger_cls = _reboot_cls
     has_page_title = title and title != "MatrixBox"
-    # Home item only when idle on a system page -- in-app has Exit App, home is already home.
-    home_item = f'<a class="nav-menu-item" href="/">{_nav_icon("home")} Home</a>' if (not app and has_page_title) else ""
+    # Always rendered; hidden client-side when already on "/" (script below) --
+    # that's the true home page when idle, or an app's own root page when one
+    # is running, and either way "Home" there would just reload the same page.
+    home_item = f'<a class="nav-menu-item" id="nav-home-item" href="/">{_nav_icon("home")} Home</a>'
     download_item = f'<a class="nav-menu-item" href="/download">{_nav_icon("download")} Apps</a>' if not app else ""
     # Plain link, not SPA nav() -- that only swaps #content, leaving this navbar stale.
     logo = '<a class="nav-brand" href="/">Matrix<span style="color:#f0c800;font-weight:900">BOX</span></a>'
@@ -638,6 +646,7 @@ def navbar(title=None, app=False):
 <div class="nav-menu">
 <button class="nav-x{burger_cls}" onclick="var m=this.nextElementSibling;var willOpen=!m.classList.contains('open');document.querySelectorAll('.nav-menu-list.open').forEach(function(e){{e.classList.remove('open')}});if(willOpen)m.classList.add('open');event.stopPropagation();" title="Menu">{_nav_icon("menu")}</button>
 <div class="nav-menu-list">
+<div class="nav-menu-info"><span id="clk2"></span><span id="ip2">{ip}</span><span>LOOP <span id="perf-loop2">{perf['loop_ms']}ms</span></span><span>MEM <span id="perf-mem2">{perf['mem_pct']}%</span></span></div>
 {home_item}
 <a class="nav-menu-item" href="/system/settings">{_nav_icon("settings")} Settings</a>
 {led_item}
@@ -648,10 +657,11 @@ def navbar(title=None, app=False):
 </div>
 </div>
 </nav>
-<script>function _ck(){{var d=new Date(),h=d.getHours(),m=d.getMinutes();document.getElementById('clk').textContent=(h<10?'0':'')+h+':'+(m<10?'0':'')+m;}}_ck();setInterval(_ck,15000);
+<script>function _ck(){{var d=new Date(),h=d.getHours(),m=d.getMinutes(),t=(h<10?'0':'')+h+':'+(m<10?'0':'')+m;var c=document.getElementById('clk');if(c)c.textContent=t;var c2=document.getElementById('clk2');if(c2)c2.textContent=t;}}_ck();setInterval(_ck,15000);
 function _rs(){{fetch('/system/rssi').then(function(r){{return r.text()}}).then(function(v){{var s=document.getElementById('sig');if(!s)return;var r=parseInt(v),n=r>-45?5:r>-55?4:r>-65?3:r>-75?2:r>-85?1:0;s.title=r+' dBm';var b=s.querySelectorAll('i');for(var i=0;i<b.length;i++){{if(i<n)b[i].classList.add('on');else b[i].classList.remove('on');}}}}).catch(function(){{}});}}_rs();setInterval(_rs,30000);
-function _pf(){{fetch('/system/perf').then(function(r){{return r.json()}}).then(function(j){{var l=document.getElementById('perf-loop'),m=document.getElementById('perf-mem');if(l)l.textContent=j.loop_ms+'ms';if(m)m.textContent=j.mem_pct+'% ('+j.mem_free+' free)';}}).catch(function(){{}});}}_pf();setInterval(_pf,3000);
-document.addEventListener('click',function(){{document.querySelectorAll('.nav-menu-list.open').forEach(function(e){{e.classList.remove('open')}})}});</script>"""
+function _pf(){{fetch('/system/perf').then(function(r){{return r.json()}}).then(function(j){{var l=document.getElementById('perf-loop'),m=document.getElementById('perf-mem'),l2=document.getElementById('perf-loop2'),m2=document.getElementById('perf-mem2');if(l)l.textContent=j.loop_ms+'ms';if(m)m.textContent=j.mem_pct+'% ('+j.mem_free+' free)';if(l2)l2.textContent=j.loop_ms+'ms';if(m2)m2.textContent=j.mem_pct+'%';}}).catch(function(){{}});}}_pf();setInterval(_pf,3000);
+document.addEventListener('click',function(){{document.querySelectorAll('.nav-menu-list.open').forEach(function(e){{e.classList.remove('open')}})}});
+if(location.pathname==='/'){{var _h=document.getElementById('nav-home-item');if(_h)_h.remove();}}</script>"""
 
 def header(title="Settings", app=False):
     nav = navbar(title, app)
