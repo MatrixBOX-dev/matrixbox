@@ -1,4 +1,4 @@
-from fetch_data import fetch
+#from fetch_data import fetch
 #from load_settings import savesettings
 from __main__ import *
 import __main__
