@@ -5,7 +5,7 @@
     "main.py",
     "lib/web_interface.py",
     "lib/web_components.py",
-    "lib/wifi_setup.py",
+    "lib/wlan.py",
     "lib/ampule.py",
     "lib/load_screen.py",
     "lib/downloader.py",
