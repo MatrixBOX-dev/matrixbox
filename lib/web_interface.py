@@ -97,9 +97,9 @@ def textbox(settings):
     }
     hidden_keys = {"ai_provider", "ai_key", "ai_model", "repository_file"}
     # ssid/password/wifi_power/channel live in their own WiFi card
-    # (wifi_setup.wifi_card()) and rotation in the Quick Actions card
+    # (wlan.config_card()) and rotation in the Quick Actions card
     # (_quick_actions_card()) -- none of them belong in this generic form.
-    wifi_card_keys = {"ssid", "password", "wifi_power", "channel"}
+    config_card_keys = {"ssid", "password", "wifi_power", "channel"}
     # Panel hardware -- normally auto-detected, grouped in Advanced with a warning.
     hardware_order = ["width", "height", "tiles", "color_correct"]
     other_advanced_order = ["repository_url", "enable_button"]
@@ -109,7 +109,7 @@ def textbox(settings):
     adv_items = {}
     for setting in settings:
         if setting in hidden_keys: continue
-        if setting in wifi_card_keys: continue
+        if setting in config_card_keys: continue
         if setting == "rotation": continue
         print("Setting: ", setting)
         val = settings[setting]
@@ -720,18 +720,18 @@ def _quick_actions_card():
 
 def _apps_content():
     # Same Quick Actions + WiFi cards as /system/settings (not the separate
-    # "WiFi Setup" wizard render_wifi_setup() used to be) -- one experience
+    # "WiFi Setup" wizard setup_content() used to be) -- one experience
     # for configuring the device regardless of which page you land on.
     if not wifi.radio.connected:
-        top_html = _quick_actions_card() + wifi_setup.wifi_card()
+        top_html = _quick_actions_card() + wlan.config_card()
     else:
         # The full card only makes sense while disconnected, but a
-        # lingering wifi_status (e.g. a failed post-connect settings
+        # lingering wlan.STATUS (e.g. a failed post-connect settings
         # save) still needs to surface somewhere -- this is the page the
         # AP setup flow lands back on after connecting, so it's the one
         # place that's guaranteed to be seen even if the user never
         # visits /system/settings afterward.
-        top_html = wifi_setup.status_banner()
+        top_html = wlan.status_banner()
     installed_apps = ""
     for app in os.listdir("/"):
         if app == "LICENSE": continue
@@ -787,7 +787,7 @@ def webinterface_post(request):
                 except: pass
         clearscreen(True)
         if not savesettings(settings):
-            __main__.wifi_status = "Couldn't save settings (read-only filesystem)"
+            wlan.STATUS = "Couldn't save settings (read-only filesystem)"
         clearscreen(False)
         __main__.autostart = settings.get("autostart", False)
         __main__.screensaver_app = settings.get("screensaver", "")
@@ -908,7 +908,7 @@ def _settings_content():
     app_card = f'<div class="card"><div class="section-title">App Behavior</div>{app_html}</div>' if app_html else ""
     adv_card = f'<div class="card"><details><summary><span class="caret">&#9656;</span>&#9881; Advanced</summary>{adv_html}</details></div>' if adv_html else ""
     return """<div class="logo"><h1>Settings</h1><p>Configure your device</p></div>
-""" + _quick_actions_card() + wifi_setup.wifi_card() + f"""
+""" + _quick_actions_card() + wlan.config_card() + f"""
 <form id="settingsform" onsubmit="sav(event)">
 {main_card}
 {app_card}
@@ -985,7 +985,7 @@ def _system_perf(request):
 
 import cmd
 import filemanager
-import wifi_setup
+import wlan
 
 
 @ampule.route('/system/favicon.svg')

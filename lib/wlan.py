@@ -1,54 +1,114 @@
-import ampule
-import web_interface
-import web_components
+import time
 
-import __main__
+import ampule
+import web_components
+import web_interface
+
 from __main__ import (
-    connect_to_network,
     macid,
     pprint,
     render_home_screen,
+    savesettings,
     settings,
     wifi,
 )
 
-
-# Shared "this device isn't on WiFi yet" UI + connect flow, usable from any
-# app or route via wifi_setup.needs_setup() / render_wifi_setup() / page().
-# Routes live under /system/wifi/... so they're auto-promoted (see
-# ampule.py) and reachable from inside any app.
+# All WiFi radio management: connecting, AP/hotspot fallback, connection
+# status, and the shared "this device isn't on WiFi yet" UI + connect flow,
+# usable from any app or route via wlan.is_connected() / wlan.setup_content()
+# / wlan.setup_page(). Routes live under /system/wifi/... so they're
+# auto-promoted (see ampule.py) and reachable from inside any app.
 #
 # Expected usage from an app:
 #
-#     import wifi_setup
+#     import wlan
 #
 #     def main_loop():
 #         while True:
-#             if wifi_setup.needs_setup():
-#                 wifi_setup.show_setup_on_led()
+#             if not wlan.is_connected():
+#                 wlan.show_setup_on_led()
 #                 continue
 #
 #             ...  # normal app behavior
 #
 #     @ampule.route('/', method='GET')
 #     def index(request):
-#         if wifi_setup.needs_setup():
-#             return (200, {}, header("WiFi Setup", app=True) + wifi_setup.render_wifi_setup() + footer())
+#         if not wlan.is_connected():
+#             return wlan.setup_page()
 #
 #         return (200, {}, normal_app_page())
 #
-# wifi_card() is the full picker+power+channel card shared by the home
-# page and /system/settings; wifi_fields() is just the network/password
-# part, reused by render_wifi_setup()'s standalone page.
+# wlan.config_card() is the full picker+power+channel card shared by the
+# home page and /system/settings; wlan.credentials_fields() is just the
+# network/password part, reused by wlan.setup_content()'s standalone page.
 #
 # apps/departures has its own separate copy, untouched for now.
 #
 # web_interface is imported eagerly since this module is only ever
 # imported from inside web_interface.py's own execution.
+#
+# macid, the boot-time socket/tx_power bring-up, and the shared HTTP
+# session (pool/socket/requests) stay in main.py -- fetch_data.py reads
+# macid via a `from __main__ import *` that runs before web_interface.py
+# (and this module) are ever loaded, and pool/socket/requests are plain
+# HTTP/TCP plumbing used directly by nearly every app, not WiFi-radio setup.
 
 
-def needs_setup():
-    return not wifi.radio.connected
+STATUS = ""
+
+
+def connect_to_network(timeout=False, silent=False, save=False):
+    # Never draws. save=True only for an explicit user-initiated connect --
+    # boot/retry reuse stored settings and have nothing new to persist.
+    global STATUS
+
+    if silent and wifi.radio.connected:
+        return time.monotonic()
+
+    STATUS = ""
+    print("Connecting...")
+
+    try:
+        channel = settings.get("channel", 0)
+        if channel:
+            wifi.radio.connect(
+                str(settings["ssid"]),
+                str(settings["password"]),
+                channel=int(channel),
+                timeout=timeout,
+            )
+        else:
+            wifi.radio.connect(
+                str(settings["ssid"]), str(settings["password"]), timeout=timeout
+            )
+        if save and wifi.radio.connected:
+            if not savesettings(settings):
+                STATUS = "Connected, but couldn't save settings (read-only filesystem)"
+
+    except Exception as e:
+        if "unknown failure" in str(e).lower():
+            e = "Router distance!"
+        if "no network with" in str(e).lower():
+            e = "Wrong WiFi name"
+        if "authentication failure" in str(e).lower():
+            e = "Wrong password"
+
+        print(e)
+        STATUS = str(e)
+
+    return time.monotonic()
+
+
+def start_hotspot():
+    try:
+        wifi.radio.start_ap(ssid=macid)
+        render_home_screen()
+    except Exception as e:
+        pprint(str(e))
+
+
+def is_connected():
+    return wifi.radio.connected
 
 
 def show_setup_on_led():
@@ -84,19 +144,25 @@ def _scan_options(current_ssid=""):
     wifi.radio.stop_scanning_networks()
 
     if current_ssid and not matched_current:
-        networks = f"<option value='{current_ssid}' selected>{current_ssid} (not found)</option>" + networks
+        networks = (
+            f"<option value='{current_ssid}' selected>{current_ssid} (not found)</option>"
+            + networks
+        )
 
     networks += "<option value='__manual__'>Enter manually&hellip;</option>"
     return networks
 
 
-def wifi_fields(current_ssid=""):
+def credentials_fields(current_ssid=""):
     """Network picker + password field, shared by the AP-setup page and
     /system/settings. Only auto-scans while disconnected -- scanning while
     connected can drop the radio off its own AP, so once connected only
     the rescan button (⟳) scans."""
-    options = _scan_options(current_ssid) if not wifi.radio.connected else _current_options(current_ssid)
-
+    options = (
+        _scan_options(current_ssid)
+        if not wifi.radio.connected
+        else _current_options(current_ssid)
+    )
     return f"""<label for="ssid">Network</label>
 <div class="pw-wrap">
 <select id="ssid" name="ssid">{options}</select>
@@ -158,12 +224,12 @@ document.getElementById("password").addEventListener("blur", function(e) {{
 
 
 def status_banner():
-    """Last wifi_status error on its own, for pages that don't show the full wifi_card()."""
-    wifi_error = str(__main__.wifi_status)
+    """Last STATUS error on its own, for pages that don't show the full config_card()."""
+    wifi_error = str(STATUS)
     return f'<p class="error-msg">{wifi_error}</p>' if wifi_error else ""
 
 
-def wifi_card():
+def config_card():
     """Full WiFi card (picker, power, channel, connect, error) shared by home and /system/settings."""
     try:
         power = int(float(settings.get("wifi_power", 9)))
@@ -176,7 +242,7 @@ def wifi_card():
     channel_label = "Auto" if channel == 0 else str(channel)
     error_html = status_banner()
     return f"""<div class="card"><div class="section-title">WiFi</div>
-{wifi_fields(settings.get("ssid", ""))}
+{credentials_fields(settings.get("ssid", ""))}
 <label for="wifi_power">WiFi Power</label>
 <div class="range-wrap">
 <input type="range" id="wifi_power" min="7" max="20" step="1" value="{power}" oninput="document.getElementById('v_wifi_power').textContent=this.value" onchange="fetch('/system/wifi/power?v='+this.value,{{method:'POST'}})">
@@ -193,28 +259,28 @@ def wifi_card():
 </div>"""
 
 
-def render_wifi_setup():
-    wifi_error = str(__main__.wifi_status)
+def setup_content():
+    wifi_error = str(STATUS)
     error_html = f'<p class="error-msg">{wifi_error}</p>' if wifi_error else ""
     return f"""<div class="logo">
     <h1>WiFi Setup</h1>
     <p>Connect to a wireless network</p>
 </div>
 <div class="card">
-    {wifi_fields(settings.get("ssid", ""))}
+    {credentials_fields(settings.get("ssid", ""))}
     <button class="btn btn-full" onclick="fetch('/system/wifi/connect').then(function(){{location.reload()}})">Connect</button>
     {error_html}
 </div>"""
 
 
-def page(title="WiFi Setup"):
+def setup_page(title="WiFi Setup"):
     # Convenience for the common case: an app that already uses
-    # web_interface's header()/footer() can just return wifi_setup.page().
+    # web_interface's header()/footer() can just return wlan.setup_page().
     return (
         200,
         {},
         web_interface.header(title, app=True)
-        + render_wifi_setup()
+        + setup_content()
         + web_interface.footer(),
     )
 
