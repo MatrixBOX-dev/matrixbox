@@ -105,58 +105,6 @@ def _current_window():
 
 _color_map = {"black":0,"yellow":1,"brightwhite":2,"bright_white":2,"bright-white":2,"blue":3,"red":4,"white":5,"light_blue":6,"green":7,"grey":8,"black2":9,"pink":10,"orange":11}
 
-def _pprint(string, line=False, color="white", font=font_mini, _refresh=False, clear=True, top_offset=0, window=None, _clearscreen=True, hr="(", slow=False, block=False, shadow_color=0):
-    """Original pprint with debug output — use for diagnostics."""
-    if window is None: window = _current_window()
-    print(string)
-    global line_window
-    print(line_window)
-    if _clearscreen:
-        string = string + hr * (settings["width"] - strlen(string))
-    max_lines = int(5*(settings["height"]*1/32))
-    if "int" in str(type(line)):
-        _lines = [string]
-        line_window = ["" * (int(line) + 1)]
-    else:
-        line_window.append(string)
-        if len(line_window) > max_lines: line_window.pop(0)
-        _lines = line_window
-    pixwidth = 0
-    _color = color if isinstance(color, int) else _color_map.get(color, 5)
-    offs = 1 + top_offset
-    try:
-        for lin, stringline in enumerate(_lines):
-            if line: lin = line
-            if line == -1: lin = max_lines - 1
-            print(lin, len(_lines))
-            for character in str(stringline):
-                if font == font_mini: character = character.lower()
-                if character not in font: character = "_"
-                for width in range(font[character][0]):
-                    for height in range(font["fontheight"]):
-                        invertedwidth = font[character][0] - width
-                        if isinstance(font[character][1], int):
-                            bit = ((font[character][height+1] >> invertedwidth) & 1)
-                            if int(bit):
-                                window[width + pixwidth, ((6 * lin) + height) + offs] = _color
-                                if block:
-                                    sx = width + pixwidth + 1
-                                    sy = ((6 * lin) + height) + offs + 1
-                                    if 0 <= sx < window.width and 0 <= sy < window.height:
-                                        window[sx, sy] = shadow_color
-                            else:
-                                if not block:
-                                    if clear: window[width+pixwidth, ((6*lin) + height)+offs] = 0
-                        else: window[width+pixwidth, (height)+offs] = int(font[character][height+1][width])
-                if slow: refresh()
-                if isinstance(font[character][1], int): pixwidth += font[character][0]
-                else: pixwidth += len(font[character][1])
-            pixwidth = 0
-            if _refresh: refresh()
-        if lin + 1 == len(_lines): refresh()
-    except Exception as e:
-        print(e)
-
 def pprint(string, line=False, color="white", font=font_mini, _refresh=True, clear=True, top_offset=0, window=None, _clearscreen=True, hr=None, slow=False, block=False, shadow_color=0, overlay=False):
     if window is None: window = _current_window()
     _is_mini = (font == font_mini)

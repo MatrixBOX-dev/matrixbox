@@ -219,7 +219,7 @@ def huvudsidan(request):
                             print(dicts.language[varinit.settings["language"]]["display"]["updating"], file)
                     except: pass
                     functions.sysprint(dicts.language[varinit.settings["language"]]["display"]["updating_file"],10,cls=topbottom)
-                    functions.sysprint("((((((((((((((" +str(filenum + 1) + " av " + str(total_files) ,11)
+                    functions.sysprint((BLANK * 14) + str(filenum + 1) + " av " + str(total_files) ,11)
                     functions.refresh()
                     
                 except Exception as errnum: 

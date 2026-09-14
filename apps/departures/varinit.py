@@ -7,6 +7,12 @@ import os, time, json, functions, ampule, ipaddress, binascii, dicts
 #watchdog.timeout = 60
 #watchdog.mode = WatchDogMode.RESET
 def wd(): pass
+
+# Invisible 1px-wide glyph for pixel-precise padding. Falls back to "("
+# (also blank, same width) while the OS-side font update from #25 is still
+# rolling out.
+BLANK = "\x00" if "\x00" in dicts.font_mini and "\x00" in dicts.font_small and "\x00" in dicts.font_large else "("
+
 deviations_list = []
 deviations_timer = time.monotonic()
 ad_timer = time.monotonic()
