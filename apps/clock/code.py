@@ -5,6 +5,11 @@ import load_screen
 from check_button import check_if_button_pressed
 from load_screen import *
 
+# Invisible 1px-wide glyph for pixel-precise padding. Falls back to "("
+# (also blank, same width) while the OS-side font update from #25 is still
+# rolling out.
+BLANK = "\x00" if "\x00" in font_mini and "\x00" in font_small and "\x00" in font_large else "("
+
 with open("clock.html") as f: html_body = f.read()
 
 DISP_W = settings["width"]
@@ -367,7 +372,7 @@ def draw_time(timestring, colon_vis=True):
 
     # build display string with optional colon blink
     dstr = timestring
-    colon_blank = "(" * f.get(":", (3,))[0]  # pixel-width placeholder for hidden colon
+    colon_blank = BLANK * f.get(":", (3,))[0]  # pixel-width placeholder for hidden colon
     if clocksettings["blink_colon"] and not colon_vis:
         dstr = dstr.replace(":", colon_blank)
 

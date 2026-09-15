@@ -141,7 +141,7 @@ def load_text():
     
     http = "" if int(varinit.settings["long"]) == -1 else "http://"
     if not varinit.settings["no_more_departures"]: varinit.settings["no_more_departures"] = dicts.language[settings["language"]]["display"]["no_more_departures"]
-    _logo = "((" + LOGO_CHAR + " "
+    _logo = (BLANK * 2) + LOGO_CHAR + " "
     return [_logo+dicts.language[settings["language"]]["display"]["sign"],#+" v" + settings["version"] + "     ",
             "WIFI: " + settings["ssid"] + "      ",
             dicts.language[settings["language"]]["display"]["your_settings"],
@@ -608,9 +608,9 @@ def reformat_data(trainlist):
         try: tlist[1] = tlist[1][:varinit.settings["line_length"]]
         except: pass
         if not varinit.settings["clocktime"]: tlist[3] += varinit.settings["mins"]
-        spacing = "((((((((("
+        spacing = BLANK * 9
         if varinit.if_long == 128:
-            spacing = "((("
+            spacing = BLANK * 3
             if tlist[2] in station_names_dict:
                 tlist[2] = station_names_dict[tlist[2]]
             else: 
@@ -650,20 +650,14 @@ def reformat_data(trainlist):
 
         offs = varinit.if_long - (strlen(tlist[3]) + strlen(tlist[1] + spacing + tlist[2]))
         if int(trainlist[0][0]): return trainlist
-        
-        #if varinit.if_long > 128: renderstring(tlist[1] + spacing + tlist[2] + ("(" * offs) + tlist[3], 1)
-        #else:
-        #    offs = 128 - strlen(tlist[3])
-        #    renderstring(offs*"(" + tlist[3], 1)
-        #    renderstring(tlist[1] + spacing + tlist[2], 1)
-        
+
         offs = max(0, varinit.if_long - strlen(tlist[3]))
-        renderstring(offs*"(" + tlist[3], 1)
+        renderstring(offs*BLANK + tlist[3], 1)
         renderstring(tlist[1] + spacing + tlist[2], 1)
 
         return trainlist[1:]
-    spacing = "" if varinit.if_long == 128 else "(("
-    long_buffer = "("*120 if varinit.if_long > 128 else ""
+    spacing = "" if varinit.if_long == 128 else BLANK * 2
+    long_buffer = BLANK * 120 if varinit.if_long > 128 else ""
     if not len(trainlist):                                                                             
         cls(top)
         cls(bottom)
@@ -1056,7 +1050,7 @@ def list_mode(mini=False, half=False):
                 if not varinit.settings["clocktime"]:
                     _mins_ref_w = strlen("00")
                     if strlen(all[3]) < _mins_ref_w:
-                        all[3] = (_mins_ref_w - strlen(all[3])) * "(" + all[3]
+                        all[3] = (_mins_ref_w - strlen(all[3])) * BLANK + all[3]
 
                 if_not_clocktime = (
                     varinit.settings["mins"]
