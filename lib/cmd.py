@@ -14,6 +14,36 @@ def _cmd_print(*args, **kwargs):
     print(text)
 
 
+def _wrap_text(text, max_w, strlen, font):
+    # word-wrap to pixel width, same approach as apps/dictaphone's wrap_text
+    words = text.split(" ")
+    result = []
+    current = ""
+    for w in words:
+        test = (current + " " + w).strip()
+        if strlen(test, font) <= max_w:
+            current = test
+        else:
+            if current:
+                result.append(current)
+            current = w
+            while strlen(current, font) > max_w and len(current) > 1:
+                current = current[:-1]
+    if current:
+        result.append(current)
+    return result
+
+
+def _make_wrapped_pprint(real_pprint, strlen, display, font_mini):
+    def _wrapped(string, line=None, color="white", font=None, **kwargs):
+        f = font if font is not None else font_mini
+        max_lines = display.height // f["fontheight"]
+        base = line if isinstance(line, int) else 0
+        for i, wl in enumerate(_wrap_text(str(string), display.width - 2, strlen, f)[:max_lines]):
+            real_pprint(wl, line=base + i, color=color, font=f, **kwargs)
+    return _wrapped
+
+
 def _run_command(command):
     """Shared eval/exec logic for both the POST and GET handlers."""
     global _cmd_buf, _cmd_env
@@ -21,6 +51,12 @@ def _run_command(command):
         from __main__ import __dict__ as _main_dict
         _cmd_env = dict(_main_dict)
         _cmd_env["print"] = _cmd_print
+        real_pprint = _main_dict.get("pprint")
+        strlen = _main_dict.get("strlen")
+        display = _main_dict.get("display")
+        font_mini = _main_dict.get("font_mini")
+        if real_pprint and strlen and display and font_mini:
+            _cmd_env["pprint"] = _make_wrapped_pprint(real_pprint, strlen, display, font_mini)
     _cmd_buf = []
     try:
         result = eval(command, _cmd_env)
