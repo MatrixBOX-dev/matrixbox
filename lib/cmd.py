@@ -6,20 +6,38 @@ import web_interface
 _cmd_buf = []
 _cmd_env = None
 
+
 def _cmd_print(*args, **kwargs):
     sep = kwargs.get("sep", " ")
     text = sep.join(str(a) for a in args)
     _cmd_buf.append(text)
     print(text)
 
-@ampule.route('/system/cmd', method='POST')
-def execute_command(request):
+
+def _url_decode(s):
+    """Decode %XX escapes in a string. No urllib needed (CircuitPython)."""
+    out = []
+    i = 0
+    while i < len(s):
+        if s[i] == '%' and i + 2 < len(s):
+            try:
+                out.append(chr(int(s[i + 1:i + 3], 16)))
+                i += 3
+                continue
+            except ValueError:
+                pass  # malformed escape, keep the '%' as-is
+        out.append(s[i])
+        i += 1
+    return ''.join(out)
+
+
+def _run_command(command):
+    """Shared eval/exec logic for both the POST and GET handlers."""
     global _cmd_buf, _cmd_env
     if _cmd_env is None:
         from __main__ import __dict__ as _main_dict
         _cmd_env = dict(_main_dict)
         _cmd_env["print"] = _cmd_print
-    command = request.headers["x-command"]
     _cmd_buf = []
     try:
         result = eval(command, _cmd_env)
@@ -32,7 +50,22 @@ def execute_command(request):
             _cmd_buf.append(str(e))
     except Exception as e:
         _cmd_buf.append(str(e))
-    return (200, {}, "\n".join(_cmd_buf))
+    return "\n".join(_cmd_buf)
+
+
+@ampule.route('/system/cmd', method='POST')
+def execute_command(request):
+    command = request.headers["x-command"]
+    return (200, {}, _run_command(command))
+
+
+@ampule.route('/system/exec', method='GET')
+def execute_command_get(request):
+    # Accepts /system/exec?cmd=<url-encoded python>
+    command = _url_decode(request.params.get("cmd", ""))
+    if not command:
+        return (400, {}, "missing ?cmd=")
+    return (200, {}, _run_command(command))
 
 
 @ampule.route("/system/cmd", method="GET")
