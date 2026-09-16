@@ -14,23 +14,6 @@ def _cmd_print(*args, **kwargs):
     print(text)
 
 
-def _url_decode(s):
-    """Decode %XX escapes in a string. No urllib needed (CircuitPython)."""
-    out = []
-    i = 0
-    while i < len(s):
-        if s[i] == '%' and i + 2 < len(s):
-            try:
-                out.append(chr(int(s[i + 1:i + 3], 16)))
-                i += 3
-                continue
-            except ValueError:
-                pass  # malformed escape, keep the '%' as-is
-        out.append(s[i])
-        i += 1
-    return ''.join(out)
-
-
 def _run_command(command):
     """Shared eval/exec logic for both the POST and GET handlers."""
     global _cmd_buf, _cmd_env
@@ -62,7 +45,7 @@ def execute_command(request):
 @ampule.route('/system/exec', method='GET')
 def execute_command_get(request):
     # Accepts /system/exec?cmd=<url-encoded python>
-    command = _url_decode(request.params.get("cmd", ""))
+    command = web_interface.url_decoder(request.params.get("cmd", ""))
     if not command:
         return (400, {}, "missing ?cmd=")
     return (200, {}, _run_command(command))
