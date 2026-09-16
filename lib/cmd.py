@@ -74,17 +74,7 @@ def _run_command(command):
 
 @ampule.route('/system/cmd', method='POST')
 def execute_command(request):
-    command = request.headers["x-command"]
-    return (200, {}, _run_command(command))
-
-
-@ampule.route('/system/exec', method='GET')
-def execute_command_get(request):
-    # Accepts /system/exec?cmd=<url-encoded python>
-    command = web_interface.url_decoder(request.params.get("cmd", ""))
-    if not command:
-        return (400, {}, "missing ?cmd=")
-    return (200, {}, _run_command(command))
+    return (200, {}, _run_command(request.body))
 
 
 @ampule.route("/system/cmd", method="GET")
@@ -125,11 +115,7 @@ body{display:flex;flex-direction:column;height:100vh;overflow:hidden;padding-bot
             try {
                 const response = await fetch(endpoint, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Command': command,
-                    },
-                    body: null,
+                    body: command,
                 });
 
                 if (!response.ok) {
