@@ -10,7 +10,7 @@ from check_button import *
 # from check_button import check_if_button_pressed
 
 def boot_splash():
-    pprint("Booting...", line=0, color="red")
+    pprint("Booting...", line=0, color="white")
 
 def check_if_button_pressed_on_boot():
     try:
@@ -34,10 +34,11 @@ if "unlock" in os.listdir():
     pprint("Unlocking filesystem")
 
 elif check_if_button_pressed_on_boot():
-    pprint("Unlocking filesystem")
+    pprint("Unlocking filesystem",  line=1, color="red")
+    time.sleep(1)
 else:
     lock()
-    pprint("Hold to unlock")
+    pprint("Hold to unlock",  line=1, color="green")
     #pprint("Locked filesystem")
     time.sleep(1)
 
