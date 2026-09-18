@@ -3,6 +3,7 @@
 from __main__ import *
 import __main__
 from web_components import checkbox, save_button, password_field
+import storage
 #from main import connect_to_network
 #import __main__
 #print(dir(__main__))
@@ -496,6 +497,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-ap
 .nav-menu-item{color:var(--text);text-decoration:none;font-size:.8rem;padding:8px 10px;border-radius:7px;display:flex;align-items:center;gap:8px;background:none;border:none;width:100%;text-align:left;cursor:pointer;font-family:inherit}
 .nav-menu-item:hover{background:var(--surface3)}
 .nav-menu-item.led-off{color:#ff4040}
+.ro-badge{display:inline-block;color:#ff4b4b;font-size:.62rem;font-weight:800;letter-spacing:.8px;padding:2px 6px;border:1px solid rgba(255,75,75,.5);border-radius:5px;background:rgba(255,75,75,.1);margin-right:6px;vertical-align:middle;flex-shrink:0}
 .nav-menu-item.reboot-needed{animation:reboot-blink 1s ease-in-out infinite}
 .nav-icon{width:18px;height:18px;flex-shrink:0;display:block}
 .nav-menu-info{display:none;padding:6px 10px 10px;margin-bottom:4px;border-bottom:1px solid var(--border);color:var(--muted);font-size:.68rem;letter-spacing:.2px;line-height:1.6}
@@ -615,6 +617,7 @@ def navbar(title=None, app=False):
     ip = str(wifi.radio.ipv4_address) if wifi.radio.ipv4_address else "OFFLINE"
     rssi = _rssi()
     perf = _perf()
+    ro_badge = '<span class="ro-badge" title="Filesystem is read-only">READ-ONLY</span>' if storage.getmount("/").readonly else ""
     led_item = f'<button class="nav-menu-item{" led-off" if _led_off else ""}" id="ledbtn" onclick="fetch(\'/system/led\',{{method:\'POST\'}}).then(function(r){{return r.json()}}).then(function(j){{var b=document.getElementById(\'ledbtn\');if(j.off){{b.classList.add(\'led-off\')}}else{{b.classList.remove(\'led-off\')}}}})">{_nav_icon("bulb")} LED</button>'
     if app:
         action_item = f'<a class="nav-menu-item" href="/exit">{_nav_icon("x")} Exit App</a>'
@@ -637,7 +640,7 @@ def navbar(title=None, app=False):
     return f"""<nav class="navbar">
 {left}
 <div class="nav-spacer"></div>
-<div class="nav-info"><span id="clk"></span><span>{ip}</span></div>
+<div class="nav-info">{ro_badge}<span id="clk"></span><span>{ip}</span></div>
 {_sig_bars(rssi)}
 <div class="nav-perf" id="perf" title="Main loop time / free memory">
 <div class="nav-perf-row"><span class="nav-perf-label">LOOP</span><span id="perf-loop">{perf['loop_ms']}ms</span></div>
