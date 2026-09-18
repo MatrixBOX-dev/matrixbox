@@ -1,4 +1,3 @@
-
 import sys, wifi, socketpool, time, os, json, microcontroller, ampule, gc
 import load_settings
 import digitalio, board
@@ -7,6 +6,7 @@ settings =  load_settings.settings()
 from load_screen import *
 from check_button import *
 import patches
+import storage
 
 if "apps" in os.listdir():
     for file in os.listdir("apps"):
@@ -16,9 +16,10 @@ if "apps" in os.listdir():
     except: pass
 
 def show_logo():
-    pprint("MatrixBOX(", line=0, color="yellow", hr="¨", _refresh=False, overlay=True)
+    readonly = "#" if storage.getmount("/").readonly else ""
+    pprint(readonly + "MatrixBOX(", line=0, color="yellow", hr="¨", _refresh=False, overlay=True)
     #pprint("", line=0, color="brightwhite", overlay=True)
-    pprint("Matrix", line=0, color="brightwhite", overlay=True)
+    pprint(readonly + "Matrix", line=0, color="brightwhite", overlay=True)
 
 _anim_x = display.width+1
 def logo_anim_step():
@@ -225,7 +226,3 @@ while 1:
                 try: load_settings.app_running = screensaver_app
                 except Exception as e: pprint(e)
                 screensaver = time.monotonic()
-
-            
-            
-            
