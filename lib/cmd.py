@@ -74,17 +74,7 @@ def _run_command(command):
 
 @ampule.route('/system/cmd', method='POST')
 def execute_command(request):
-    command = request.headers["x-command"]
-    return (200, {}, _run_command(command))
-
-
-@ampule.route('/system/exec', method='GET')
-def execute_command_get(request):
-    # Accepts /system/exec?cmd=<url-encoded python>
-    command = web_interface.url_decoder(request.params.get("cmd", ""))
-    if not command:
-        return (400, {}, "missing ?cmd=")
-    return (200, {}, _run_command(command))
+    return (200, {}, _run_command(request.body))
 
 
 @ampule.route("/system/cmd", method="GET")
@@ -97,13 +87,13 @@ body{display:flex;flex-direction:column;height:100vh;overflow:hidden;padding-bot
 .page{max-width:none!important;margin:0!important;padding:0!important;flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 #console-output{flex:1;overflow-y:auto;padding:14px 16px;font-size:.85rem;line-height:1.6;white-space:pre-wrap;word-break:break-all;cursor:text;font-family:'Cascadia Mono','Fira Code','Consolas',monospace;color:var(--text)}
 #input-row{display:flex;align-items:stretch;padding:10px 14px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;gap:8px}
-#command-input{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r);outline:none;color:var(--text);font-family:'Cascadia Mono','Fira Code','Consolas',monospace;font-size:.88rem;caret-color:var(--accent);padding:9px 12px}
+#command-input{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r);outline:none;color:var(--text);font-family:'Cascadia Mono','Fira Code','Consolas',monospace;font-size:.88rem;caret-color:var(--accent);padding:9px 12px;resize:none;min-height:38px;max-height:35vh;overflow-y:auto;line-height:1.4;box-sizing:border-box}
 #command-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,111,255,.15)}
 #command-button{flex-shrink:0;padding-top:0;padding-bottom:0}
 </style>
 <div id="console-output">Welcome to the terminal. Enter Python commands to execute directly in the interpreter.\n\nRunning: """ + os.uname().version + """\n\n</div>
 <div id="input-row">
-<input id="command-input" type="text" placeholder="Enter command..." autocomplete="off" autofocus>
+<textarea id="command-input" rows="1" placeholder="Enter command... (Cmd/Ctrl+Enter to run)" autofocus></textarea>
 <button id="command-button" class="btn btn-sm">Execute</button>
 </div>
 <script>
@@ -125,11 +115,7 @@ body{display:flex;flex-direction:column;height:100vh;overflow:hidden;padding-bot
             try {
                 const response = await fetch(endpoint, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Command': command,
-                    },
-                    body: null,
+                    body: command,
                 });
 
                 if (!response.ok) {
@@ -142,6 +128,7 @@ body{display:flex;flex-direction:column;height:100vh;overflow:hidden;padding-bot
                 var p=document.createElement('span');p.textContent='>>> '+command+'\\n';outputConsole.appendChild(p);
                 if (data) { var e=document.createElement('span');e.textContent=data+'\\n';outputConsole.appendChild(e); }
                 commandInput.value = '';
+                autoGrow();
                 outputConsole.scrollTop = outputConsole.scrollHeight;
             } catch (error) {
                 console.error('Error sending command:', error);
@@ -150,8 +137,17 @@ body{display:flex;flex-direction:column;height:100vh;overflow:hidden;padding-bot
         }
     });
 
+    function autoGrow() {
+        commandInput.style.height = 'auto';
+        commandInput.style.height = Math.min(commandInput.scrollHeight, window.innerHeight * 0.35) + 'px';
+    }
+    commandInput.addEventListener('input', autoGrow);
+
     commandInput.addEventListener('keydown', function(ev) {
-        if (ev.keyCode == 13) { commandButton.click(); }
+        if (ev.key == 'Enter' && (ev.metaKey || ev.ctrlKey)) {
+            ev.preventDefault();
+            commandButton.click();
+        }
     });
 </script>"""
     return (200, {}, web_interface._shell(content, "Terminal", "/system/cmd", app=in_app))
