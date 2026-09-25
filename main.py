@@ -17,7 +17,7 @@ if "apps" in os.listdir():
 
 def show_logo():
     readonly = "#" if storage.getmount("/").readonly else ""
-    pprint(readonly + "MatrixBOX(", line=0, color="orange", hr="¨", _refresh=False, overlay=True)
+    pprint(readonly + "MatrixBOX(", line=0, color="yellow", hr="¨", _refresh=False, overlay=True)
     #pprint("", line=0, color="brightwhite", overlay=True)
     pprint(readonly + "Matrix", line=0, color="brightwhite", overlay=True)
 
