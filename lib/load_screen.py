@@ -21,7 +21,7 @@ if os.uname().machine == "Waveshare ESP32-S3-Zero with ESP32S3":
     _bit_depth = 4
     addr_pins_placeholder = [board.IO7, board.IO8, board.IO9, board.IO10]
     rgb_pins_placeholder = [board.IO1,board.IO3,board.IO2, board.IO4,board.IO6,board.IO5]
-    if settings["height"] == 64: 
+    if settings["height"] == 64 or settings["height"] == 128: 
         addr_pins_placeholder.append(board.IO17)
         rgb_pins_placeholder = [board.IO1,board.IO2,board.IO3, board.IO4,board.IO5,board.IO6]
     matrix = RGBMatrix(width=settings["width"], height=settings["height"], bit_depth=_bit_depth,
