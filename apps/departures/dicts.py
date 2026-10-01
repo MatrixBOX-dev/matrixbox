@@ -180,7 +180,11 @@ settingstxt = {"password": "none",
             "clock_row_align":"left",
             "clock_row_color":"white",
             "dest_scroll":0,
-            
+
+            "dlr_scroll_delay": 15,
+            "custom_scroll_show": 0,
+            "custom_scroll_text": "",
+
             "clocktime": 0, 
 
             "user": "", 

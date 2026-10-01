@@ -461,6 +461,28 @@ def huvudsidan(request):
             varinit.settings["listmode"] = 1 - int(varinit.settings["listmode"])
         functions.switch(_screen = True)
         return (200, {}, "")
+    elif "skin" in request.params:
+        functions.set_skin(request.params["skin"])
+        functions.switch(_screen=False)
+        return (200, {}, "")
+    elif "dlr_scroll_delay" in request.params:
+        try:
+            v = int(request.params["dlr_scroll_delay"])
+            if 1 <= v <= 300: varinit.settings["dlr_scroll_delay"] = v
+        except: pass
+        functions.switch(_screen=False)
+        return (200, {}, "")
+    elif "custom_scroll_show" in request.params:
+        varinit.settings["custom_scroll_show"] = 1 - int(varinit.settings.get("custom_scroll_show", 0))
+        functions.switch(_screen=False)
+        return (200, {}, "")
+    elif "custom_scroll_text" in request.params:
+        text = str(request.params["custom_scroll_text"])
+        for a in html_decode:
+            text = text.replace(a, html_decode[a])
+        varinit.settings["custom_scroll_text"] = text
+        functions.switch(_screen=False)
+        return (200, {}, "")
     elif "clocktime" in request.params: 
         varinit.settings["clocktime"] = 1 - varinit.settings["clocktime"]
         functions.switch(_screen = False)

@@ -129,7 +129,7 @@ PAGE_TPL = """<!DOCTYPE html>
 {SL_SECTION}
 </div>
 <div class="card">
-{LISTMODE_CHK}
+{SKIN_SECTION}
 {CLOCKTIME_CHK}
 {DEVIATIONS_SECTION}
 {DISRUPTIONS}
@@ -156,6 +156,7 @@ PAGE_TPL = """<!DOCTYPE html>
 <tr><td><b>{T_TONE}</b></td><td><div style="display:flex;gap:10px">{TONE_SWATCHES}</div></td></tr>
 {FONT_SIZE_ROW}
 {CLOCK_ROW_HTML}
+{DLR_SETTINGS_SECTION}
 <tr><td><b>Timer</b></td><td><button type="button" class="btn btn-sm" onclick="location.href='/?timer=set'">&#8987; Configure</button></td></tr>
 <tr><td><b>{T_ROTATION}</b></td><td><button type="button" class="btn btn-sm" data-u="/?rotate=1">&#128260; 90&deg;</button></td></tr>
 <tr><td><b>{T_POWER}</b></td><td><input type="text" id="power" class="form-control" style="width:80px;display:inline" placeholder="{POWER_VAL}" data-p="power" data-e="blur"></td></tr>
@@ -190,6 +191,7 @@ function doSearch(){var s=document.getElementById('sstring').value;if(!s)return;
 function doScan(){fetch('/checknet').then(function(r){return r.text();}).then(function(h){var sel=document.getElementById('ssid');sel.innerHTML=h;sel.disabled=false;document.getElementById('password').disabled=false;document.getElementById('connect_wifi').disabled=false;}).catch(function(){});}
 
 var mc=document.getElementById('multiple');if(mc)mc.addEventListener('change',function(){var sb=document.getElementById('screenbtns');if(sb)sb.style.visibility=mc.checked?'visible':'hidden';var sc=document.getElementById('stationcount');if(sc)sc.style.display=mc.checked?'':'none';});
+var sk=document.getElementById('skin_select');if(sk)sk.addEventListener('change',function(){var d=document.getElementById('dlr_settings_rows');if(d)d.style.display=sk.value==='tfl_dlr'?'':'none';});
 function setFont(v,el){fetch('/?font_size='+v);var bs=el.parentNode.querySelectorAll('button');bs.forEach(function(b){b.classList.remove('on');});el.classList.add('on');}
 function setColor(v,el){fetch('/?color='+v);el.parentNode.querySelectorAll('.color-swatch-btn').forEach(function(b){b.classList.remove('active');});el.classList.add('active');}
 document.querySelectorAll('[data-u],[data-p]').forEach(function(el){
@@ -421,10 +423,34 @@ def html():
             + '</select></div>'
         )
 
-    # list mode
-    listmode_html = ""
+    # skin selector: built-in scroll/list, plus any downloadable skins.
+    # A dropdown (rather than segmented buttons) scales to an arbitrary
+    # number of plugin skins, and reuses the generic data-p/data-e wiring
+    # below so picking one is a plain background fetch, not a page reload.
+    skin_html = ""
     if if_long > 64 and varinit.display.height <= 32:
-        listmode_html = _toggle2("abc", s["listmode"], "/?listmode=switch", T["scroll_mode"], T["list_mode"], T["mode_label"])
+        import skinloader
+        cur_skin = functions.get_skin()
+        skin_opts = [("scroll", T["scroll_mode"]), ("list", T["list_mode"])]
+        for _sid, _sinfo in skinloader.PLUGIN_SKINS.items():
+            skin_opts.append((_sid, _sinfo["label"]))
+        skin_select_opts = "".join(_opt(_sid, cur_skin, _label) for _sid, _label in skin_opts)
+        skin_html = ('<div class="toggle-row"><label for="skin_select" class="toggle-label">' + T["mode_label"] + '</label>'
+                     '<select id="skin_select" class="form-control" style="width:160px;display:inline" data-p="skin" data-e="change">'
+                     + skin_select_opts + '</select></div>')
+
+    # TfL DLR skin's own settings. Always rendered (in their own <tbody>) so
+    # switching skins only needs a client-side visibility toggle, not a
+    # server re-render + page reload.
+    _dlr_active = functions.get_skin() == "tfl_dlr"
+    dlr_settings_html = (
+        '<tbody id="dlr_settings_rows" style="' + ("" if _dlr_active else "display:none;") + '">'
+        '<tr><td><b>DLR message dwell</b></td><td><input type="text" id="dlr_scroll_delay" class="form-control" style="width:80px;display:inline" placeholder="' + str(s.get("dlr_scroll_delay", 15)) + '" data-p="dlr_scroll_delay" data-e="blur">'
+        '<br><small>Seconds each departure row shows before disruption/custom messages scroll through.</small></td></tr>'
+        '<tr><td><b>Custom message</b></td><td>' + _chk("custom_scroll_show", s.get("custom_scroll_show", 0), "/?custom_scroll_show=switch", "Show custom scrolling message") + '</td></tr>'
+        '<tr><td><b>Custom message text</b></td><td><input type="text" id="custom_scroll_text" class="form-control" style="width:160px;display:inline" placeholder="' + str(s.get("custom_scroll_text", "")) + '" data-p="custom_scroll_text" data-e="blur" data-enc="1"></td></tr>'
+        '</tbody>'
+    )
 
     # clocktime
     clock_html = _toggle2("clocktime", s["clocktime"], "/?clocktime=switch", T["countdown"], T["clock_time"], T["time_label"])
@@ -538,7 +564,8 @@ def html():
         "DIRECTION_SECTION": dir_html,
         "SCROLL_SECTION": scroll_html,
         "T_TRAFFIC_TYPES": T["traffic_types"],
-        "LISTMODE_CHK": listmode_html, "CLOCKTIME_CHK": clock_html,
+        "SKIN_SECTION": skin_html, "CLOCKTIME_CHK": clock_html,
+        "DLR_SETTINGS_SECTION": dlr_settings_html,
         "DEVIATIONS_SECTION": devs_html,
         "SLEEP_CHK": sleep_html, "BUTTON_MODE_CHK": button_mode_html, "SHOW_STATION_CHK": show_stn_html,
         "T_SAVE": T["save"],

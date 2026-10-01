@@ -62,7 +62,7 @@ def check_button():
                     if int(varinit.settings.get("button_mode", 0)):
                         varinit.deviations_timer = time.monotonic()
                         if varinit.display.width > 64 and varinit.display.height <= 32:
-                            varinit.settings["listmode"] = 1 - int(varinit.settings["listmode"])
+                            set_skin("scroll" if get_skin() == "list" else "list")
                         switch(_screen=True)
                     else:
                         nightcheck(_switch=True, turnon=varinit.group.hidden); refresh()
@@ -136,6 +136,37 @@ def switch(_screen=True, _cls=False, force=False, wifi_screen=False):
         bounce(direction)
     cls(bottom, _refresh=True)
     reset_scroll()
+    # web settings routes all funnel through here (usually via _screen=False),
+    # so this is also the one place a plugin skin needs to hear about changes
+    if varinit.active_skin_ns:
+        try: varinit.active_skin_ns["refresh_settings"]()
+        except Exception as e: print("Skin refresh_settings error:", e)
+
+def get_skin():
+    return varinit.settings.get("skin", "list" if int(varinit.settings.get("listmode", 0)) else "scroll")
+
+def set_skin(skin_id):
+    """Activate a display skin: built-in scroll/list, or a downloadable plugin."""
+    varinit.settings["skin"] = skin_id
+    varinit.settings["listmode"] = 0 if skin_id == "scroll" else 1
+    if skin_id in ("scroll", "list"):
+        varinit.active_skin_id = None
+        varinit.active_skin_ns = None
+        return
+    import skinloader
+    try:
+        if not skinloader.is_downloaded(skin_id):
+            sysprint("Downloading skin...", 0, _refresh=True)
+        ns = skinloader.load(skin_id)
+        varinit.active_skin_ns = ns
+        varinit.active_skin_id = skin_id
+        varinit.shared["scroll_timer"] = ns["on_enter"]()
+    except Exception as e:
+        print("Skin load error:", e)
+        varinit.active_skin_id = None
+        varinit.active_skin_ns = None
+        varinit.settings["skin"] = "list"
+        varinit.settings["listmode"] = 1
 
 def load_text():
     

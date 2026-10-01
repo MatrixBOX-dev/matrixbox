@@ -62,14 +62,24 @@ while not varinit.exit:
         if x: 
             ampule.listen(socket)
             check_button()
-        if int(varinit.settings["listmode"]) and time.monotonic() > varinit.shared["scroll_timer"] + updatedelay: varinit.shared["scroll_timer"] = list_mode()
-        elif not int(varinit.settings["listmode"]) and varinit.display.width > 64: 
-            varinit.tg2.x -= 1
-            refresh(int(delay + varinit.settings["scroll"]) + 1 * (delay*2))
-            if varinit.tg2.x < -varinit.scrollsum: scroll_mode()
-            elif time.monotonic() > varinit.shared["scroll_timer"] + updatedelay and shared["loop_counter"] >= 0: scroll_mode()
+        _skin = get_skin()
+        if _skin not in ("scroll", "list") and varinit.active_skin_id != _skin:
+            set_skin(_skin)          # (down)loads a plugin skin and calls its on_enter()
+            _skin = get_skin()       # re-read: set_skin() falls back to "list" on failure
+        if _skin == "list":
+            if time.monotonic() > varinit.shared["scroll_timer"] + updatedelay: varinit.shared["scroll_timer"] = list_mode()
+        elif _skin == "scroll":
+            if varinit.display.width > 64:
+                varinit.tg2.x -= 1
+                refresh(int(delay + varinit.settings["scroll"]) + 1 * (delay*2))
+                if varinit.tg2.x < -varinit.scrollsum: scroll_mode()
+                elif time.monotonic() > varinit.shared["scroll_timer"] + updatedelay and shared["loop_counter"] >= 0: scroll_mode()
+        elif varinit.active_skin_ns:
+            _ns = varinit.active_skin_ns
+            if not _ns["animate_tick"]():
+                if time.monotonic() > varinit.shared["scroll_timer"] + updatedelay: varinit.shared["scroll_timer"] = _ns["render"]()
         # Dest TileGrid smooth scroll (runs every main-loop iteration in listmode)
-        if int(varinit.settings["listmode"]) and int(varinit.settings.get("dest_scroll", 0)):
+        if _skin == "list" and int(varinit.settings.get("dest_scroll", 0)):
             try:
                 _nt = time.monotonic()
                 _scrolled = False
