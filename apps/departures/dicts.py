@@ -187,6 +187,7 @@ settingstxt = {"password": "none",
 
             "dsa_api_provider": 1,
             "dsa_layout": 1,
+            "dsa_summer_time": 0,
 
             "clocktime": 0, 
 

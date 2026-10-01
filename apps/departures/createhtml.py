@@ -501,6 +501,10 @@ def huvudsidan(request):
         except: pass
         functions.switch(_screen=False)
         return (200, {}, "")
+    elif "dsa_summer_time" in request.params:
+        varinit.settings["dsa_summer_time"] = 1 - int(varinit.settings.get("dsa_summer_time", 0))
+        functions.switch(_screen=False)
+        return (200, {}, "")
     elif "clocktime" in request.params: 
         varinit.settings["clocktime"] = 1 - varinit.settings["clocktime"]
         functions.switch(_screen = False)

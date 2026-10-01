@@ -195,7 +195,7 @@ function doSearch(){var s=document.getElementById('sstring').value;if(!s)return;
 function doScan(){fetch('/checknet').then(function(r){return r.text();}).then(function(h){var sel=document.getElementById('ssid');sel.innerHTML=h;sel.disabled=false;document.getElementById('password').disabled=false;document.getElementById('connect_wifi').disabled=false;}).catch(function(){});}
 
 var mc=document.getElementById('multiple');if(mc)mc.addEventListener('change',function(){var sb=document.getElementById('screenbtns');if(sb)sb.style.visibility=mc.checked?'visible':'hidden';var sc=document.getElementById('stationcount');if(sc)sc.style.display=mc.checked?'':'none';});
-var sk=document.getElementById('skin_select');if(sk)sk.addEventListener('change',function(){var d=document.getElementById('dlr_settings_rows');if(d)d.style.display=sk.value==='tfl_dlr'?'':'none';var op=document.getElementById('operator_picker');if(op)op.style.display=sk.value==='dsa'?'none':'';var dp=document.getElementById('dsa_provider_picker');if(dp)dp.style.display=sk.value==='dsa'?'':'none';});
+var sk=document.getElementById('skin_select');if(sk)sk.addEventListener('change',function(){var d=document.getElementById('dlr_settings_rows');if(d)d.style.display=sk.value==='tfl_dlr'?'':'none';var op=document.getElementById('operator_picker');if(op)op.style.display=sk.value==='dsa'?'none':'';var dp=document.getElementById('dsa_provider_picker');if(dp)dp.style.display=sk.value==='dsa'?'':'none';var ms=document.getElementById('multiple_section');if(ms)ms.style.display=sk.value==='dsa'?'none':'';});
 function setFont(v,el){fetch('/?font_size='+v);var bs=el.parentNode.querySelectorAll('button');bs.forEach(function(b){b.classList.remove('on');});el.classList.add('on');}
 function setColor(v,el){fetch('/?color='+v);el.parentNode.querySelectorAll('.color-swatch-btn').forEach(function(b){b.classList.remove('active');});el.classList.add('active');}
 document.querySelectorAll('[data-u],[data-p]').forEach(function(el){
@@ -409,7 +409,8 @@ def html():
         scroll_html = ''.join(['<div class="col"><label for="scroll">', T["scroll"], '</label><select id="scroll" name="scroll" class="form-control" data-p="scroll" data-e="change">', _opt(0, s["scroll"], "Normal"), _opt(1, s["scroll"], T["low"]), '</select></div>'])
 
     # multiple (wide: side-by-side lists; XS: merged single sorted list) - shown
-    # first so the [1][2][3] screen picker below makes sense
+    # first so the [1][2][3] screen picker below makes sense. DSA always shows
+    # a single hardcoded station, so this is meaningless while it's active.
     mult_html = _chk("multiple", s["multiple"], "/?multiple=1", T["multiple"])
 
     # station count (XL only: with 3 panels available, side-by-side lists
@@ -426,6 +427,7 @@ def html():
             + _opt("xl", _cur_width, "3 stations")
             + '</select></div>'
         )
+    mult_html = '<div class="col" id="multiple_section" style="' + ("display:none;" if functions.get_skin() == "dsa" else "") + '">' + mult_html + '</div>'
 
     # skin selector: built-in scroll/list, plus any downloadable skins.
     # A dropdown (rather than segmented buttons) scales to an arbitrary
@@ -471,7 +473,11 @@ def html():
         + _opt(2, s.get("dsa_layout", 1), "Layout 2")
     )
     dsa_provider_html = (
-        '<div class="col" id="dsa_provider_picker" style="' + ("" if _dsa_active else "display:none;") + '">'
+        # flex-basis:100% (not class="col") so this wraps onto its own full-width
+        # line in the parent .form-row, instead of squeezing in as one flex:1
+        # item alongside operator_picker/screenbtns/newstation and THEN trying
+        # to fit two more .col dropdowns inside that already-narrow slice.
+        '<div id="dsa_provider_picker" style="flex:1 1 100%;' + ("" if _dsa_active else "display:none;") + '">'
         '<div class="form-row">'
         '<div class="col"><label for="dsa_api_provider" class="control-label">API provider</label>'
         '<select id="dsa_api_provider" class="form-control" data-p="dsa_api_provider" data-e="change">'
@@ -479,7 +485,10 @@ def html():
         '<div class="col"><label for="dsa_layout" class="control-label">Layout</label>'
         '<select id="dsa_layout" class="form-control" data-p="dsa_layout" data-e="change">'
         + _dsa_layout_opts + '</select></div>'
-        '</div></div>'
+        '</div>'
+        + _chk("dsa_summer_time", s.get("dsa_summer_time", 0), "/?dsa_summer_time=switch",
+               "Summer time (DST, +1h)")
+        + '</div>'
     )
 
     # downloaded skin files (Advanced): a delete button for whichever plugin
