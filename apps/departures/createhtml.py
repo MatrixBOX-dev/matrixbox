@@ -465,6 +465,10 @@ def huvudsidan(request):
         functions.set_skin(request.params["skin"])
         functions.switch(_screen=False)
         return (200, {}, "")
+    elif "skin_delete" in request.params:
+        import skinloader
+        skinloader.delete(request.params["skin_delete"])
+        return (200, {}, mkhtml())
     elif "dlr_scroll_delay" in request.params:
         try:
             v = int(request.params["dlr_scroll_delay"])
@@ -481,6 +485,20 @@ def huvudsidan(request):
         for a in html_decode:
             text = text.replace(a, html_decode[a])
         varinit.settings["custom_scroll_text"] = text
+        functions.switch(_screen=False)
+        return (200, {}, "")
+    elif "dsa_api_provider" in request.params:
+        try:
+            v = int(request.params["dsa_api_provider"])
+            if v in (1, 2, 3): varinit.settings["dsa_api_provider"] = v
+        except: pass
+        functions.switch(_screen=False)
+        return (200, {}, "")
+    elif "dsa_layout" in request.params:
+        try:
+            v = int(request.params["dsa_layout"])
+            if v in (1, 2): varinit.settings["dsa_layout"] = v
+        except: pass
         functions.switch(_screen=False)
         return (200, {}, "")
     elif "clocktime" in request.params: 
@@ -655,6 +673,17 @@ def search_station(request):
     if not sstring:
         try: sstring = request.params["sstring"]
         except: return (200, {}, "")
+    # a skin owning its own (non data.t-skylt.se) station directory can provide its
+    # own search_station(query) hook instead; it builds its own <option> HTML and
+    # populates varinit.datadict itself, same contract as the fallback below.
+    if varinit.active_skin_ns and "search_station" in varinit.active_skin_ns:
+        try:
+            datastr = varinit.active_skin_ns["search_station"](sstring)
+            varinit.results = datastr
+            return (200, {}, datastr)
+        except Exception as e:
+            print("Skin search error:", e)
+            return (200, {}, "")
     datastr = '<option value="0">' + varinit.dicts.language[varinit.settings["language"]]["display"]["select_station"] + '</option>'
     try:
         data = functions.fetch_data("data.t-skylt.se", 90, "/search_stop?country=" + varinit.settings["stations"][num]["country"] + "&operator=" + varinit.settings["stations"][num]["operator"] + "&station=" + sstring)

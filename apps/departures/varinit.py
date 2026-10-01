@@ -52,6 +52,7 @@ dns = False
 currentfont = 0
 active_skin_id = None    # id of the currently-loaded plugin skin, or None for scroll/list
 active_skin_ns = None    # its exec'd namespace (see skinloader.py), or None
+skin_update_checked = set()  # skin ids already checked for an update this boot
 saving_state = False
 settingstoml = dicts.settingstoml
 settingstxt = dicts.settingstxt

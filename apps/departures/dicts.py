@@ -185,6 +185,9 @@ settingstxt = {"password": "none",
             "custom_scroll_show": 0,
             "custom_scroll_text": "",
 
+            "dsa_api_provider": 1,
+            "dsa_layout": 1,
+
             "clocktime": 0, 
 
             "user": "", 

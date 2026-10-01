@@ -100,8 +100,11 @@ PAGE_TPL = """<!DOCTYPE html>
 <div class="section-title">{T_NETWORK_LABEL}</div>
 {MULTIPLE_SECTION}
 <div class="form-row" style="margin-top:12px">
+<div id="operator_picker" style="{OPERATOR_PICKER_DISP}">
 <div class="dropdown" id="opdd"><button type="button" class="dropbtn" id="opbtn" {OPBTN_PULSE} onclick="toggleDropdown(event)">{COUNTRY_FLAG} {OPERATOR} &#9660;</button>
 <div class="dropdown-content">{COMBINED_LIST}</div></div>
+</div>
+{DSA_PROVIDER_SECTION}
 <div id="screenbtns" style="{SCREEN_BTN_DISP}display:flex;align-items:center;gap:6px">
 <span style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Editing</span>
 {SCREEN_BUTTONS}
@@ -166,6 +169,7 @@ PAGE_TPL = """<!DOCTYPE html>
 <tr><td><b>Destination abbreviations</b></td><td><input type="text" id="dest_abbrev" class="form-control" style="width:160px;display:inline" placeholder="{DEST_ABBREV_VAL}" data-p="dest_abbrev" data-e="blur" data-enc="1"></td></tr>
 <tr><td><b>{T_NO_MORE_DEP}</b></td><td><input type="text" id="no_more_departures" class="form-control" style="width:160px;display:inline" placeholder="{NO_MORE_DEP_VAL}" data-p="no_more_departures" data-e="blur" data-enc="1"></td></tr>
 <tr><td><b>{T_MINS}</b></td><td><input type="text" id="mins" class="form-control" style="width:160px;display:inline" placeholder="{MINS_VAL}" data-p="mins" data-e="blur" data-enc="1"></td></tr>
+{SKIN_DELETE_SECTION}
 </table>
 {RT_INDICATOR_CHK}
 {XS_LINE_ID_CHK}
@@ -191,7 +195,7 @@ function doSearch(){var s=document.getElementById('sstring').value;if(!s)return;
 function doScan(){fetch('/checknet').then(function(r){return r.text();}).then(function(h){var sel=document.getElementById('ssid');sel.innerHTML=h;sel.disabled=false;document.getElementById('password').disabled=false;document.getElementById('connect_wifi').disabled=false;}).catch(function(){});}
 
 var mc=document.getElementById('multiple');if(mc)mc.addEventListener('change',function(){var sb=document.getElementById('screenbtns');if(sb)sb.style.visibility=mc.checked?'visible':'hidden';var sc=document.getElementById('stationcount');if(sc)sc.style.display=mc.checked?'':'none';});
-var sk=document.getElementById('skin_select');if(sk)sk.addEventListener('change',function(){var d=document.getElementById('dlr_settings_rows');if(d)d.style.display=sk.value==='tfl_dlr'?'':'none';});
+var sk=document.getElementById('skin_select');if(sk)sk.addEventListener('change',function(){var d=document.getElementById('dlr_settings_rows');if(d)d.style.display=sk.value==='tfl_dlr'?'':'none';var op=document.getElementById('operator_picker');if(op)op.style.display=sk.value==='dsa'?'none':'';var dp=document.getElementById('dsa_provider_picker');if(dp)dp.style.display=sk.value==='dsa'?'':'none';});
 function setFont(v,el){fetch('/?font_size='+v);var bs=el.parentNode.querySelectorAll('button');bs.forEach(function(b){b.classList.remove('on');});el.classList.add('on');}
 function setColor(v,el){fetch('/?color='+v);el.parentNode.querySelectorAll('.color-swatch-btn').forEach(function(b){b.classList.remove('active');});el.classList.add('active');}
 document.querySelectorAll('[data-u],[data-p]').forEach(function(el){
@@ -452,6 +456,51 @@ def html():
         '</tbody>'
     )
 
+    # DSA skin's own settings (API provider), shown in place of the ordinary
+    # flag/operator picker above - DSA doesn't use data.t-skylt.se stations/
+    # operators at all, so that picker is meaningless while it's active.
+    _dsa_active = functions.get_skin() == "dsa"
+    operator_picker_disp = "display:none;" if _dsa_active else ""
+    _dsa_provider_opts = (
+        _opt(1, s.get("dsa_api_provider", 1), "Bahn.de: ICE/IC/Regional/SBahn")
+        + _opt(2, s.get("dsa_api_provider", 1), "Bahn.de: all services")
+        + _opt(3, s.get("dsa_api_provider", 1), "VVO Dresden (EFA)")
+    )
+    _dsa_layout_opts = (
+        _opt(1, s.get("dsa_layout", 1), "Layout 1")
+        + _opt(2, s.get("dsa_layout", 1), "Layout 2")
+    )
+    dsa_provider_html = (
+        '<div class="col" id="dsa_provider_picker" style="' + ("" if _dsa_active else "display:none;") + '">'
+        '<div class="form-row">'
+        '<div class="col"><label for="dsa_api_provider" class="control-label">API provider</label>'
+        '<select id="dsa_api_provider" class="form-control" data-p="dsa_api_provider" data-e="change">'
+        + _dsa_provider_opts + '</select></div>'
+        '<div class="col"><label for="dsa_layout" class="control-label">Layout</label>'
+        '<select id="dsa_layout" class="form-control" data-p="dsa_layout" data-e="change">'
+        + _dsa_layout_opts + '</select></div>'
+        '</div></div>'
+    )
+
+    # downloaded skin files (Advanced): a delete button for whichever plugin
+    # skins currently have local files, so a stuck/broken skin can always be
+    # force-reinstalled by deleting + reselecting it - simpler than a
+    # separate "check for update" button now that set_skin() already checks
+    # automatically each time a skin is (re)activated.
+    import skinloader
+    _skin_rows = ""
+    for _sid, _sinfo in skinloader.PLUGIN_SKINS.items():
+        if skinloader.is_downloaded(_sid):
+            _skin_rows += (
+                '<tr><td><b>' + _sinfo["label"] + '</b></td><td>'
+                '<button type="button" class="btn btn-sm btn-danger" '
+                'onclick="if(confirm(\'Delete downloaded files for ' + _sinfo["label"]
+                + '? It will re-download next time it is selected.\'))fetch(\'/?skin_delete=' + _sid
+                + '\').then(function(){location.reload()})">'
+                'Delete</button></td></tr>'
+            )
+    skin_delete_html = ('<tr><td colspan="2"><b>Downloaded skins</b></td></tr>' + _skin_rows) if _skin_rows else ""
+
     # clocktime
     clock_html = _toggle2("clocktime", s["clocktime"], "/?clocktime=switch", T["countdown"], T["clock_time"], T["time_label"])
 
@@ -566,6 +615,9 @@ def html():
         "T_TRAFFIC_TYPES": T["traffic_types"],
         "SKIN_SECTION": skin_html, "CLOCKTIME_CHK": clock_html,
         "DLR_SETTINGS_SECTION": dlr_settings_html,
+        "OPERATOR_PICKER_DISP": operator_picker_disp,
+        "DSA_PROVIDER_SECTION": dsa_provider_html,
+        "SKIN_DELETE_SECTION": skin_delete_html,
         "DEVIATIONS_SECTION": devs_html,
         "SLEEP_CHK": sleep_html, "BUTTON_MODE_CHK": button_mode_html, "SHOW_STATION_CHK": show_stn_html,
         "T_SAVE": T["save"],

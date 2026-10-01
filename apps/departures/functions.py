@@ -147,6 +147,9 @@ def get_skin():
 
 def set_skin(skin_id):
     """Activate a display skin: built-in scroll/list, or a downloadable plugin."""
+    if varinit.active_skin_ns and skin_id != varinit.active_skin_id and "on_exit" in varinit.active_skin_ns:
+        try: varinit.active_skin_ns["on_exit"]()
+        except Exception as e: print("Skin on_exit error:", e)
     varinit.settings["skin"] = skin_id
     varinit.settings["listmode"] = 0 if skin_id == "scroll" else 1
     if skin_id in ("scroll", "list"):
@@ -157,6 +160,10 @@ def set_skin(skin_id):
     try:
         if not skinloader.is_downloaded(skin_id):
             sysprint("Downloading skin...", 0, _refresh=True)
+        elif skin_id not in varinit.skin_update_checked and skinloader.check_for_update(skin_id):
+            sysprint("Updating skin...", 0, _refresh=True)
+            skinloader.update(skin_id)
+        varinit.skin_update_checked.add(skin_id)
         ns = skinloader.load(skin_id)
         varinit.active_skin_ns = ns
         varinit.active_skin_id = skin_id
