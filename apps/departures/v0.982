@@ -1,4 +1,4 @@
 {"description":"Live public transport departures around Europe (formerly known as T-Skylt)",
-"v0.981" : ["added scrolling traffic deviations to operator Västtrafik"],
+"v0.982" : ["added a skin selector for styles of different countries"],
 "icon":0,
 "emoji":"🚉"}
