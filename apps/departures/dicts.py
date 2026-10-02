@@ -189,6 +189,8 @@ settingstxt = {"password": "none",
             "dsa_layout": 1,
             "dsa_summer_time": 0,
 
+            "vbz_color": 1,
+
             "clocktime": 0, 
 
             "user": "", 

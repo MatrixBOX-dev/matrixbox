@@ -505,6 +505,10 @@ def huvudsidan(request):
         varinit.settings["dsa_summer_time"] = 1 - int(varinit.settings.get("dsa_summer_time", 0))
         functions.switch(_screen=False)
         return (200, {}, "")
+    elif "vbz_color" in request.params:
+        varinit.settings["vbz_color"] = 1 - int(varinit.settings.get("vbz_color", 1))
+        functions.switch(_screen=False)
+        return (200, {}, "")
     elif "clocktime" in request.params: 
         varinit.settings["clocktime"] = 1 - varinit.settings["clocktime"]
         functions.switch(_screen = False)

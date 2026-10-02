@@ -160,6 +160,7 @@ PAGE_TPL = """<!DOCTYPE html>
 {FONT_SIZE_ROW}
 {CLOCK_ROW_HTML}
 {DLR_SETTINGS_SECTION}
+{VBZ_SETTINGS_SECTION}
 <tr><td><b>Timer</b></td><td><button type="button" class="btn btn-sm" onclick="location.href='/?timer=set'">&#8987; Configure</button></td></tr>
 <tr><td><b>{T_ROTATION}</b></td><td><button type="button" class="btn btn-sm" data-u="/?rotate=1">&#128260; 90&deg;</button></td></tr>
 <tr><td><b>{T_POWER}</b></td><td><input type="text" id="power" class="form-control" style="width:80px;display:inline" placeholder="{POWER_VAL}" data-p="power" data-e="blur"></td></tr>
@@ -195,7 +196,7 @@ function doSearch(){var s=document.getElementById('sstring').value;if(!s)return;
 function doScan(){fetch('/checknet').then(function(r){return r.text();}).then(function(h){var sel=document.getElementById('ssid');sel.innerHTML=h;sel.disabled=false;document.getElementById('password').disabled=false;document.getElementById('connect_wifi').disabled=false;}).catch(function(){});}
 
 var mc=document.getElementById('multiple');if(mc)mc.addEventListener('change',function(){var sb=document.getElementById('screenbtns');if(sb)sb.style.visibility=mc.checked?'visible':'hidden';var sc=document.getElementById('stationcount');if(sc)sc.style.display=mc.checked?'':'none';});
-var sk=document.getElementById('skin_select');if(sk)sk.addEventListener('change',function(){var d=document.getElementById('dlr_settings_rows');if(d)d.style.display=sk.value==='tfl_dlr'?'':'none';var op=document.getElementById('operator_picker');if(op)op.style.display=sk.value==='dsa'?'none':'';var dp=document.getElementById('dsa_provider_picker');if(dp)dp.style.display=sk.value==='dsa'?'':'none';var ms=document.getElementById('multiple_section');if(ms)ms.style.display=sk.value==='dsa'?'none':'';});
+var sk=document.getElementById('skin_select');if(sk)sk.addEventListener('change',function(){var d=document.getElementById('dlr_settings_rows');if(d)d.style.display=sk.value==='tfl_dlr'?'':'none';var vb=document.getElementById('vbz_settings_rows');if(vb)vb.style.display=sk.value==='vbz'?'':'none';var op=document.getElementById('operator_picker');if(op)op.style.display=sk.value==='dsa'?'none':'';var dp=document.getElementById('dsa_provider_picker');if(dp)dp.style.display=sk.value==='dsa'?'':'none';var ms=document.getElementById('multiple_section');if(ms)ms.style.display=(sk.value==='dsa'||sk.value==='vbz')?'none':'';});
 function setFont(v,el){fetch('/?font_size='+v);var bs=el.parentNode.querySelectorAll('button');bs.forEach(function(b){b.classList.remove('on');});el.classList.add('on');}
 function setColor(v,el){fetch('/?color='+v);el.parentNode.querySelectorAll('.color-swatch-btn').forEach(function(b){b.classList.remove('active');});el.classList.add('active');}
 document.querySelectorAll('[data-u],[data-p]').forEach(function(el){
@@ -427,7 +428,7 @@ def html():
             + _opt("xl", _cur_width, "3 stations")
             + '</select></div>'
         )
-    mult_html = '<div class="col" id="multiple_section" style="' + ("display:none;" if functions.get_skin() == "dsa" else "") + '">' + mult_html + '</div>'
+    mult_html = '<div class="col" id="multiple_section" style="' + ("display:none;" if functions.get_skin() in ("dsa", "vbz") else "") + '">' + mult_html + '</div>'
 
     # skin selector: built-in scroll/list, plus any downloadable skins.
     # A dropdown (rather than segmented buttons) scales to an arbitrary
@@ -455,6 +456,14 @@ def html():
         '<br><small>Seconds each departure row shows before disruption/custom messages scroll through.</small></td></tr>'
         '<tr><td><b>Custom message</b></td><td>' + _chk("custom_scroll_show", s.get("custom_scroll_show", 0), "/?custom_scroll_show=switch", "Show custom scrolling message") + '</td></tr>'
         '<tr><td><b>Custom message text</b></td><td><input type="text" id="custom_scroll_text" class="form-control" style="width:160px;display:inline" placeholder="' + str(s.get("custom_scroll_text", "")) + '" data-p="custom_scroll_text" data-e="blur" data-enc="1"></td></tr>'
+        '</tbody>'
+    )
+
+    # VBZ skin's own settings (color toggle). Same always-rendered-tbody pattern as DLR above.
+    _vbz_active = functions.get_skin() == "vbz"
+    vbz_settings_html = (
+        '<tbody id="vbz_settings_rows" style="' + ("" if _vbz_active else "display:none;") + '">'
+        '<tr><td><b>Line colors</b></td><td>' + _chk("vbz_color", s.get("vbz_color", 1), "/?vbz_color=switch", "Show real per-line colors") + '</td></tr>'
         '</tbody>'
     )
 
@@ -624,6 +633,7 @@ def html():
         "T_TRAFFIC_TYPES": T["traffic_types"],
         "SKIN_SECTION": skin_html, "CLOCKTIME_CHK": clock_html,
         "DLR_SETTINGS_SECTION": dlr_settings_html,
+        "VBZ_SETTINGS_SECTION": vbz_settings_html,
         "OPERATOR_PICKER_DISP": operator_picker_disp,
         "DSA_PROVIDER_SECTION": dsa_provider_html,
         "SKIN_DELETE_SECTION": skin_delete_html,

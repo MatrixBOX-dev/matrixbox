@@ -26,6 +26,7 @@ _SKINS_DIR = "skins"
 PLUGIN_SKINS = {
     "tfl_dlr": {"label": "TfL DLR (London)"},
     "dsa": {"label": "DSA (Westfrankenbahn)"},
+    "vbz": {"label": "VBZ (Zürich)"},
 }
 
 _cache = {}  # skin_id -> exec'd namespace, kept warm while the app is running
