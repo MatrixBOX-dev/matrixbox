@@ -438,7 +438,7 @@ def html():
     if if_long > 64 and varinit.display.height <= 32:
         import skinloader
         cur_skin = functions.get_skin()
-        skin_opts = [("scroll", T["scroll_mode"]), ("list", T["list_mode"])]
+        skin_opts = [("list", T["list_mode"]), ("scroll", T["scroll_mode"])]
         for _sid, _sinfo in skinloader.PLUGIN_SKINS.items():
             skin_opts.append((_sid, _sinfo["label"]))
         skin_select_opts = "".join(_opt(_sid, cur_skin, _label) for _sid, _label in skin_opts)

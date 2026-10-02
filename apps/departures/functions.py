@@ -159,9 +159,9 @@ def set_skin(skin_id):
     import skinloader
     try:
         if not skinloader.is_downloaded(skin_id):
-            sysprint("Downloading skin...", 0, _refresh=True)
+            sysprint("Downloading skin...", 0, color="red", shading=True, _refresh=True, ontop=True)
         elif skin_id not in varinit.skin_update_checked and skinloader.check_for_update(skin_id):
-            sysprint("Updating skin...", 0, _refresh=True)
+            sysprint("Updating skin...", 0, color="red", shading=True, _refresh=True, ontop=True)
             skinloader.update(skin_id)
         varinit.skin_update_checked.add(skin_id)
         ns = skinloader.load(skin_id)
