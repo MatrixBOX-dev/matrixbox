@@ -814,6 +814,7 @@ def scroll_mode():
     if varinit.if_long > 128: version_delay(slowdown=2)
     nightcheck()
     varinit.tg1.y, varinit.tg2.y, varinit.tg3.y = 0, 16, 32
+    cls(topbottom)
     direction = varinit.text[9]
     scroll_buff = varinit.text[1]
     if varinit.shared["loop_counter"] == -7: reset()
