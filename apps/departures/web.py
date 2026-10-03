@@ -435,7 +435,7 @@ def html():
     # number of plugin skins, and reuses the generic data-p/data-e wiring
     # below so picking one is a plain background fetch, not a page reload.
     skin_html = ""
-    if if_long > 64 and varinit.display.height <= 32:
+    if if_long > 64 and varinit.display.height <= 64:
         import skinloader
         cur_skin = functions.get_skin()
         skin_opts = [("list", T["list_mode"]), ("scroll", T["scroll_mode"])]
