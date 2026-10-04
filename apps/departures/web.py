@@ -97,7 +97,8 @@ PAGE_TPL = """<!DOCTYPE html>
 <button type="button" class="btn btn-outline-secondary btn-sm" id="connect_wifi" style="margin-top:10px" data-u="/?connect_wifi=true" {NET_DIS}>{T_CONNECT}</button>
 </div></div>
 <div class="card">
-<div class="section-title">{T_NETWORK_LABEL}</div>
+<div class="section-title">{T_STATION_DISPLAY}</div>
+{SKIN_SECTION}
 {MULTIPLE_SECTION}
 <div class="form-row" style="margin-top:12px">
 <div id="operator_picker" style="{OPERATOR_PICKER_DISP}">
@@ -132,7 +133,6 @@ PAGE_TPL = """<!DOCTYPE html>
 {SL_SECTION}
 </div>
 <div class="card">
-{SKIN_SECTION}
 {CLOCKTIME_CHK}
 {DEVIATIONS_SECTION}
 {DISRUPTIONS}
@@ -195,8 +195,11 @@ function chCO(c,o,n){fetch('/?country='+c+'&operator='+o);var el=document.queryS
 function doSearch(){var s=document.getElementById('sstring').value;if(!s)return;var b=document.getElementById('searchbtn');b.disabled=true;b.innerHTML='<span class="spin"></span>';fetch('/search?sstring='+encodeURIComponent(s)).then(function(r){return r.text();}).then(function(h){var sel=document.getElementById('newstation');sel.innerHTML=h;sel.disabled=false;sel.style.borderColor='#ff6060';sel.style.animation='guide-pulse 2.5s ease-in-out infinite';document.getElementById('sstring').style.animation='';b.disabled=false;b.textContent='{T_SEARCH}';}).catch(function(){b.disabled=false;b.textContent='{T_SEARCH}';});}
 function doScan(){fetch('/checknet').then(function(r){return r.text();}).then(function(h){var sel=document.getElementById('ssid');sel.innerHTML=h;sel.disabled=false;document.getElementById('password').disabled=false;document.getElementById('connect_wifi').disabled=false;}).catch(function(){});}
 
-var mc=document.getElementById('multiple');if(mc)mc.addEventListener('change',function(){var sb=document.getElementById('screenbtns');if(sb)sb.style.visibility=mc.checked?'visible':'hidden';var sc=document.getElementById('stationcount');if(sc)sc.style.display=mc.checked?'':'none';});
-var sk=document.getElementById('skin_select');if(sk)sk.addEventListener('change',function(){var d=document.getElementById('dlr_settings_rows');if(d)d.style.display=sk.value==='tfl_dlr'?'':'none';var vb=document.getElementById('vbz_settings_rows');if(vb)vb.style.display=sk.value==='vbz'?'':'none';var op=document.getElementById('operator_picker');if(op)op.style.display=sk.value==='dsa'?'none':'';var dp=document.getElementById('dsa_provider_picker');if(dp)dp.style.display=sk.value==='dsa'?'':'none';var ms=document.getElementById('multiple_section');if(ms)ms.style.display=(sk.value==='dsa'||sk.value==='vbz')?'none':'';});
+var currentSkin='{CURRENT_SKIN}';
+var mc=document.getElementById('multiple');
+function updateMultipleControls(){var isList=currentSkin==='list',enabled=isList&&mc&&mc.checked;var ms=document.getElementById('multiple_section');if(ms)ms.style.display=isList?'':'none';var sb=document.getElementById('screenbtns');if(sb)sb.style.visibility=enabled?'visible':'hidden';var sc=document.getElementById('stationcount');if(sc)sc.style.display=enabled?'':'none';}
+if(mc)mc.addEventListener('change',updateMultipleControls);
+var sk=document.getElementById('skin_select');if(sk)sk.addEventListener('change',function(){currentSkin=sk.value;updateMultipleControls();var d=document.getElementById('dlr_settings_rows');if(d)d.style.display=sk.value==='tfl_dlr'?'':'none';var vb=document.getElementById('vbz_settings_rows');if(vb)vb.style.display=sk.value==='vbz'?'':'none';var op=document.getElementById('operator_picker');if(op)op.style.display=sk.value==='dsa'?'none':'';var dp=document.getElementById('dsa_provider_picker');if(dp)dp.style.display=sk.value==='dsa'?'':'none';});
 function setFont(v,el){fetch('/?font_size='+v);var bs=el.parentNode.querySelectorAll('button');bs.forEach(function(b){b.classList.remove('on');});el.classList.add('on');}
 function setColor(v,el){fetch('/?color='+v);el.parentNode.querySelectorAll('.color-swatch-btn').forEach(function(b){b.classList.remove('active');});el.classList.add('active');}
 document.querySelectorAll('[data-u],[data-p]').forEach(function(el){
@@ -242,6 +245,7 @@ def html():
     T = language[lg]["settings"]
     D = language[lg]["display"]
     connected = functions.wifi.radio.connected
+    cur_skin = functions.get_skin()
     co = stn["country"].lower()
     op_code = stn["operator"].upper()
     op = op_code
@@ -317,7 +321,7 @@ def html():
     # screen buttons (used both for wide side-by-side lists and XS merged list stop selection)
     screen_btns = ""
     screen_btn_disp = ""
-    if not int(s["multiple"]):
+    if cur_skin != "list" or not int(s["multiple"]):
         screen_btn_disp = "visibility:hidden;"
     ns = 2 if if_long == 128 else 3
     _p = []
@@ -409,9 +413,7 @@ def html():
     if if_long == 128:
         scroll_html = ''.join(['<div class="col"><label for="scroll">', T["scroll"], '</label><select id="scroll" name="scroll" class="form-control" data-p="scroll" data-e="change">', _opt(0, s["scroll"], "Normal"), _opt(1, s["scroll"], T["low"]), '</select></div>'])
 
-    # multiple (wide: side-by-side lists; XS: merged single sorted list) - shown
-    # first so the [1][2][3] screen picker below makes sense. DSA always shows
-    # a single hardcoded station, so this is meaningless while it's active.
+    # Multiple stations only applies to the built-in list layout.
     mult_html = _chk("multiple", s["multiple"], "/?multiple=1", T["multiple"])
 
     # station count (XL only: with 3 panels available, side-by-side lists
@@ -428,7 +430,7 @@ def html():
             + _opt("xl", _cur_width, "3 stations")
             + '</select></div>'
         )
-    mult_html = '<div class="col" id="multiple_section" style="' + ("display:none;" if functions.get_skin() in ("dsa", "vbz") else "") + '">' + mult_html + '</div>'
+    mult_html = '<div class="col" id="multiple_section" style="' + ("" if cur_skin == "list" else "display:none;") + '">' + mult_html + '</div>'
 
     # skin selector: built-in scroll/list, plus any downloadable skins.
     # A dropdown (rather than segmented buttons) scales to an arbitrary
@@ -437,7 +439,6 @@ def html():
     skin_html = ""
     if if_long > 64 and varinit.display.height <= 64:
         import skinloader
-        cur_skin = functions.get_skin()
         skin_opts = [("list", T["list_mode"]), ("scroll", T["scroll_mode"])]
         for _sid, _sinfo in skinloader.PLUGIN_SKINS.items():
             skin_opts.append((_sid, _sinfo["label"]))
@@ -608,7 +609,8 @@ def html():
         "T_POWER": T["power"],
         "POWER_VAL": str(s["power"]),
         "DNS_SECTION": dns_html,
-        "T_NETWORK_LABEL": T["search"],
+        "T_STATION_DISPLAY": T["station_display"],
+        "CURRENT_SKIN": cur_skin,
         "MULTIPLE_SECTION": mult_html,
         "COUNTRY_FLAG": country_flag,
         "OPERATOR": op, "COMBINED_LIST": combined_list,
