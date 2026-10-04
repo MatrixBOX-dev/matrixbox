@@ -322,7 +322,7 @@ def disp_init():
     varinit.tg1.x = 0; varinit.tg1.y = 0
     varinit.tg2.x = varinit.if_long; varinit.tg2.y = 16
     varinit.tg3.y = 32
-    varinit.palette[2] = (40,40,40)    # vit
+    varinit.palette[2] = (32,32,32)    # vit
     varinit.palette[3] = 0x000765      # morkbla
     varinit.palette[4] = (100,0,0)     # rod
     varinit.palette[5] = (20,20,20)    # grå
