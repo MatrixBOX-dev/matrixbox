@@ -462,12 +462,27 @@ def huvudsidan(request):
         functions.switch(_screen = True)
         return (200, {}, "")
     elif "skin" in request.params:
+        varinit.on_off_counter = 0
+        functions.nightcheck()
+        functions.refresh()
+
         functions.set_skin(request.params["skin"])
         functions.switch(_screen=False)
+
+        varinit.on_off_counter = 1
+        functions.nightcheck()
+        functions.refresh()
         return (200, {}, "")
     elif "skin_delete" in request.params:
+        varinit.on_off_counter = 0
+        functions.nightcheck()
+        functions.refresh()
+
         import skinloader
         skinloader.delete(request.params["skin_delete"])
+        varinit.on_off_counter = 1
+        functions.nightcheck()
+        functions.refresh()
         return (200, {}, mkhtml())
     elif "dlr_scroll_delay" in request.params:
         try:
