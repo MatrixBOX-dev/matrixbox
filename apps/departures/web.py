@@ -99,6 +99,7 @@ PAGE_TPL = """<!DOCTYPE html>
 <div class="card">
 <div class="section-title">{T_STATION_DISPLAY}</div>
 {SKIN_SECTION}
+{VBZ_SETTINGS_SECTION}
 {MULTIPLE_SECTION}
 <div class="form-row" style="margin-top:12px">
 <div id="operator_picker" style="{OPERATOR_PICKER_DISP}">
@@ -160,7 +161,6 @@ PAGE_TPL = """<!DOCTYPE html>
 {FONT_SIZE_ROW}
 {CLOCK_ROW_HTML}
 {DLR_SETTINGS_SECTION}
-{VBZ_SETTINGS_SECTION}
 <tr><td><b>Timer</b></td><td><button type="button" class="btn btn-sm" onclick="location.href='/?timer=set'">&#8987; Configure</button></td></tr>
 <tr><td><b>{T_ROTATION}</b></td><td><button type="button" class="btn btn-sm" data-u="/?rotate=1">&#128260; 90&deg;</button></td></tr>
 <tr><td><b>{T_POWER}</b></td><td><input type="text" id="power" class="form-control" style="width:80px;display:inline" placeholder="{POWER_VAL}" data-p="power" data-e="blur"></td></tr>
@@ -460,12 +460,19 @@ def html():
         '</tbody>'
     )
 
-    # VBZ skin's own settings (color toggle). Same always-rendered-tbody pattern as DLR above.
+    # VBZ skin's own settings (color toggle). Shown right under the Mode
+    # selector in the Station & display card (not Advanced) since it only
+    # ever applies while that one skin is active - same show/hide-by-id
+    # pattern as DLR/DSA's own skin-exclusive settings use elsewhere.
     _vbz_active = functions.get_skin() == "vbz"
+    # Segmented toggle like clocktime's Countdown/Clock time: unchecked (0)
+    # highlights the left label, checked (1) highlights the right one - so
+    # "Classic" (val 0, no badges) goes left and "Color" (val 1, the
+    # existing real-per-line-colors mode) goes right.
     vbz_settings_html = (
-        '<tbody id="vbz_settings_rows" style="' + ("" if _vbz_active else "display:none;") + '">'
-        '<tr><td><b>Line colors</b></td><td>' + _chk("vbz_color", s.get("vbz_color", 1), "/?vbz_color=switch", "Show real per-line colors") + '</td></tr>'
-        '</tbody>'
+        '<div id="vbz_settings_rows" style="' + ("" if _vbz_active else "display:none;") + '">'
+        + _toggle2("vbz_color", s.get("vbz_color", 1), "/?vbz_color=switch", "Classic", "Color", "Line colors:")
+        + '</div>'
     )
 
     # DSA skin's own settings (API provider), shown in place of the ordinary
