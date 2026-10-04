@@ -1,13 +1,22 @@
-import sys, wifi, socketpool, ampule, time, os, json, microcontroller, storage
-import load_settings
+import sys, wifi, socketpool, time, os, json, microcontroller, storage
+
 import digitalio, board
-settings =  load_settings.settings()
+try: import ampule
+except: pass
+try:
+    import load_settings
+    settings =  load_settings.settings()
+except: pass
 
 
-from load_screen import *
-import check_button
-from check_button import *
-# from check_button import check_if_button_pressed
+try:
+    from load_screen import *
+    import check_button
+    from check_button import *
+    # from check_button import check_if_button_pressed
+except:
+    def pprint(text, line=0,color=0):
+        return
 
 def boot_splash():
     pprint("Booting...", line=0, color="white")
@@ -51,3 +60,4 @@ except: pass
 
 #try: clearscreen(True)
 #except Exception as e: pprint(str(e))
+while True: pass
