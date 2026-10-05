@@ -21,6 +21,7 @@ def strlen(_string):
     return sum(fonts[varinit.currentfont][c][0] for c in _string)
 
 LOGO_CHAR = "Ⓜ"
+LOGO_CHAR = "🇹"
 
 def temperature_check():
     if round(microcontroller.cpu.temperature) > varinit.temperature_threshold: 
