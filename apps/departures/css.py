@@ -3,7 +3,16 @@ _css = """:root{--bg:#08080f;--surface:#111118;--surface2:#1c1c2a;--surface3:#26
 body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;min-height:100vh;padding-bottom:40px;font-size:14px;line-height:1.5}
 .navbar{position:sticky;top:0;z-index:100;background:rgba(8,8,15,.85);border-bottom:1px solid var(--border);padding:0 14px;display:flex;align-items:center;height:46px;gap:4px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .nav-title{font-weight:600;font-size:.9rem;color:var(--text);flex:1;padding-left:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.nav-spacer{flex:1}
+.wifi-nav-form{position:relative;flex-shrink:0}
+.wifi-nav>summary{height:30px;display:flex;align-items:center;padding:0 8px;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:.65rem;letter-spacing:.3px;white-space:nowrap;list-style:none;cursor:pointer}
+.wifi-nav>summary::-webkit-details-marker{display:none}
+.wifi-nav[open]>summary{color:var(--text);border-color:var(--accent)}
+.wifi-nav-panel{position:absolute;right:0;top:calc(100% + 8px);width:min(330px,calc(100vw - 28px));padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);z-index:110}
+.wifi-nav-panel .form-row{gap:8px}
+.wifi-nav-panel .col{min-width:0}
+.wifi-nav-panel label{font-size:.6rem}
+.wifi-nav-panel .form-control{height:34px;padding:0 8px;font-size:.76rem}
+.wifi-nav-panel .btn{height:30px}
 .nav-info{color:var(--muted);font-size:.68rem;letter-spacing:.2px;text-align:right;line-height:1.4}
 .nav-info span{display:block}
 .sig{display:flex;align-items:center;gap:2px;margin:0 6px}
@@ -16,6 +25,16 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-ap
 .nav-led.led-off{color:#ff4040;border-color:rgba(255,64,64,.35);background:rgba(255,64,64,.06)}
 .nav-ro{color:#ff6060;font-size:.85rem;display:flex;align-items:center;margin:0 2px}
 .page{max-width:480px;margin:0 auto;padding:16px 14px}
+.brand-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 6px 12px}
+.brand-lockup{display:flex;align-items:center;gap:8px;color:var(--text);font:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:left}
+.brand-mark{width:34px;display:flex;flex-direction:column;align-items:center;line-height:1;flex-shrink:0}
+.brand-mark>span{width:27px;height:31px;border:3px solid var(--text);border-radius:1px;display:flex;align-items:center;justify-content:center;font-size:1.35rem;font-weight:800}
+.brand-mark small{font-size:.38rem;color:var(--text);letter-spacing:.1px;margin-top:2px}
+.brand-name{font-size:1.45rem;font-weight:700;letter-spacing:-.6px}
+.signup-link{font-family:Georgia,serif;font-size:1.15rem;font-style:italic;text-decoration:underline;color:var(--text);white-space:nowrap}
+.signup-card{padding:16px 18px}
+.signup-card input[type=email]{height:42px;font-size:1rem}
+.email-collapsed .signup-link,.email-collapsed .signup-card{display:none}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;margin-bottom:10px;box-shadow:var(--shadow)}
 .section-title{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1.4px;font-weight:700;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .form-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
@@ -81,6 +100,7 @@ td:first-child{width:44%;color:var(--muted);font-size:.72rem;text-transform:uppe
 tr:last-child td{border-bottom:none}
 details>summary{cursor:pointer;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;list-style:none;padding:4px 0}
 details[open]>summary{margin-bottom:8px;color:var(--text)}
+.wifi-nav>summary{height:30px;padding:0 8px;font-size:.65rem;letter-spacing:.3px}
 .grp{margin-bottom:14px}
 .grp:last-child{margin-bottom:0}
 .grp-title{font-size:.65rem;text-transform:uppercase;letter-spacing:.9px;color:var(--muted);margin-bottom:8px;font-weight:700}

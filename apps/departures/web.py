@@ -69,21 +69,10 @@ PAGE_TPL = """<!DOCTYPE html>
 <nav class="navbar">
 <a class="nav-x" href="/exit" title="Exit" style="margin-left:0;margin-right:4px">&#8592;</a>
 <span class="nav-title">{HEADER}</span>
-<div class="nav-spacer"></div>
-<div class="nav-info"><span id="clk"></span><span>{IP_DISPLAY}</span></div>
-{SIG_BARS}
-<button type="button" class="nav-led{LED_OFF_CLS}" id="ledbtn" onclick="fetch('/?onoff=active').then(function(){document.getElementById('ledbtn').classList.toggle('led-off')})" title="Turn display on/off">&#x1F4A1;</button>
-<a class="nav-x" href="/exit" title="Exit">&#x2715;</a>
-</nav>
-<div class="page">
-<form method="post" action="/">
-<div class="card">
-
-<div class="section-title">
-<details>
+<form method="post" action="/" class="wifi-nav-form">
+<details class="wifi-nav">
 <summary>&#9881; {T_WIFI_LABEL}</summary>
-
-
+<div class="wifi-nav-panel">
 <div class="form-row">
 <div class="col">
 <label for="ssid"><a href="#" onclick="doScan();return false" title="Scan">&#128268;</a> {T_WIFI_LABEL}</label>
@@ -94,8 +83,27 @@ PAGE_TPL = """<!DOCTYPE html>
 <input type="text" id="password" class="form-control" name="password" placeholder="*******" data-p="password" data-e="blur" data-enc="1" {NET_DIS}>
 </div>
 </div>
-<button type="button" class="btn btn-outline-secondary btn-sm" id="connect_wifi" style="margin-top:10px" data-u="/?connect_wifi=true" {NET_DIS}>{T_CONNECT}</button>
-</div></div>
+<button type="button" class="btn btn-outline-secondary btn-sm" id="connect_wifi" style="margin-top:8px" data-u="/?connect_wifi=true" {NET_DIS}>{T_CONNECT}</button>
+</div>
+</details>
+</form>
+<div class="nav-info"><span id="clk"></span><span>{IP_DISPLAY}</span></div>
+{SIG_BARS}
+<button type="button" class="nav-led{LED_OFF_CLS}" id="ledbtn" onclick="fetch('/?onoff=active').then(function(){document.getElementById('ledbtn').classList.toggle('led-off')})" title="Turn display on/off">&#x1F4A1;</button>
+<a class="nav-x" href="/exit" title="Exit">&#x2715;</a>
+</nav>
+<div class="page">
+<header class="brand-header">
+<button type="button" class="brand-lockup" id="brand-lockup" aria-label="Edit email address" aria-controls="signup-card" aria-expanded="true">
+<span class="brand-mark" aria-hidden="true"><span>T</span><small>SKYLT</small></span>
+<span class="brand-name">Departures</span>
+</button>
+<a class="signup-link" href="http://subscription.t-skylt.se/" target="_blank" rel="noopener noreferrer">Sign up!</a>
+</header>
+<div class="card signup-card" id="signup-card">
+<input type="email" id="signup-email" class="form-control" value="{USER_EMAIL}" placeholder="your.name@example.com" autocomplete="email" aria-label="Email address">
+</div>
+<form method="post" action="/">
 <div class="card">
 <div class="section-title">{T_STATION_DISPLAY}</div>
 {SKIN_SECTION}
@@ -194,6 +202,16 @@ function pickC(c){var d=document.getElementById('ddops');d.innerHTML='';var ops=
 function chCO(c,o,n){fetch('/?country='+c+'&operator='+o);var el=document.querySelector('.dd-grid img[data-c="'+c+'"');var f='';if(el)f=el.outerHTML.replace(/dd-sel/g,'')+' ';document.getElementById('opbtn').innerHTML=f+n+' &#9660;';document.getElementById('opbtn').style.animation='';document.getElementById('sstring').style.animation='guide-pulse 2.5s ease-in-out infinite';var sl=document.getElementById('slsection');if(sl)sl.style.display=o==='sl'?'':'none';document.getElementById('opdd').classList.remove('open');}
 function doSearch(){var s=document.getElementById('sstring').value;if(!s)return;var b=document.getElementById('searchbtn');b.disabled=true;b.innerHTML='<span class="spin"></span>';fetch('/search?sstring='+encodeURIComponent(s)).then(function(r){return r.text();}).then(function(h){var sel=document.getElementById('newstation');sel.innerHTML=h;sel.disabled=false;sel.style.borderColor='#ff6060';sel.style.animation='guide-pulse 2.5s ease-in-out infinite';document.getElementById('sstring').style.animation='';b.disabled=false;b.textContent='{T_SEARCH}';}).catch(function(){b.disabled=false;b.textContent='{T_SEARCH}';});}
 function doScan(){fetch('/checknet').then(function(r){return r.text();}).then(function(h){var sel=document.getElementById('ssid');sel.innerHTML=h;sel.disabled=false;document.getElementById('password').disabled=false;document.getElementById('connect_wifi').disabled=false;}).catch(function(){});}
+
+var signupEmail=document.getElementById('signup-email');
+var brandLockup=document.getElementById('brand-lockup');
+function setSignupCollapsed(collapsed){document.body.classList.toggle('email-collapsed',collapsed);brandLockup.setAttribute('aria-expanded',collapsed?'false':'true');}
+function isValidSignupEmail(){return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(signupEmail.value.trim());}
+var signupSaveTimer;
+signupEmail.addEventListener('input',function(){clearTimeout(signupSaveTimer);signupSaveTimer=setTimeout(function(){fetch('/?user='+encodeURIComponent(signupEmail.value.trim())).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);}).catch(function(err){console.error('Could not update email address',err);});},350);});
+signupEmail.addEventListener('blur',function(){setSignupCollapsed(isValidSignupEmail());});
+brandLockup.addEventListener('click',function(){if(document.body.classList.contains('email-collapsed')){setSignupCollapsed(false);signupEmail.focus();}});
+setSignupCollapsed(isValidSignupEmail());
 
 var currentSkin='{CURRENT_SKIN}';
 var mc=document.getElementById('multiple');
@@ -604,6 +622,7 @@ def html():
     _v = {
         "CSS": css, "TITLE": T["title"],
         "HEADER": T["title"],
+        "USER_EMAIL": str(s.get("user", "")).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;"),
         "LED_OFF_CLS": led_off_cls,
         "SIG_BARS": sig_bars,
         "IP_DISPLAY": ip,
