@@ -59,11 +59,17 @@ def check_if_button_pressed(strict=True):
     
     
 
-button = digitalio.DigitalInOut(board.RX) # RX-pinnen för ena
+if "S2" in os.uname().machine:  # Träskylt:
+    use_pin = board.IO14
+    if "16" in os.listdir(): use_pin = board.IO16
+    button = digitalio.DigitalInOut(use_pin)
+
+else: button = digitalio.DigitalInOut(board.RX) # RX-pinnen för ena
 button.direction = digitalio.Direction.INPUT
 button.pull = digitalio.Pull.UP
 
-gbutton = digitalio.DigitalInOut(board.TX) # TX-pinnena för andra
+if "S2" in os.uname().machine:  gbutton = digitalio.DigitalInOut(board.IO17) # Träskylt:
+else: gbutton = digitalio.DigitalInOut(board.TX) # TX-pinnena för andra
 gbutton.direction = digitalio.Direction.INPUT
 gbutton.pull = digitalio.Pull.DOWN
 
