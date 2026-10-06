@@ -361,6 +361,10 @@ def disp_init():
 
 
 def refresh(times = 2):
+    if "S2" in os.uname().machine:  # Träskylt:
+        display.refresh(minimum_frames_per_second=0)
+        return
+
     if cpver == 9 and microcontroller.cpu.frequency == 160000000:
         if varinit.if_long > 128: return display.refresh(minimum_frames_per_second=0)
         if varinit.tg2.x > 64:
