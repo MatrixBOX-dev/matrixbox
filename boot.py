@@ -9,14 +9,20 @@ try:
 except: pass
 
 
-try:
-    from load_screen import *
-    import check_button
-    from check_button import *
-    # from check_button import check_if_button_pressed
-except:
-    def pprint(text, line=0,color=0):
-        return
+
+if not "S2" in os.uname().machine:  # Träskylt:
+    try:
+        from load_screen import *
+        import check_button
+        from check_button import *
+        # from check_button import check_if_button_pressed
+    except:
+        def pprint(text, line=0,color=0):
+            return
+        def time_button(): return
+else:
+    def pprint(text, line=0,color=0): return
+    def time_button(): return
 
 def boot_splash():
     pprint("Booting...", line=0, color="white")
