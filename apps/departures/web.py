@@ -223,6 +223,7 @@ function setColor(v,el){fetch('/?color='+v);el.parentNode.querySelectorAll('.col
 document.querySelectorAll('[data-u],[data-p]').forEach(function(el){
 el.addEventListener(el.dataset.e||'click',function(ev){
 var u=el.dataset.u;
+if(el.id==='night_buses')u='/?buses_option='+(el.checked?'1':'0');
 if(!u){var v=ev.target.value.replace(/#/g,'%23');if(el.dataset.enc)v=encodeURIComponent(v);u='/?'+el.dataset.p+'='+v;}
 fetch(u,{method:'GET'});
 });});
