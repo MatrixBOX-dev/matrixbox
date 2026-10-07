@@ -27,6 +27,7 @@ PLUGIN_SKINS = {
     "tfl_dlr": {"label": "TfL DLR (London)"},
     "dsa": {"label": "DSA (Westfrankenbahn)"},
     "vbz": {"label": "VBZ (Zürich)"},
+    "ubahn": {"label": "U-Bahn (Berlin)"},
 }
 
 _cache = {}  # skin_id -> exec'd namespace, kept warm while the app is running
