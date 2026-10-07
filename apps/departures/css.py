@@ -3,11 +3,11 @@ _css = """:root{--bg:#08080f;--surface:#111118;--surface2:#1c1c2a;--surface3:#26
 body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;min-height:100vh;padding-bottom:40px;font-size:14px;line-height:1.5}
 .navbar{position:sticky;top:0;z-index:100;background:rgba(8,8,15,.85);border-bottom:1px solid var(--border);padding:0 14px;display:flex;align-items:center;height:46px;gap:4px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .nav-title{font-weight:600;font-size:.9rem;color:var(--text);flex:1;padding-left:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wifi-nav-form{position:relative;flex-shrink:0}
+.wifi-nav-form{flex-shrink:0}
 .wifi-nav>summary{height:30px;display:flex;align-items:center;padding:0 8px;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:.65rem;letter-spacing:.3px;white-space:nowrap;list-style:none;cursor:pointer}
 .wifi-nav>summary::-webkit-details-marker{display:none}
 .wifi-nav[open]>summary{color:var(--text);border-color:var(--accent)}
-.wifi-nav-panel{position:absolute;right:0;top:calc(100% + 8px);width:min(330px,calc(100vw - 28px));padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);z-index:110}
+.wifi-nav-panel{position:absolute;right:14px;top:calc(100% + 8px);width:min(330px,calc(100% - 28px));max-height:calc(100vh - 68px);overflow-y:auto;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);z-index:110}
 .wifi-nav-panel .form-row{gap:8px}
 .wifi-nav-panel .col{min-width:0}
 .wifi-nav-panel label{font-size:.6rem}
