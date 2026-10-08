@@ -108,6 +108,7 @@ PAGE_TPL = """<!DOCTYPE html>
 <div class="section-title">{T_STATION_DISPLAY}</div>
 {SKIN_SECTION}
 {VBZ_SETTINGS_SECTION}
+{UBAHN_SETTINGS_SECTION}
 {MULTIPLE_SECTION}
 <div class="form-row" style="margin-top:12px">
 <div id="operator_picker" style="{OPERATOR_PICKER_DISP}">
@@ -217,7 +218,7 @@ var currentSkin='{CURRENT_SKIN}';
 var mc=document.getElementById('multiple');
 function updateMultipleControls(){var isList=currentSkin==='list',enabled=isList&&mc&&mc.checked;var ms=document.getElementById('multiple_section');if(ms)ms.style.display=isList?'':'none';var sb=document.getElementById('screenbtns');if(sb)sb.style.visibility=enabled?'visible':'hidden';var sc=document.getElementById('stationcount');if(sc)sc.style.display=enabled?'':'none';}
 if(mc)mc.addEventListener('change',updateMultipleControls);
-var sk=document.getElementById('skin_select');if(sk)sk.addEventListener('change',function(){currentSkin=sk.value;updateMultipleControls();var d=document.getElementById('dlr_settings_rows');if(d)d.style.display=sk.value==='tfl_dlr'?'':'none';var vb=document.getElementById('vbz_settings_rows');if(vb)vb.style.display=sk.value==='vbz'?'':'none';var op=document.getElementById('operator_picker');if(op)op.style.display=sk.value==='dsa'?'none':'';var dp=document.getElementById('dsa_provider_picker');if(dp)dp.style.display=sk.value==='dsa'?'':'none';});
+var sk=document.getElementById('skin_select');if(sk)sk.addEventListener('change',function(){currentSkin=sk.value;updateMultipleControls();var d=document.getElementById('dlr_settings_rows');if(d)d.style.display=sk.value==='tfl_dlr'?'':'none';var vb=document.getElementById('vbz_settings_rows');if(vb)vb.style.display=sk.value==='vbz'?'':'none';var ub=document.getElementById('ubahn_settings_rows');if(ub)ub.style.display=sk.value==='ubahn'?'':'none';var op=document.getElementById('operator_picker');if(op)op.style.display=sk.value==='dsa'?'none':'';var dp=document.getElementById('dsa_provider_picker');if(dp)dp.style.display=sk.value==='dsa'?'':'none';});
 function setFont(v,el){fetch('/?font_size='+v);var bs=el.parentNode.querySelectorAll('button');bs.forEach(function(b){b.classList.remove('on');});el.classList.add('on');}
 function setColor(v,el){fetch('/?color='+v);el.parentNode.querySelectorAll('.color-swatch-btn').forEach(function(b){b.classList.remove('active');});el.classList.add('active');}
 document.querySelectorAll('[data-u],[data-p]').forEach(function(el){
@@ -494,6 +495,16 @@ def html():
         + '</div>'
     )
 
+    # U-Bahn Berlin skin's own settings (countdown style toggle) - same
+    # show/hide-by-id pattern as VBZ's own skin-exclusive setting above.
+    _ubahn_active = functions.get_skin() == "ubahn"
+    ubahn_settings_html = (
+        '<div id="ubahn_settings_rows" style="' + ("" if _ubahn_active else "display:none;") + '">'
+        + _toggle2("ubahn_countdown_style", s.get("ubahn_countdown_style", 0), "/?ubahn_countdown_style=switch",
+                   "5'", "in 5 min", "Countdown style:")
+        + '</div>'
+    )
+
     # DSA skin's own settings (API provider), shown in place of the ordinary
     # flag/operator picker above - DSA doesn't use data.t-skylt.se stations/
     # operators at all, so that picker is meaningless while it's active.
@@ -663,6 +674,7 @@ def html():
         "SKIN_SECTION": skin_html, "CLOCKTIME_CHK": clock_html,
         "DLR_SETTINGS_SECTION": dlr_settings_html,
         "VBZ_SETTINGS_SECTION": vbz_settings_html,
+        "UBAHN_SETTINGS_SECTION": ubahn_settings_html,
         "OPERATOR_PICKER_DISP": operator_picker_disp,
         "DSA_PROVIDER_SECTION": dsa_provider_html,
         "SKIN_DELETE_SECTION": skin_delete_html,

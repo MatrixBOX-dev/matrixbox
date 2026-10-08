@@ -191,6 +191,8 @@ settingstxt = {"password": "none",
 
             "vbz_color": 1,
 
+            "ubahn_countdown_style": 0,
+
             "clocktime": 0, 
 
             "user": "", 
