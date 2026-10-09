@@ -1070,6 +1070,15 @@ def list_mode(mini=False, half=False):
                         _w = strlen(_a[1][:varinit.settings["line_length"]])
                         if _w > _xs_max_lw: _xs_max_lw = _w
 
+            # Width actually used by line-ids on screen (capped at line_length, but usually
+            # shorter), rather than assuming every row uses the full configured length.
+            _norm_max_lw = 0
+            if isinstance(trainlist, list):
+                for _a in trainlist:
+                    if isinstance(_a, list) and len(_a) > 1:
+                        _w = strlen(_a[1][:varinit.settings["line_length"]])
+                        if _w > _norm_max_lw: _norm_max_lw = _w
+
             for x, all in enumerate(trainlist):
 
                 is_clock_row = len(all) > 4 and all[4] == CLOCK_ROW_MARK
@@ -1122,7 +1131,7 @@ def list_mode(mini=False, half=False):
                     while len(all[2]) > 0 and sum(_font.get(c, _font['_'])[0] for c in all[2]) > max(0, _max_px):
                         all[2] = all[2][:-1]
                 elif not half:
-                    _line_col_w = 0 if (is_clock_row or is_msg_row) else varinit.settings["line_length"] * (4 if mini else 6)
+                    _line_col_w = 0 if (is_clock_row or is_msg_row or not varinit.settings["line_length"]) else _norm_max_lw + (4 if mini else 6)
                     _max_px = varinit.if_long - strlen(all[3]) - _line_col_w - 2
                     _full_dest_w = strlen(all[2])
                     if not (_dest_scroll and _full_dest_w > max(0, _max_px)):
@@ -1182,9 +1191,9 @@ def list_mode(mini=False, half=False):
                         line = all[1][:varinit.settings["line_length"]]
                         added_space_w = _xs_max_lw + 2
                 elif mini:
-                    added_space_w = varinit.settings["line_length"] * 4
+                    added_space_w = _norm_max_lw + 4
                     if half: added_space_w = COL_MARGIN + (line_col if multi_station_line_id else 0)
-                else: added_space_w = varinit.settings["line_length"] * 6
+                else: added_space_w = _norm_max_lw + 6
                 if not varinit.settings["line_length"]:
                     added_space_w = 0
                     line = ""
