@@ -1193,7 +1193,7 @@ def list_mode(mini=False, half=False):
                 elif mini:
                     added_space_w = _norm_max_lw + 4
                     if half: added_space_w = COL_MARGIN + (line_col if multi_station_line_id else 0)
-                else: added_space_w = _norm_max_lw + 6
+                else: added_space_w = _norm_max_lw + 3
                 if not varinit.settings["line_length"]:
                     added_space_w = 0
                     line = ""
