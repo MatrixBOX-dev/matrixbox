@@ -44,7 +44,8 @@ class App:
         self.t_pre = 0
         try: self.hw0 = (display.rotation, wifi.radio.tx_power)
         except Exception: self.hw0 = None
-        self.restart()
+        try: self.restart()
+        except Exception as e: self.note("start: " + str(e))     # the settings page still comes up, so the settings can be fixed
 
     # ---- helpers -------------------------------------------------------
     def note(self, text):
@@ -116,6 +117,9 @@ class App:
                 deps = d2; msg = None; src = "fallback"; op = st.get("fb_operator") or st["operator"]
             elif deps is None and m2 == "loading":
                 msg = "loading"
+        if deps is not None and not deps and e["deps"] is None and e.get("n0", 0) < 2:
+            e["n0"] = e.get("n0", 0) + 1      # an empty first answer is often a station the server is still loading: ask again soon
+            deps = None; msg = "loading"
         if deps is None:
             if e["deps"] is None: e["msg"] = msg
             e["retry"] = now + ((4000 if e["loads"] < 3 else 15000) if msg == "loading" else 60000)
@@ -209,7 +213,8 @@ class App:
 
     def _sig(self, rows, msg):
         if msg: return msg
-        return "|".join([r["line"] + r["dest"] + r["time"] + r["dly"] + ("d" if r["dim"] else "") + ("b" if r["blink"] else "") + ("l" if r["live"] else "") for r in rows])
+        t = str((self.net.now() or 0) // 60) if (self.cfg["srow_time"] and self.cfg["srow"] != "off") else ""
+        return t + "|".join([r["line"] + r["dest"] + r["time"] + r["dly"] + ("d" if r["dim"] else "") + ("b" if r["blink"] else "") + ("l" if r["live"] else "") for r in rows])
 
     def _page(self, pg, count=1):
         act = self.active()
@@ -241,6 +246,7 @@ class App:
         self.draw_page(self.scr.nxt)
         k = self.cfg["page_trans"]
         if k == "auto": k = "scroll" if self.cfg["trans"] in ("left", "right") else "left"
+        self.scr.hold()       # the same station: its row stays where it is
         self.scr.flip(k, self.on_frame)
         self.pager()
         self.t0 = mono_ms()
@@ -252,7 +258,11 @@ class App:
             self.draw_intro(bmp, act[self.i])       # the station's title with a small loading mark, not a bare "Loading..."
             self.scr.spinner(bmp, self.spin)
         elif msg: self.scr.draw_message(bmp, [(msg[4:] if msg[:4] == "msg:" else self.S(msg), C_DIM)])
-        else: self.scr.draw_rows(bmp, rows, self.cfg)
+        else: self.scr.draw_rows(bmp, rows, self.cfg, self.header())
+        if self.cfg["fb_mark"] and not msg:
+            act = self.active()
+            sts = act if self.cfg["mode"] == "merged" else act[self.i:self.i + 1]
+            if [1 for s in sts if (self.cache.get(self.key(s)) or {}).get("src") == "fallback"]: self.scr.mark(bmp)
         self.sig = self._sig(rows, msg)
         self.ids = None if msg else [r["line"] + "|" + r["dest"] for r in rows]
         self.npg = 1
@@ -278,12 +288,35 @@ class App:
                 if old[s:] == new[:len(old) - s]:
                     k = s               # moved up by s rows
                     break
+        scr.hold()
         if a == "roll":
             if k > 0: scr.roll(k * scr.pitch, self.on_frame)
             else: scr.flip("cut")
         else: scr.flip(a if k else "cut", self.on_frame)
 
+    def header(self):
+        """The station row: (name, lines, time) or None."""
+        c = self.cfg
+        if c["srow"] == "off": return None
+        act = self.active()
+        if c["mode"] == "merged" or self.i >= len(act): name = c["srow_text"] or self.S("deps"); lines = []
+        else:
+            st = act[self.i]; name = st["name"]
+            lines = self.title_lines(st) if c["srow_lines"] else []
+        tm = ""
+        now = self.net.now()
+        if c["srow_time"] and now is not None:
+            h, m, wd, d, mo = dp_data.split_secs(now)
+            tm = _pad2(h) + ":" + _pad2(m)
+        return (name, lines, tm)
+
     def draw_intro(self, bmp, st):
+        lines = self.title_lines(st)
+        w = st["walk"]
+        self.scr.draw_intro(bmp, st["name"], lines[:8],        # the name exactly as it stands in the settings
+                            self.S("walk").replace("%", str(w)) if w else "", (str(w) + " " + self.S("min").upper()) if w else "", self.cfg)
+
+    def title_lines(self, st):
         seen = []
         e = self.cache.get(self.key(st))
         lines = []
@@ -294,9 +327,7 @@ class App:
                     rgb, pill = dp_cfg.line_color(st["country"], e["op"], d[1], d[2], d[6])
                     if self.cfg["badge"] == "mono" or (d[2] in ("BUS", "TRAM") and not self.cfg["bus_color"]): rgb = None
                     lines.append((d[1], rgb, pill))
-        w = st["walk"]
-        self.scr.draw_intro(bmp, st["name"], lines[:8],        # the name exactly as it stands in the settings
-                            self.S("walk").replace("%", str(w)) if w else "", (str(w) + " " + self.S("min").upper()) if w else "", self.cfg)
+        return lines
 
     # ---- flow ----------------------------------------------------------
     def restart(self):
@@ -399,10 +430,11 @@ class App:
                     days = self.S("days").split(",")
                     if len(days) != 7: days = dp_cfg.STR["days"].split(",")
                     date = days[wd].strip() + " " + date
-        left = cs + "|" + date
+        ic = [(c["icon%d" % k], c["icon%d_c" % k]) for k in (1, 2, 3)]
+        left = cs + "|" + date + "|" + str(ic)
         if left != self.clock_s or force:
             self.clock_s = left
-            self.scr.set_left(cs, date, c["st_icon"] and c["st_clock"])
+            self.scr.set_left(cs, date, c["st_icon"] and c["st_clock"], ic, c["st_icons"], c["clock_pos"])
             changed = True
         self.prune()
         parts = []
@@ -466,6 +498,7 @@ class App:
             self.sig = None
             self.t_sec = 0
             self.t0 = mono_ms()
+            if self.cfg["power_wait"]: self.cache = {}     # nothing was fetched while dark: wait for fresh data
             if self.cfg["mode"] == "rotate" and self.active():
                 self.phase = "none"              # back on: start over with the first station and its title
                 self.show(0 if self.pin < 0 else self.pin, False)
@@ -570,10 +603,13 @@ class App:
                 elif self.stale(act[self.i]):
                     self.fetch(act[self.i])
                     self.t_sec = 0
-                elif now - self.t_pre >= 1500:
-                    # Keep the other stations loaded too, so a station has its departures the moment its turn comes.
+                elif len(act) > 1 and self.pin < 0 and self.cfg["dwell"] * 1000 - (now - self.t0) < 2500 and now - self.t_pre >= 3000:
+                    # Load the next station just before its turn, so the ticker is held up only then.
                     self.t_pre = now
-                    self.poll_one(act)
+                    nx = act[(self.i + 1) % len(act)]
+                    if self.stale(nx):
+                        self.fetch(nx)
+                        self.t_sec = 0
                 if self.sig == "loading" and now - self.t_spin >= 300:
                     self.t_spin = now
                     self.spin += 1

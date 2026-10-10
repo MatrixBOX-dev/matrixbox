@@ -2,7 +2,7 @@
 # Pure data and helpers, no hardware access.
 import json
 
-VERSION = "0.8.0"
+VERSION = "0.9.0"
 APP = "departuresplus"
 CFG_FILE = "departuresplus.json"
 
@@ -43,10 +43,22 @@ DEFAULTS = {
     "gap": 3,                # pixels between the line column and the destination
     "walk_text": "",         # walking time on the station title, % is the number of minutes
     "days_text": "",         # seven weekday names, Monday first, comma separated
-    "status": "on",          # on | off: the row at the bottom
+    "status": "on",          # on | off: the status row
+    "st_pos": "bottom",      # bottom | top
+    "clock_pos": "left",     # left | center | right: clock and date
+    "st_icons": "right",     # off | left | right
+    "icon1": "", "icon1_c": "", "icon2": "", "icon2_c": "", "icon3": "", "icon3_c": "",   # icon name or up to 2 characters, colour
+    "srow": "off",           # off | top | bottom: a row with the station's name
+    "srow_align": "left",    # left | center | right
+    "srow_lines": 1,         # the station's lines in the station row
+    "srow_time": 0,          # the time in the station row
+    "srow_text": "",         # station row in the mixed list, empty = "Departures"
+    "fb_mark": 0,            # a small dot while a station shows its fallback source
+    "power_wait": 1,         # on power-on, show the title with a loading mark until fresh data is in
     "st_clock": 1,
     "st_icon": 0,            # small clock symbol in front of the time
     "st_date": "wday",       # off | date | wday
+    "st_bright": 0,          # clock symbol and date as bright as the clock
     "st_ticker": 1,
     "ticker_color": "white", # white | tone
     "ticker_text": "",       # always in the ticker
@@ -56,6 +68,9 @@ DEFAULTS = {
     "ticker_speed": "normal",  # fast | normal | slow
     "tone": "amber",         # see dp_draw.TONES, or "custom" with tone_hex
     "tone_hex": "#ff9900",
+    # Own colours per element, empty = the default. A name (red, green, blue, yellow, orange, white) or #RRGGBB.
+    "c_time": "", "c_dest": "", "c_line": "", "c_tag": "", "c_clock": "", "c_date": "", "c_ticker": "",
+    "c_srow": "", "c_srow_t": "", "c_title": "", "c_walk": "", "c_pager": "",
     "margin_l": 0,           # unused columns at the left and right edge
     "margin_r": 0,
     "brightness": 2,         # 1..3
@@ -79,19 +94,22 @@ CHOICES = {
     "list_anim": ("off", "roll", "scroll", "down", "left", "right", "dissolve", "blinds", "wipe"), "pager": ("dots", "bar", "off"),
     "font": ("compact", "normal", "large"), "badge": ("fill", "invert", "text", "mono"),
     "time_fmt": ("min", "tick", "plain", "clock"), "delay": ("incl", "plus"), "walk": ("show", "dim", "hide"),
-    "status": ("on", "off"), "st_date": ("off", "date", "wday"), "ticker_color": ("white", "tone"),
+    "status": ("on", "off"), "st_pos": ("bottom", "top"), "clock_pos": ("left", "center", "right"),
+    "st_icons": ("off", "left", "right"), "srow": ("off", "top", "bottom"), "srow_align": ("left", "center", "right"), "st_date": ("off", "date", "wday"), "ticker_color": ("white", "tone"),
     "tone": ("amber", "orange", "yellow", "white", "warm", "red", "green", "blue", "cyan", "pink", "custom"),
     "button": ("next", "power"), "ticker_speed": ("fast", "normal", "slow"),
     "blink": ("off", "time", "dest", "line", "row"), "live": ("off", "wave", "dot", "bar", "tick", "approx"), "delay_color": ("red", "tone"), "badge_ink": ("auto", "black", "white"),
 }
-LIMITS = {"intro": (0, 10), "dwell": (3, 60), "pages": (1, 3), "skip": (0, 60), "brightness": (1, 3), "poll": (20, 600),
+LIMITS = {"intro": (0, 10), "dwell": (1, 60), "pages": (1, 5), "skip": (0, 60), "brightness": (1, 3), "poll": (20, 600),
           "port": (1, 65535), "max_rows": (0, 16), "line_len": (0, 6), "line_col": (0, 6), "gap": (0, 12), "tx_power": (0, 20), "margin_l": (0, 12), "margin_r": (0, 12)}
-STRLEN = {"ticker_text": 160, "abbr": 240, "strip": 120, "sched_days": 100, "tone_hex": 7, "walk_text": 24, "days_text": 70, "ticker_sep": 12, "nodeps_text": 60}
+STRLEN = {"ticker_text": 160, "abbr": 240, "strip": 120, "sched_days": 100, "tone_hex": 7, "walk_text": 24, "days_text": 70, "ticker_sep": 12, "nodeps_text": 60, "srow_text": 24,
+          "icon1": 12, "icon2": 12, "icon3": 12, "icon1_c": 9, "icon2_c": 9, "icon3_c": 9,
+          "c_time": 9, "c_dest": 9, "c_line": 9, "c_tag": 9, "c_clock": 9, "c_date": 9, "c_ticker": 9, "c_srow": 9, "c_srow_t": 9, "c_title": 9, "c_walk": 9, "c_pager": 9}
 
 # Fixed words. Each can be replaced with the setting named <key>_text.
 STR = {"now": "now", "now_s": "0", "cancel": "cancelled", "cancel_s": "canc.", "min": "min", "walk": "% MIN WALK",
        "days": "Mon,Tue,Wed,Thu,Fri,Sat,Sun", "nodeps": "No departures", "nodata": "No data",
-       "loading": "Loading...", "setup": "Set up at:"}
+       "loading": "Loading...", "setup": "Set up at:", "deps": "Departures"}
 # Settings saved before 0.5 had a display language instead of free texts: (walk, days, now, nodeps).
 OLD_LANG = {"de": ("% MIN ZU FUSS", "Mo,Di,Mi,Do,Fr,Sa,So", "sofort", "Keine Abfahrten"),
             "sv": ("% MIN ATT GÅ", "Mån,Tis,Ons,Tor,Fre,Lör,Sön", "nu", "Inga avgångar")}
@@ -172,7 +190,7 @@ def _clean_station(s):
     except Exception: out["walk"] = 0
     try: out["dir"] = max(0, min(2, int(s.get("dir", 0))))
     except Exception: out["dir"] = 0
-    try: out["pages"] = max(0, min(3, int(s.get("pages", 0))))      # 0 = the general setting
+    try: out["pages"] = max(0, min(5, int(s.get("pages", 0))))      # 0 = the general setting
     except Exception: out["pages"] = 0
     return out
 

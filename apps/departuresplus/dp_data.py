@@ -70,7 +70,7 @@ class Net:
         data = bytearray()
         try:
             with pool.socket() as s:
-                s.settimeout(6)
+                s.settimeout(4)
                 s.connect((host, int(port)))
                 s.sendall(req.encode("utf-8"))
                 buf = bytearray(1024)
