@@ -10,6 +10,7 @@ country_and_operators = {
   "no":[["no","Entur (entire Norway)"]],
   "fi":[["all","All of Finland"], ["hsl","HSL"]],
   "cr":[["za","ZET (Zagreb)"]],
+  "bg":[["so","Sofia"]],
   "nl":[["all","Countrywide"], ["ns","Nederlandse Spoorwegen"]],
   "ch":[["ch","Switzerland"],["sbb","SBB"]],
   "fr":[["sncf","SNCF"], ["idfm","IDFM (Paris)"], ["ilevia","Ilévia"], ["met","Le MET"]],
