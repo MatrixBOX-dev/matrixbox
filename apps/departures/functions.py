@@ -18,7 +18,16 @@ def reset():
     microcontroller.reset()
 def strlen(_string): 
     if isinstance(_string, str): _string = _string.lower()
-    return sum(fonts[varinit.currentfont][c][0] for c in _string)
+    font = fonts[varinit.currentfont]
+    total = 0
+    for c in _string:
+        # Mirror renderstring()'s per-character fallback so a glyph missing from
+        # the active font measures (and later draws) as "_" instead of raising
+        # a KeyError that aborts the whole row/frame in list_mode().
+        if c == LOGO_CHAR and LOGO_CHAR not in font: c = "%"
+        if c not in font: c = "_"
+        total += font[c][0]
+    return total
 
 LOGO_CHAR = "Ⓜ"
 LOGO_CHAR = "🇹"
