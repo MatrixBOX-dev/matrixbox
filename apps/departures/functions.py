@@ -1309,7 +1309,7 @@ def savesettings(_settings=varinit.settings, saved=dicts.language[varinit.settin
 
 try: 
     import font_mini
-    dicts.font_mini = font_mini
+    dicts.font_mini = font_mini.font_mini
     varinit.fonts.append(font_mini.font_mini)
     #print(len(varinit.fonts))
 except:
