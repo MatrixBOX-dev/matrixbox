@@ -28,6 +28,7 @@ PLUGIN_SKINS = {
     "dsa": {"label": "DSA (Westfrankenbahn)"},
     "vbz": {"label": "VBZ (Zürich)"},
     "ubahn": {"label": "U-Bahn (Berlin)"},
+    "cyrillic": {"label": "Bulgarian cyrillic (font)"},
     #"departuresplus": {"label": "Departuresplus (coming soon)"},
 }
 
