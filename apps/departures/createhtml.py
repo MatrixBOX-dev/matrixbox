@@ -87,7 +87,7 @@ def huvudsidan(request):
                 #datastr = ""
                 datastr = """<option value=""" + "\"" + "0" +  "\"" + """>""" + varinit.dicts.language[varinit.settings["language"]]["display"]["select_station"] + """</option>"""
 
-                data  = functions.fetch_data("data.t-skylt.se", 90, "/search_stop?country=" + varinit.settings["stations"][num]["country"] + "&operator=" + varinit.settings["stations"][num]["operator"] + "&station=" + request.params["sstring"])
+                data  = functions.fetch_data(*functions.data_server(), args="/search_stop?country=" + varinit.settings["stations"][num]["country"] + "&operator=" + varinit.settings["stations"][num]["operator"] + "&station=" + request.params["sstring"])
                 data = json.loads(data)                  
                 try:
                     for stations in data:
@@ -358,6 +358,20 @@ def huvudsidan(request):
         varinit.settings["ssid"] = request.params["ssid"]
         for a in html_decode:
             varinit.settings["ssid"] = varinit.settings["ssid"].replace(a, html_decode[a])
+        return (200, {}, "")
+    elif "data_server" in request.params:
+        # "host" or "host:port"; "default" restores data.t-skylt.se:90, empty is ignored
+        value = request.params["data_server"]
+        for a in html_decode: value = value.replace(a, html_decode[a])
+        value = value.strip().replace("http://", "").rstrip("/")
+        if value.lower() == "default":
+            varinit.settings["data_host"], varinit.settings["data_port"] = "", 90
+        elif value:
+            host, port = (value.split(":", 1) + [""])[:2]
+            try:
+                varinit.settings["data_port"] = int(port) if port else 90
+                varinit.settings["data_host"] = host
+            except ValueError: print("Invalid data server port:", port)
         return (200, {}, "")
     elif "user" in request.params:
         varinit.settings["user"] = request.params["user"]
@@ -713,7 +727,7 @@ def search_station(request):
             return (200, {}, "")
     datastr = '<option value="0">' + varinit.dicts.language[varinit.settings["language"]]["display"]["select_station"] + '</option>'
     try:
-        data = functions.fetch_data("data.t-skylt.se", 90, "/search_stop?country=" + varinit.settings["stations"][num]["country"] + "&operator=" + varinit.settings["stations"][num]["operator"] + "&station=" + sstring)
+        data = functions.fetch_data(*functions.data_server(), args="/search_stop?country=" + varinit.settings["stations"][num]["country"] + "&operator=" + varinit.settings["stations"][num]["operator"] + "&station=" + sstring)
         data = json.loads(data)
         datalist = []
         for stations in data:

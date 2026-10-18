@@ -44,7 +44,7 @@ def temperature_check():
 def ping_screen():
     while varinit.ping:
         start_time = time.monotonic()
-        _data = fetch_data("data.t-skylt.se",90,"/get_departures?country=se&operator=sl&station=9001", )
+        _data = fetch_data(*data_server(), args="/get_departures?country=se&operator=sl&station=9001", )
         end_time = time.monotonic()
         varinit.ping_list.append(int(end_time - start_time))
         print("temp: ", str(round(microcontroller.cpu.temperature)))
@@ -222,7 +222,7 @@ def get_deviations():
     operator = varinit.settings["stations"]["1"]["operator"]
     siteid = varinit.settings["stations"]["1"]["siteid"]
     if not len(varinit.deviations_list):
-        data = fetch_data(host="data.t-skylt.se", port=90, args="/get_deviations?country=" + country + "&operator=" + operator + "&station=" + siteid)
+        data = fetch_data(*data_server(), args="/get_deviations?country=" + country + "&operator=" + operator + "&station=" + siteid)
         data = json.loads(data)
         varinit.deviations_list = data
     print(*varinit.deviations_list, sep='\n')
@@ -410,6 +410,11 @@ def nightcheck(force=False, _switch=False, turnon=False):
         if not varinit.group.hidden: return lights(False)
     else: lights(True)
     
+def data_server():
+    # Host/port of the departures data server (get_departures, search_stop, get_deviations).
+    # Configurable for self-hosting; defaults to the official T-Skylt server.
+    return varinit.settings.get("data_host") or "data.t-skylt.se", int(varinit.settings.get("data_port") or 90)
+
 def fetch_data(host, port=80, args="", headers = "", filetype="text"):
     if varinit.if_long > 128 and not int(varinit.settings["listmode"]): version_delay(slowdown=1)
     
@@ -580,7 +585,7 @@ def get_departure(num = "1", dataout = [["1", "^ Data error","","",""]]):
     else:
       try: 
         temperature_check()
-        _data = fetch_data(host="data.t-skylt.se", port=90, args='/get_departures?country=' + varinit.settings["stations"][num]["country"] + '&operator=' + varinit.settings["stations"][num]["operator"] + "&station=" + str(varinit.settings["stations"][num]["siteid"]))
+        _data = fetch_data(*data_server(), args='/get_departures?country=' + varinit.settings["stations"][num]["country"] + '&operator=' + varinit.settings["stations"][num]["operator"] + "&station=" + str(varinit.settings["stations"][num]["siteid"]))
         if _data: data = json.loads(_data)
         else: 
             varinit.active_message = True
