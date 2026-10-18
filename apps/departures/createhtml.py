@@ -3,6 +3,8 @@ from functions import *
 import web
 #from code import exit
 
+_HOST_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-"
+
 def timer():
     html = web.timer(varinit.settings["language"], varinit.settings["timer"])
     return html
@@ -368,10 +370,12 @@ def huvudsidan(request):
             varinit.settings["data_host"], varinit.settings["data_port"] = "", 90
         elif value:
             host, port = (value.split(":", 1) + [""])[:2]
-            try:
-                varinit.settings["data_port"] = int(port) if port else 90
-                varinit.settings["data_host"] = host
-            except ValueError: print("Invalid data server port:", port)
+            try: port = int(port) if port else 90
+            except ValueError: port = 0
+            # strict host/port: the value is echoed back into the settings page HTML
+            if 0 < len(host) <= 253 and all(c in _HOST_CHARS for c in host) and 0 < port < 65536:
+                varinit.settings["data_host"], varinit.settings["data_port"] = host, port
+            else: print("Invalid data server:", value)
         return (200, {}, "")
     elif "user" in request.params:
         varinit.settings["user"] = request.params["user"]
