@@ -2,7 +2,7 @@
 # Pure data and helpers, no hardware access.
 import json
 
-VERSION = "0.9.0"
+VERSION = "0.9.1"
 APP = "departuresplus"
 CFG_FILE = "departuresplus.json"
 
@@ -57,6 +57,7 @@ DEFAULTS = {
     "power_wait": 1,         # on power-on, show the title with a loading mark until fresh data is in
     "st_clock": 1,
     "st_icon": 0,            # small clock symbol in front of the time
+    "st_secs": 0,            # the clock shows seconds
     "st_date": "wday",       # off | date | wday
     "st_bright": 0,          # clock symbol and date as bright as the clock
     "st_ticker": 1,

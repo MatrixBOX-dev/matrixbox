@@ -89,12 +89,15 @@ class App:
         if body is None: return None, "nodata"
         return dp_data.parse(body, st, c)
 
-    def _upcoming(self, deps):
+    def _upcoming(self, deps, st):
+        """How many of these departures the display would show: not gone, not cancelled, and reachable while unreachable ones are hidden."""
         now = self.net.now()
-        if deps is None or now is None: return False
+        if deps is None or now is None: return 0
+        lim = st["walk"] * 60 - 30 if (self.cfg["walk"] == "hide" and st["walk"]) else -20
+        n = 0
         for d in deps:
-            if d[0] - now > -20 and not d[5]: return True
-        return False
+            if d[0] - now >= lim and not d[5]: n += 1
+        return n
 
     def fetch(self, st):
         gc.collect()
@@ -110,10 +113,11 @@ class App:
         e["loads"] = e["loads"] + 1 if msg == "loading" else 0      # the server answers "Loading..." on a cold station
         # The fallback steps in when the main source has nothing coming up: an error,
         # a station that never finishes loading, or a list that has gone stale.
-        if st.get("fb_id") and not self._upcoming(deps) and (msg != "loading" or e["loads"] >= 3):
+        n = self._upcoming(deps, st)
+        if st.get("fb_id") and n < 2 and (msg != "loading" or e["loads"] >= 3):
             gc.collect()
             d2, m2 = self._get(st, st.get("fb_operator") or st["operator"], st["fb_id"])
-            if self._upcoming(d2):
+            if self._upcoming(d2, st) > n:      # the fallback has more to show; the main source is asked first again next time
                 deps = d2; msg = None; src = "fallback"; op = st.get("fb_operator") or st["operator"]
             elif deps is None and m2 == "loading":
                 msg = "loading"
@@ -121,9 +125,13 @@ class App:
             e["n0"] = e.get("n0", 0) + 1      # an empty first answer is often a station the server is still loading: ask again soon
             deps = None; msg = "loading"
         if deps is None:
+            if msg != "loading":
+                e["err"] = e.get("err", 0) + 1
+                if e["deps"] is None and e["err"] <= 2: msg = "loading"      # a hiccup: ask again soon before saying so
             if e["deps"] is None: e["msg"] = msg
-            e["retry"] = now + ((4000 if e["loads"] < 3 else 15000) if msg == "loading" else 60000)
+            e["retry"] = now + ((4000 if e["loads"] < 8 else 15000) if msg == "loading" else 20000)
             return
+        e["err"] = 0
         e["deps"] = deps; e["msg"] = None; e["retry"] = 0; e["src"] = src; e["op"] = op
         gc.collect()
 
@@ -257,7 +265,7 @@ class App:
         if msg == "loading" and self.cfg["mode"] == "rotate" and self.i < len(act):
             self.draw_intro(bmp, act[self.i])       # the station's title with a small loading mark, not a bare "Loading..."
             self.scr.spinner(bmp, self.spin)
-        elif msg: self.scr.draw_message(bmp, [(msg[4:] if msg[:4] == "msg:" else self.S(msg), C_DIM)])
+        elif msg: self.scr.draw_message(bmp, [(msg[4:] if msg[:4] == "msg:" else self.S(msg), C_DIM)] + ([("v" + dp_cfg.VERSION, C_DIM)] if msg == "loading" else []))
         else: self.scr.draw_rows(bmp, rows, self.cfg, self.header())
         if self.cfg["fb_mark"] and not msg:
             act = self.active()
@@ -349,7 +357,7 @@ class App:
         self.status_update(True)
         if not act:
             ip = str(wifi.radio.ipv4_address) if wifi.radio.ipv4_address else ""
-            self.scr.draw_message(self.scr.cur, [("Departures Plus", C_TONE), (self.S("setup"), C_DIM), ("http://" + ip, C_DIM)])
+            self.scr.draw_message(self.scr.cur, [("Departures Plus v" + dp_cfg.VERSION, C_TONE), (self.S("setup"), C_DIM), ("http://" + ip, C_DIM)])
             self.pager()
             display.refresh()
             return
@@ -420,10 +428,10 @@ class App:
         now = self.net.now()
         cs = ""; date = ""
         if now is None:
-            if c["st_clock"]: cs = "--:--"
+            if c["st_clock"]: cs = "--:--:--" if c["st_secs"] else "--:--"
         else:
             h, m, wd, d, mo = dp_data.split_secs(now)
-            if c["st_clock"]: cs = _pad2(h) + ":" + _pad2(m)
+            if c["st_clock"]: cs = _pad2(h) + ":" + _pad2(m) + ((":" + _pad2(int(now) % 60)) if c["st_secs"] else "")
             if c["st_date"] != "off":
                 date = str(d) + "." + str(mo) + "."
                 if c["st_date"] == "wday":
@@ -568,6 +576,7 @@ class App:
             if act and self.phase == "deps":
                 rows, msg = self.page_rows()
                 if self._sig(rows, msg) != self.sig:
+                    if self.sig == "loading": self.t0 = now      # the departures just came in: give them their full time
                     self.update_page()
                     dirty = True
         if act:
@@ -586,7 +595,7 @@ class App:
                     self.t0 = mono_ms()
                     dirty = True
             elif self.phase == "deps":
-                due = now - self.t0 >= self.cfg["dwell"] * 1000
+                due = now - self.t0 >= self.cfg["dwell"] * 1000 and not (self.sig == "loading" and now - self.t0 < 20000)
                 if due and self.more_pages():
                     self.turn(self.pg + 1)
                     dirty = True
@@ -603,6 +612,8 @@ class App:
                 elif self.stale(act[self.i]):
                     self.fetch(act[self.i])
                     self.t_sec = 0
+                elif second and len(act) > 1 and [1 for s in act if (self.cache.get(self.key(s)) or {}).get("deps") is None]:
+                    self.poll_one(act)         # warming up: the data server loads a cold station only once it is asked
                 elif len(act) > 1 and self.pin < 0 and self.cfg["dwell"] * 1000 - (now - self.t0) < 2500 and now - self.t_pre >= 3000:
                     # Load the next station just before its turn, so the ticker is held up only then.
                     self.t_pre = now
