@@ -35,6 +35,44 @@ device's hotspot, and the other by connecting it to a computer.
 4. If you use a coding agent to write your apps, you can refer it to
    `system_prompt.md` for general guidelines
 
+### Third-party apps
+
+Apps don't have to live in this repo. Any public GitHub repo with a
+`manifest.json` can be installed from the Apps page by entering its URL:
+
+- `github.com/owner/repo` or `owner/repo`: manifest at the repo root
+- `owner/repo/some/dir` or `github.com/owner/repo/tree/main/some/dir`: app in
+  a subdirectory
+- `owner/repo@branch`: another branch than the default one
+
+```json
+{
+  "name": "My App",
+  "description": "What it does",
+  "version": "0.1",
+  "emoji": "🎵",
+  "files": ["__init__.py", "code.py", "myapp.html"]
+}
+```
+
+- `files` lists everything the device downloads, and must include
+  `__init__.py`
+- `version` decides when an update is offered: bump it to ship a new version
+- The app is installed as `/<owner>-<repo>`, or `/<owner>-<dir>` for an app in
+  a subdirectory (a `matrixbox-` prefix is dropped), so open files relative to
+  the app directory
+- `emoji` is optional
+
+Updates are manual: "Check for updates" on the Apps page compares each
+installed app's version with its repo, and Update downloads all files again.
+
+Apps can also be added to the Community list on the Apps page by opening a PR
+adding them to [`thirdparty.json`](./thirdparty.json). An entry is only
+`repo` (plus optional `path` and `ref`) and the `name`, `description` and
+`emoji` shown before it's installed; versions always come from the app's own
+manifest, so releasing an update never needs a change here. See
+[matrixbox-lastfm] for an example.
+
 ## Recover your device
 
 If you lose access to your device, e.g. by files getting corrupted while
@@ -124,6 +162,7 @@ reach us at
 [email]: mailto:info@matrixbox.app
 [flash]: https://matrixbox.app/flash/
 [gif-resizer]: https://github.com/MatrixBOX-dev/gif-resizer
+[matrixbox-lastfm]: https://github.com/bombsimon/matrixbox-lastfm
 [matrixbox-simulator]: https://github.com/MatrixBOX-dev/simulator
 [matrixbox.app]: https://matrixbox.app
 [paint]: ./apps/paint

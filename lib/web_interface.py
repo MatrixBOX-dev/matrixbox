@@ -35,6 +35,8 @@ def _get_installed_apps():
     return apps
 
 def _app_ver(path):
+    m = _read_json(path + "/manifest.json")
+    if m: return _norm_ver(m.get("version", ""))
     try:
         best = ""
         for f in os.listdir(path):
@@ -46,6 +48,8 @@ def _app_ver(path):
     return ""
 
 def _app_ver_data(path):
+    m = _read_json(path + "/manifest.json")
+    if m: return m
     try:
         for f in os.listdir(path):
             if f[0] == "v" and f[1:2].isdigit():
@@ -53,6 +57,20 @@ def _app_ver_data(path):
                     return json.loads(fh.read())
     except: pass
     return {}
+
+def _read_json(path):
+    try:
+        with open(path) as f: return json.loads(f.read())
+    except: return None
+
+def _norm_ver(ver):
+    ver = str(ver).strip()
+    return ver[1:] if ver[:1] in ("v", "V") else ver
+
+def _app_name(path):
+    """Display name: manifest.json's name for third-party apps, else the dir."""
+    m = _read_json(path + "/manifest.json")
+    return (m.get("name") if m else "") or path.strip("/")
 
 def _dir_size(path):
     total = 0
@@ -83,11 +101,9 @@ def _total_space():
     return s[0] * s[2]  # block size * total blocks
 
 def _run_button_html(app):
-    return """<button class="btn btn-sm" onclick="run"""+app+"""()">&#9654; Run</button>
-<script>function run"""+app+"""() {
-    fetch("/?run="""+app+"""", { method: "GET" }).then(() => {
-        setTimeout(() => { window.location.href = "/"; }, 10);
-    });}</script>"""
+    # Inline handler rather than a per-app named function: third-party dirs
+    # like "owner-repo" aren't valid JS identifiers.
+    return """<button class="btn btn-sm" onclick="fetch('/?run="""+app+"""').then(function(){setTimeout(function(){window.location.href='/'},10)})">&#9654; Run</button>"""
 
 def textbox(settings):
     """Builds settings fields as (main_html, app_html, adv_html) -- one
@@ -234,13 +250,17 @@ def _bootstrapper_urls(app):
         return raw, files
     except: return None, None
 
-def install_app(app, third_party=False):
+def install_app(app, raw_base=None, files=None):
+    """Download app's files into /app. raw_base + files override where they
+    come from (third-party apps); otherwise the main repo is used. Returns
+    True if every file was downloaded and written."""
     if app == "system": app = "/"
-    _ext_prefix = ""
-    if third_party:
-        _ext_raw, _ext_files, _ext_prefix = _third_party_bootstrapper_urls(app)
-    else:
+    _bootstrap = raw_base is None
+    if _bootstrap:
         _ext_raw, _ext_files = _bootstrapper_urls(app) if app != "/" else (None, None)
+    else:
+        _ext_raw, _ext_files = raw_base, files
+    ok = False
     print("Install: ", app)
     applist = load_settings.latest_available_apps
     _files = _ext_files if _ext_files is not None else applist.get(app, [])
@@ -271,7 +291,7 @@ def install_app(app, third_party=False):
                     except: pass
             print("File: ", file)
             _draw_progress(x, no_of_files, file)
-            _url = (_ext_raw + _ext_prefix + file) if _ext_raw else (settings["repository_url"] + ("apps/" + app + "/" if app != "/" else "") + file)
+            _url = (_ext_raw + file) if _ext_raw else (settings["repository_url"] + ("apps/" + app + "/" if app != "/" else "") + file)
             resp = requests.get(_url)
             print(resp.status_code)
             if resp.status_code != 200:
@@ -294,6 +314,7 @@ def install_app(app, third_party=False):
             except:
                 error_color = "red"
         downloads = None
+        ok = error_color != "red"
         #gc.collect()
     finally:
         try: microcontroller.cpu.frequency = 180000000
@@ -322,7 +343,7 @@ def install_app(app, third_party=False):
         except: pass
         window.fill(0)
         pprint("Done.", 1, _clearscreen=True)
-        if _ext_raw:
+        if _ext_raw and _bootstrap:
             try:
                 with open("/" + app + "/.installed", "w") as f: f.write("")
             except: pass
@@ -331,7 +352,8 @@ def install_app(app, third_party=False):
                 with open("reboot_required", "w") as f: f.write("")
             except OSError: pass
         __main__.show_logo()
-        
+    return ok
+
 
 
 def _repo_api_base():
@@ -344,9 +366,6 @@ def _repo_api_base():
     return parts[1], parts[2]
 
 _cached_apps = None
-_THIRD_PARTY_APPS_API = "https://api.github.com/repos/MatrixBOX-dev/3rd_party_apps/git/trees/main?recursive=1"
-_THIRD_PARTY_APPS_RAW = "https://raw.githubusercontent.com/MatrixBOX-dev/3rd_party_apps/refs/heads/main/"
-
 def get_updates(force=False):
     global _cached_apps
     if _cached_apps is not None and not force:
@@ -415,90 +434,6 @@ def get_updates(force=False):
         apps = None
     return apps
 
-def _get_third_party_apps():
-    resp = requests.get(_THIRD_PARTY_APPS_API, headers={"User-Agent": "MatrixBox"}, timeout=10)
-    try:
-        if resp.status_code != 200:
-            raise RuntimeError("third-party catalog request returned HTTP " + str(resp.status_code))
-        tree = json.loads(resp.text)["tree"]
-    finally:
-        resp.close()
-    if not isinstance(tree, list):
-        raise ValueError("third-party catalog response does not contain a file tree")
-    apps = set()
-    for item in tree:
-        path = item.get("path", "")
-        parts = path.split("/")
-        if (item.get("type") == "blob" and len(parts) == 2 and
-                parts[1] == "__init__.py" and
-                all(c in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for c in parts[0])):
-            apps.add(parts[0])
-    return sorted(apps)
-
-def _third_party_bootstrapper_urls(app):
-    if not app or not all(c in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for c in app):
-        raise ValueError("invalid third-party app name")
-    response = requests.get(_THIRD_PARTY_APPS_RAW + app + "/__init__.py",
-                            headers={"User-Agent": "MatrixBox"}, timeout=10)
-    try:
-        if response.status_code != 200:
-            raise RuntimeError("third-party app source returned HTTP " + str(response.status_code))
-        content = response.text
-    finally:
-        response.close()
-    raw = api = prefix = None
-    for line in content.split("\n"):
-        line = line.strip()
-        if line.startswith("_RAW"):
-            raw = line.split('"')[1]
-        elif line.startswith("_API"):
-            api = line.split('"')[1]
-        elif line.startswith("_PREFIX"):
-            prefix = line.split('"')[1]
-    if not (raw and api and prefix):
-        raise ValueError("third-party app is missing its _RAW, _API, or _PREFIX source")
-    if prefix.startswith("/") or not prefix.endswith("/") or ".." in prefix.split("/"):
-        raise ValueError("third-party app has an invalid _PREFIX")
-    response = requests.get(api, headers={"User-Agent": "MatrixBOX"}, timeout=10)
-    try:
-        if response.status_code != 200:
-            raise RuntimeError("third-party app file list returned HTTP " + str(response.status_code))
-        tree = json.loads(response.text)["tree"]
-    finally:
-        response.close()
-    if not isinstance(tree, list):
-        raise ValueError("third-party app response does not contain a file tree")
-    files = []
-    for item in tree:
-        path = item.get("path", "")
-        if item.get("type") != "blob" or not path.startswith(prefix):
-            continue
-        relative_path = path[len(prefix):]
-        if relative_path and not relative_path.startswith("/") and ".." not in relative_path.split("/"):
-            files.append(relative_path)
-    if not files:
-        raise ValueError("third-party app has no downloadable files")
-    return raw, files, prefix
-
-def _third_party_app_metadata(app):
-    raw, files, prefix = _third_party_bootstrapper_urls(app)
-    version_files = [name for name in files
-                     if name.startswith("v") and name[1:2].isdigit()]
-    if not version_files:
-        return raw, files, prefix, "", {}
-    version_file = max(version_files)
-    response = requests.get(raw + prefix + version_file,
-                            headers={"User-Agent": "MatrixBox"}, timeout=10)
-    try:
-        if response.status_code != 200:
-            raise RuntimeError("third-party app version info returned HTTP " + str(response.status_code))
-        metadata = json.loads(response.text)
-    finally:
-        response.close()
-    if not isinstance(metadata, dict):
-        raise ValueError("third-party app version info is not an object")
-    return raw, files, prefix, version_file[1:], metadata
-
 def _ver_detail_html(data, ver):
     html = ""
     desc = data.get("description", "")
@@ -564,6 +499,249 @@ function del"""+dir+"""(e){_busyWait("/?delete="""+dir+"""",e.currentTarget)}</s
             applist += f'<div class="download-item" style="flex-direction:column;align-items:stretch"><div style="display:flex;align-items:flex-start;justify-content:space-between"><div style="display:flex;min-width:0;flex:1">{_icon_html}<div style="min-width:0">{_vrow}</div></div>' + """<button class="btn btn-sm btn-success" style="flex-shrink:0;margin-left:8px" onclick="install"""+dir+"""(event)">&#x2B07; Install</button>
 <script>function install"""+dir+"""(e){_busyWait("/?install="""+dir+"""",e.currentTarget)}</script></div>""" + _vdh + '</div>'
     return applist
+
+# -- Third-party apps ----------------------------------------------------------
+# Apps in other GitHub repos, described by a manifest.json (see README.md).
+# Everything comes from raw.githubusercontent.com, so no GitHub API calls. An
+# install is /<owner>-<name> plus the manifest and a .source file used for
+# updates, which are manual and re-download every file.
+
+_TP_LIST = "thirdparty.json"  # curated list, in this repo
+_TP_OK = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."
+_TP_VERSIONS = "/.thirdparty_versions"  # last check's results, kept across reboots
+_tp_curated = None   # cached "apps" from thirdparty.json
+_tp_remote = _read_json(_TP_VERSIONS) or {}  # dir -> remote version seen by the last update check
+_tp_status = ""      # result of the last install/check, shown once in the UI
+
+def _tp_parse(src):
+    """'owner/repo[/path][@ref]' or a GitHub URL ('github.com/owner/repo',
+    'github.com/owner/repo/tree/<ref>/<path>') -> (owner, repo, ref, path),
+    or None if it doesn't look like one."""
+    s = src.strip()
+    for prefix in ("https://", "http://", "www.", "github.com/"):
+        if s.startswith(prefix): s = s[len(prefix):]
+    ref = "HEAD"  # raw.githubusercontent.com resolves it to the default branch
+    if "@" in s: s, ref = s.split("@", 1)
+    parts = [p for p in s.split("/") if p]
+    if len(parts) < 2: return None
+    owner, repo, rest = parts[0], parts[1], parts[2:]
+    if repo.endswith(".git"): repo = repo[:-4]
+    if len(rest) > 1 and rest[0] == "tree": ref, rest = rest[1], rest[2:]
+    for part in [owner, repo] + ref.split("/") + rest:
+        if not part or part in (".", "..") or any(c not in _TP_OK for c in part): return None
+    return owner, repo, ref, "/".join(rest)
+
+def _tp_src(source):
+    """.source file or thirdparty.json entry -> "owner/repo[/path][@ref]"."""
+    ref = source.get("ref", "HEAD")
+    return source.get("repo", "") + ("/" + source["path"] if source.get("path") else "") + ("@" + ref if ref != "HEAD" else "")
+
+def _tp_dir(owner, repo, ref="HEAD", path=""):
+    name = path.split("/")[-1].lower() if path else repo.lower()
+    if name.startswith("matrixbox-"): name = name[len("matrixbox-"):]
+    # dirs with a "." aren't recognized as apps
+    return (owner.lower() + "-" + name).replace(".", "_")
+
+def _tp_raw(owner, repo, ref="HEAD", path=""):
+    return "https://raw.githubusercontent.com/" + owner + "/" + repo + "/" + ref + "/" + (path + "/" if path else "")
+
+def _tp_fetch_manifest(owner, repo, ref="HEAD", path=""):
+    """Returns (manifest, None) or (None, error message)."""
+    try:
+        r = requests.get(_tp_raw(owner, repo, ref, path) + "manifest.json", headers={"User-Agent": "MatrixBox"}, timeout=10)
+        status, text = r.status_code, r.text
+        r.close()
+    except Exception as e:
+        print("manifest fetch:", e)
+        return None, "Couldn't reach GitHub"
+    if status == 404: return None, "No manifest.json in " + _tp_src({"repo": owner + "/" + repo, "ref": ref, "path": path})
+    if status != 200: return None, "manifest.json: http " + str(status)
+    try: m = json.loads(text)
+    except: return None, "manifest.json is not valid JSON"
+    if not isinstance(m, dict): return None, "manifest.json is not an object"
+    if not _norm_ver(m.get("version", "")): return None, "manifest.json has no version"
+    files = m.get("files")
+    if not isinstance(files, list) or "__init__.py" not in files:
+        return None, "manifest.json files must include __init__.py"
+    for f in files:
+        if not isinstance(f, str) or f.startswith("/") or ".." in f.split("/"):
+            return None, "manifest.json has an invalid file: " + str(f)
+    return m, None
+
+def _is_app(d):
+    try: return "__init__.py" in os.listdir("/" + d)
+    except: return False
+
+def _tp_installed():
+    """{dir: .source} for every installed third-party app."""
+    found = {}
+    for d in os.listdir("/"):
+        if "." in d or not _is_app(d): continue
+        s = _read_json("/" + d + "/.source")
+        if s and s.get("repo"): found[d] = s
+    return found
+
+def install_thirdparty(src):
+    """Install or update (same thing: re-download everything) from a GitHub
+    URL or owner/repo[/path][@ref]. Returns True on success."""
+    global _tp_status
+    p = _tp_parse(src)
+    if not p:
+        _tp_status = "Not a GitHub repo: " + _esc(src)
+        return False
+    owner, repo, ref, path = p
+    source = {"repo": owner + "/" + repo, "path": path, "ref": ref}
+    m, err = _tp_fetch_manifest(*p)
+    if err:
+        _tp_status = _esc(err)
+        pprint(err, color="red", line=-1, _refresh=True)
+        return False
+    d = _tp_dir(*p)
+    name = _tp_src({"repo": source["repo"], "path": path})
+    old = _read_json("/" + d + "/.source")
+    if _is_app(d) and (not old or _tp_src({"repo": old.get("repo", ""), "path": old.get("path", "")}).lower() != name.lower()):
+        _tp_status = "/" + d + " already exists and isn't " + name
+        return False
+    if not install_app(d, _tp_raw(*p), m["files"]):
+        _tp_status = "Installing " + name + " failed (read-only filesystem?)"
+        return False
+    try:
+        with open("/" + d + "/manifest.json", "w") as f: f.write(json.dumps(m))
+        with open("/" + d + "/.source", "w") as f: f.write(json.dumps(source))
+    except OSError:
+        _tp_status = "Couldn't write /" + d + " (read-only filesystem?)"
+        return False
+    _tp_remote[d] = _norm_ver(m["version"])
+    _tp_save_remote()
+    _tp_status = "Installed " + _esc(m.get("name") or d) + " v" + _norm_ver(m["version"])
+    return True
+
+def _tp_save_remote():
+    try:
+        with open(_TP_VERSIONS, "w") as f: f.write(json.dumps(_tp_remote))
+    except OSError: pass  # read-only filesystem: results just won't survive a reboot
+
+def check_thirdparty():
+    """Refresh thirdparty.json, then fetch the manifest of every installed
+    third-party app and every curated one, and remember their versions. One
+    raw request per app, no API calls."""
+    global _tp_status
+    updates = 0
+    failed = 0
+    sources = {}
+    for e in _tp_curated_list(force=True):
+        p = _tp_parse(_tp_src(e))
+        if p: sources[_tp_dir(*p)] = p
+    installed = _tp_installed()
+    for d, source in installed.items():
+        sources[d] = _tp_parse(_tp_src(source))
+    for d, p in sources.items():
+        m, err = _tp_fetch_manifest(*p) if p else (None, "bad .source")
+        if err:
+            failed += 1
+            continue
+        _tp_remote[d] = _norm_ver(m["version"])
+        if d in installed and _tp_remote[d] != _app_ver(d): updates += 1
+    _tp_save_remote()
+    _tp_status = "Checked " + str(len(sources)) + " app(s): " + str(updates) + " update(s) available"
+    if failed: _tp_status += ", " + str(failed) + " failed"
+
+def _tp_curated_list(force=False):
+    """thirdparty.json from the main repo, fetched once and again on force,
+    falling back to the copy a system install puts in / (offline, or before
+    it's pushed upstream). A failed refresh keeps the cached list."""
+    global _tp_curated
+    if _tp_curated is None or force:
+        try:
+            r = requests.get(settings["repository_url"] + _TP_LIST, headers={"User-Agent": "MatrixBox"}, timeout=5)
+            if r.status_code == 200: _tp_curated = json.loads(r.text).get("apps", [])
+            r.close()
+        except Exception as e: print("thirdparty.json:", e)
+    if _tp_curated is None:
+        return (_read_json("/" + _TP_LIST) or {}).get("apps", [])
+    return _tp_curated
+
+def _esc(s):
+    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+def _tp_row(d, src, name, emoji, desc, l_ver, r_ver):
+    """One app row. l_ver is "" when not installed; r_ver is "" when unknown."""
+    icon = f'<span style="font-size:.95rem;margin-right:5px;flex-shrink:0">{emoji}</span>' if emoji else ''
+    upd = bool(l_ver and r_ver and l_ver != r_ver)
+    ver = l_ver or r_ver
+    ver_span = f'<span style="font-size:.75rem;color:#f0c800;font-weight:600;margin-left:6px">v{ver}</span>' if ver else ''
+    color = "#fff" if l_ver else "var(--muted)"
+    weight = "700" if l_ver else "400"
+    sub = f'<div style="font-size:.7rem;color:var(--muted);margin-top:1px">{_esc(src)}</div>'
+    if upd: sub += f'<div style="font-size:.7rem;color:#f0c800;margin-top:1px">&#x2192; v{r_ver} available</div>'
+    install = f"_busyWait('/thirdparty/install?src={src}',this)"
+    if l_ver:
+        if upd:
+            upd_btn = f'<button class="btn btn-sm" style="background:linear-gradient(135deg,#00c85d,#00e676);color:#000;border:2px solid #f0c800" onclick="{install}">&#x21BB; Update</button>'
+        else:
+            upd_btn = f'<button class="btn btn-sm btn-warning" onclick="{install}">&#x21BB; Reinstall</button>'
+        buttons = _run_button_html(d) + upd_btn + f"""<button class="btn btn-sm" style="background:#ff4b4b;color:#fff;padding:7px 9px" onclick="if(confirm('Delete {d}?'))_busyWait('/?delete={d}',this)">&#x2715;</button>"""
+    else:
+        buttons = f'<button class="btn btn-sm btn-success" onclick="{install}">&#x2B07; Install</button>'
+    desc_html = f'<div style="font-size:.75rem;color:var(--muted);margin-top:3px">{desc}</div>' if desc else ''
+    return f'<div class="download-item" style="flex-direction:column;align-items:stretch"><div style="display:flex;align-items:flex-start;justify-content:space-between"><div style="display:flex;min-width:0;flex:1">{icon}<div style="min-width:0"><div><span style="font-size:.92rem;font-weight:{weight};color:{color}">{_esc(name)}</span>{ver_span}</div>{sub}</div></div><div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px">{buttons}</div></div>{desc_html}</div>'
+
+def _thirdparty_content(force=False):
+    global _tp_status
+    installed = _tp_installed()
+    status = f'<div class="card" style="padding:10px 12px;font-size:.8rem;color:#f0c800">{_tp_status}</div>' if _tp_status else ''
+    _tp_status = ""
+
+    community = ""
+    curated_dirs = set()
+    for e in _tp_curated_list(force):
+        p = _tp_parse(_tp_src(e))
+        if not p: continue
+        d = _tp_dir(*p)
+        curated_dirs.add(d)
+        local = _app_ver_data(d) if d in installed else {}
+        # Versions only come from the app's own manifest, so a release never
+        # needs a change to thirdparty.json.
+        r_ver = _tp_remote.get(d, "")
+        community += _tp_row(d, _tp_src(e),
+                             local.get("name") or e.get("name") or d,
+                             local.get("emoji") or e.get("emoji", ""),
+                             local.get("description") or e.get("description", ""),
+                             _app_ver(d) if d in installed else "", r_ver)
+    if not community:
+        community = '<p style="color:var(--muted);font-size:.85rem">No community apps listed</p>'
+
+    custom = ""
+    for d, source in installed.items():
+        if d in curated_dirs: continue
+        m = _app_ver_data(d)
+        # Arbitrary manifests aren't reviewed, so escape their description
+        custom += _tp_row(d, _tp_src(source),
+                          m.get("name") or d, _esc(m.get("emoji", "")), _esc(m.get("description", "")),
+                          _app_ver(d), _tp_remote.get(d, ""))
+
+    add = """<div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" id="tp-src" placeholder="github.com/owner/repo" autocapitalize="off" autocorrect="off" style="flex:1;min-width:0">
+<button class="btn btn-sm btn-success" onclick="var v=document.getElementById('tp-src').value.trim();if(v&&confirm('Install unverified code from '+v+'? Only install apps you trust.'))_busyWait('/thirdparty/install?src='+encodeURIComponent(v),this)">&#x2B07; Install</button></div>
+<div style="font-size:.7rem;color:var(--muted);margin-bottom:4px">Any GitHub repo with a manifest.json. Add /path for an app in a subdirectory, @branch for another branch.</div>"""
+    check = """<button class="btn btn-full" onclick="_busyWait('/thirdparty/check',this)">&#x21BB; Check for updates</button>"""
+    return (status
+            + '<div class="card"><div class="section-title">Community</div>' + community + '</div>'
+            + '<div class="card"><div class="section-title">From GitHub</div>' + add + custom + '</div>'
+            + check)
+
+@ampule.route("/f/thirdparty")
+def _f_thirdparty(request):
+    return (200, {}, _thirdparty_content(request.params.get("reload") == "1"))
+
+@ampule.route("/thirdparty/install", method="POST")
+def _thirdparty_install(request):
+    install_thirdparty(url_decoder(request.params.get("src", "")))
+    return (200, {}, '{"ok":true}')
+
+@ampule.route("/thirdparty/check", method="POST")
+def _thirdparty_check(request):
+    check_thirdparty()
+    return (200, {}, '{"ok":true}')
 
 
 def css():
@@ -841,7 +1019,7 @@ def _apps_content():
             except: continue
             ver = _app_ver(app)
             ver_html = f'<div style="font-size:.7rem;color:var(--muted);margin-top:2px">v{ver}</div>' if ver else ''
-            installed_apps += f'<div class="app-item"><div><span class="app-name">{app}</span>{ver_html}</div>' + _run_button_html(app) + """</div>"""
+            installed_apps += f'<div class="app-item"><div><span class="app-name">{_esc(_app_name(app))}</span>{ver_html}</div>' + _run_button_html(app) + """</div>"""
     if not installed_apps:
         installed_apps = '<p style="color:var(--muted);text-align:center;padding:16px 0 8px;font-size:.9rem">No apps installed yet</p><div style="text-align:center;padding-bottom:8px"><button class="btn btn-sm btn-success" style="animation:store-pulse 2.5s ease-in-out infinite" onclick="nav(\'/f/download\')">&#x2B07; Visit the Store</button></div>'
     return top_html + """<div class="logo">
@@ -951,7 +1129,7 @@ def webinterface_post(request):
             pprint("Done." if error_color != "red" else "Error!", 1, color=error_color, _clearscreen=True)
         if "install" in request.params:
             print(request.params["install"])
-            install_app(request.params["install"], request.params.get("third_party") == "1")
+            install_app(request.params["install"])
     except Exception as e: print(e)
     return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
 
@@ -1049,36 +1227,13 @@ def _download_content(force=False):
     return """<div class="logo"><h1>Apps</h1><p>Install or update apps</p></div>
 <div class="card" style="padding:12px"><span style="font-size:.8rem;color:var(--muted)">Storage</span>""" + bar + """</div>
 <div class="card"><div class="section-title">Available</div>""" + str(apps) + """</div>
-<div class="card"><div class="section-title">About 3rd party apps</div>
-<p id="third-party-readme" style="font-size:.85rem;color:var(--muted);line-height:1.6;white-space:pre-line">Loading notice...</p></div>
-<div class="card"><div class="section-title">3rd party apps</div>
-<div id="third-party-content"><button class="btn btn-sm btn-success" onclick="_loadThirdPartyApps(this)">Load 3rd party apps</button></div></div>
+<div id="tp-box"><div style="display:flex;justify-content:center;padding:20px 0"><span style="display:inline-block;width:22px;height:22px;border:3px solid var(--surface3);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite"></span></div></div>
 <script>
 function _busyWait(url,btn){
     var old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite"></span>';
     var w=document.createElement('div');w.className='busy-warn';w.textContent='\\u26A0 Writing to disk \\u2014 do not turn off!';document.body.appendChild(w);
     fetch(url,{method:"POST"}).then(function(){w.remove();nav('/f/download')}).catch(function(){w.remove();btn.innerHTML=old;btn.disabled=false});}
-function installthirdparty(app,e){_busyWait("/?install="+encodeURIComponent(app)+"&third_party=1",e.currentTarget)}
-function _loadThirdPartyApps(btn){
-    var box=document.getElementById('third-party-content');
-    btn.disabled=true;btn.textContent='Loading...';
-    fetch('/f/third-party').then(function(r){return r.text().then(function(h){if(!r.ok)throw new Error(h);return h;})})
-    .then(function(h){box.innerHTML=h;_run(box);})
-    .catch(function(){box.innerHTML='<p style="color:#ff7777;margin:8px 0">3rd party apps failed to load.</p><button class="btn btn-sm btn-warning" onclick="_loadThirdPartyApps(this)">Try again</button>';});
-}
-function _loadThirdPartyReadme(){
-    var notice=document.getElementById('third-party-readme');
-    if(!notice)return;
-    notice.textContent='Loading notice...';
-    fetch('/f/third-party-readme').then(function(r){
-        return r.text().then(function(text){if(!r.ok)throw new Error(text);return text;});
-    }).then(function(text){notice.textContent=text;})
-    .catch(function(){
-        notice.innerHTML='Notice could not be loaded. <button class="btn btn-sm btn-warning" onclick="_loadThirdPartyReadme()">Try again</button>';
-    });
-}
-_loadThirdPartyReadme();
-</script>"""
+fetch('/f/thirdparty""" + ("?reload=1" if force else "") + """').then(function(r){return r.text()}).then(function(h){var c=document.getElementById('tp-box');if(c){c.innerHTML=h;_run(c)}})</script>"""
 
 @ampule.route('/download')
 def download(request):
@@ -1093,79 +1248,6 @@ def _f_apps(request):
 def _f_download(request):
     force = request.params.get("reload") == "1"
     return (200, {}, _download_content(force))
-
-@ampule.route("/f/third-party")
-def _f_third_party(request):
-    try:
-        apps = _get_third_party_apps()
-    except Exception as e:
-        print("third-party app catalog error:", e)
-        return (503, {}, '<p style="color:#ff7777;margin:8px 0">3rd party apps failed to load.</p><button class="btn btn-sm btn-warning" onclick="_loadThirdPartyApps(this)">Try again</button>')
-    if not apps:
-        return (200, {}, '<p style="color:var(--muted);margin:8px 0">No 3rd party apps are available.</p>')
-    cards = ""
-    for app in apps:
-        try:
-            _, _, _, remote_version, metadata = _third_party_app_metadata(app)
-        except Exception as e:
-            print("third-party app metadata error for " + app + ":", e)
-            remote_version, metadata = "", {}
-        installed = False
-        try:
-            installed = "__init__.py" in os.listdir("/" + app)
-        except OSError:
-            pass
-        if installed:
-            local_version = _app_ver("/" + app)
-            version = "v" + local_version if local_version else _fmt_size(_dir_size("/" + app))
-            version_html = f'<span style="font-size:.75rem;color:#f0c800;font-weight:600;margin-left:6px">{version}</span>'
-            update_available = bool(remote_version and local_version != remote_version)
-            update_note = f'<div style="font-size:.7rem;color:#f0c800;margin-top:1px">&#x2192; v{remote_version} available</div>' if update_available else ""
-            install_label = "&#x21BB; Update" if update_available else "&#x21BB; Reinstall"
-            install_button = (
-                f"<button class=\"btn btn-sm\" style=\"background:linear-gradient(135deg,#00c85d,#00e676);color:#000;border:2px solid #f0c800\" onclick=\"installthirdparty('{app}',event)\">{install_label}</button>"
-                if update_available else
-                f"<button class=\"btn btn-sm btn-warning\" onclick=\"installthirdparty('{app}',event)\">{install_label}</button>"
-            )
-            actions = (
-                _run_button_html(app) +
-                install_button +
-                f"<button class=\"btn btn-sm\" style=\"background:#ff4b4b;color:#fff;padding:7px 9px\" onclick=\"if(confirm('Delete {app}?'))_busyWait('/?delete={app}',event.currentTarget)\">&#x2715;</button>"
-            )
-            size_html = f'<div style="font-size:.7rem;color:var(--muted);margin-top:1px">{_fmt_size(_dir_size("/" + app))}</div>'
-        else:
-            version_html = f'<span style="font-size:.75rem;color:#f0c800;font-weight:600;margin-left:6px">v{remote_version}</span>' if remote_version else ""
-            update_note = ""
-            actions = f"<button class=\"btn btn-sm btn-success\" onclick=\"installthirdparty('{app}',event)\">&#x2B07; Install</button>"
-            size_html = ""
-        icon = metadata.get("emoji", "")
-        icon_html = f'<span style="font-size:.95rem;margin-right:5px;flex-shrink:0">{icon}</span>' if icon else ""
-        details = _ver_detail_html(metadata, remote_version)
-        name_html = f'<div><span style="font-size:.92rem;font-weight:700;color:#fff">{app}</span>{version_html}</div>'
-        cards += (
-            '<div class="download-item" style="flex-direction:column;align-items:stretch">'
-            '<div style="display:flex;align-items:flex-start;justify-content:space-between">'
-            f'<div style="display:flex;min-width:0;flex:1">{icon_html}<div style="min-width:0">{name_html}{size_html}{update_note}</div></div>'
-            f'<div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px">{actions}</div></div>'
-            + details + '</div>'
-        )
-    return (200, {}, cards)
-
-@ampule.route("/f/third-party-readme")
-def _f_third_party_readme(request):
-    url = _THIRD_PARTY_APPS_RAW + "README.md"
-    try:
-        response = requests.get(url, headers={"User-Agent": "MatrixBox"}, timeout=10)
-        try:
-            if response.status_code != 200:
-                raise RuntimeError("third-party README request returned HTTP " + str(response.status_code))
-            readme = response.text
-        finally:
-            response.close()
-    except Exception as e:
-        print("third-party README error:", e)
-        return (503, {"Content-Type": "text/plain; charset=utf-8"}, "Notice could not be loaded.")
-    return (200, {"Content-Type": "text/plain; charset=utf-8"}, readme)
 
 # Under /system/, so it stays reachable from every navbar, app or not --
 # polled every 30s.

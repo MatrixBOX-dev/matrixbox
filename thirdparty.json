@@ -1,0 +1,17 @@
+{
+  "apps": [
+    {
+      "repo": "bombsimon/matrixbox-lastfm",
+      "name": "Last.fm",
+      "description": "Displays your Last.fm data<br>requires a username and an API key",
+      "emoji": "🎵"
+    },
+    {
+      "repo": "bombsimon/matrixbox-departures-plus",
+      "path": "departuresplus",
+      "name": "Departures Plus",
+      "description": "Departures with station rotation, line colors, a ticker and a Home Assistant API",
+      "emoji": "🚇"
+    }
+  ]
+}
