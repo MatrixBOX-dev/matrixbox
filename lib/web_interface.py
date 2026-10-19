@@ -234,9 +234,13 @@ def _bootstrapper_urls(app):
         return raw, files
     except: return None, None
 
-def install_app(app):
+def install_app(app, third_party=False):
     if app == "system": app = "/"
-    _ext_raw, _ext_files = _bootstrapper_urls(app) if app != "/" else (None, None)
+    _ext_prefix = ""
+    if third_party:
+        _ext_raw, _ext_files, _ext_prefix = _third_party_bootstrapper_urls(app)
+    else:
+        _ext_raw, _ext_files = _bootstrapper_urls(app) if app != "/" else (None, None)
     print("Install: ", app)
     applist = load_settings.latest_available_apps
     _files = _ext_files if _ext_files is not None else applist.get(app, [])
@@ -267,7 +271,7 @@ def install_app(app):
                     except: pass
             print("File: ", file)
             _draw_progress(x, no_of_files, file)
-            _url = (_ext_raw + file) if _ext_raw else (settings["repository_url"] + ("apps/" + app + "/" if app != "/" else "") + file)
+            _url = (_ext_raw + _ext_prefix + file) if _ext_raw else (settings["repository_url"] + ("apps/" + app + "/" if app != "/" else "") + file)
             resp = requests.get(_url)
             print(resp.status_code)
             if resp.status_code != 200:
@@ -340,6 +344,8 @@ def _repo_api_base():
     return parts[1], parts[2]
 
 _cached_apps = None
+_THIRD_PARTY_APPS_API = "https://api.github.com/repos/MatrixBOX-dev/3rd_party_apps/git/trees/main?recursive=1"
+_THIRD_PARTY_APPS_RAW = "https://raw.githubusercontent.com/MatrixBOX-dev/3rd_party_apps/refs/heads/main/"
 
 def get_updates(force=False):
     global _cached_apps
@@ -350,8 +356,14 @@ def get_updates(force=False):
         owner, repo = _repo_api_base()
         url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/main?recursive=1"
         resp = requests.get(url, headers={"User-Agent": "MatrixBox"}, timeout=10)
-        tree = json.loads(resp.text)["tree"]
-        resp.close()
+        try:
+            if resp.status_code != 200:
+                raise RuntimeError("catalog request returned HTTP " + str(resp.status_code))
+            tree = json.loads(resp.text)["tree"]
+        finally:
+            resp.close()
+        if not isinstance(tree, list):
+            raise ValueError("catalog response does not contain a file tree")
         apps = {}
         root_files = []
         for item in tree:
@@ -400,8 +412,92 @@ def get_updates(force=False):
         _cached_apps = apps
     except Exception as e:
         print("get_updates error:", e)
-        apps = _cached_apps if _cached_apps else {}
+        apps = None
     return apps
+
+def _get_third_party_apps():
+    resp = requests.get(_THIRD_PARTY_APPS_API, headers={"User-Agent": "MatrixBox"}, timeout=10)
+    try:
+        if resp.status_code != 200:
+            raise RuntimeError("third-party catalog request returned HTTP " + str(resp.status_code))
+        tree = json.loads(resp.text)["tree"]
+    finally:
+        resp.close()
+    if not isinstance(tree, list):
+        raise ValueError("third-party catalog response does not contain a file tree")
+    apps = set()
+    for item in tree:
+        path = item.get("path", "")
+        parts = path.split("/")
+        if (item.get("type") == "blob" and len(parts) == 2 and
+                parts[1] == "__init__.py" and
+                all(c in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for c in parts[0])):
+            apps.add(parts[0])
+    return sorted(apps)
+
+def _third_party_bootstrapper_urls(app):
+    if not app or not all(c in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for c in app):
+        raise ValueError("invalid third-party app name")
+    response = requests.get(_THIRD_PARTY_APPS_RAW + app + "/__init__.py",
+                            headers={"User-Agent": "MatrixBox"}, timeout=10)
+    try:
+        if response.status_code != 200:
+            raise RuntimeError("third-party app source returned HTTP " + str(response.status_code))
+        content = response.text
+    finally:
+        response.close()
+    raw = api = prefix = None
+    for line in content.split("\n"):
+        line = line.strip()
+        if line.startswith("_RAW"):
+            raw = line.split('"')[1]
+        elif line.startswith("_API"):
+            api = line.split('"')[1]
+        elif line.startswith("_PREFIX"):
+            prefix = line.split('"')[1]
+    if not (raw and api and prefix):
+        raise ValueError("third-party app is missing its _RAW, _API, or _PREFIX source")
+    if prefix.startswith("/") or not prefix.endswith("/") or ".." in prefix.split("/"):
+        raise ValueError("third-party app has an invalid _PREFIX")
+    response = requests.get(api, headers={"User-Agent": "MatrixBOX"}, timeout=10)
+    try:
+        if response.status_code != 200:
+            raise RuntimeError("third-party app file list returned HTTP " + str(response.status_code))
+        tree = json.loads(response.text)["tree"]
+    finally:
+        response.close()
+    if not isinstance(tree, list):
+        raise ValueError("third-party app response does not contain a file tree")
+    files = []
+    for item in tree:
+        path = item.get("path", "")
+        if item.get("type") != "blob" or not path.startswith(prefix):
+            continue
+        relative_path = path[len(prefix):]
+        if relative_path and not relative_path.startswith("/") and ".." not in relative_path.split("/"):
+            files.append(relative_path)
+    if not files:
+        raise ValueError("third-party app has no downloadable files")
+    return raw, files, prefix
+
+def _third_party_app_metadata(app):
+    raw, files, prefix = _third_party_bootstrapper_urls(app)
+    version_files = [name for name in files
+                     if name.startswith("v") and name[1:2].isdigit()]
+    if not version_files:
+        return raw, files, prefix, "", {}
+    version_file = max(version_files)
+    response = requests.get(raw + prefix + version_file,
+                            headers={"User-Agent": "MatrixBox"}, timeout=10)
+    try:
+        if response.status_code != 200:
+            raise RuntimeError("third-party app version info returned HTTP " + str(response.status_code))
+        metadata = json.loads(response.text)
+    finally:
+        response.close()
+    if not isinstance(metadata, dict):
+        raise ValueError("third-party app version info is not an object")
+    return raw, files, prefix, version_file[1:], metadata
 
 def _ver_detail_html(data, ver):
     html = ""
@@ -416,7 +512,12 @@ def _ver_detail_html(data, ver):
 
 def list_available_apps(apps):
     print("Apps: ", apps)
-    load_settings.latest_available_apps = apps
+    load_settings.latest_available_apps = apps if apps is not None else {}
+    if apps is None:
+        return """<div style="text-align:center;padding:16px">
+<p style="color:#ff7777;margin-bottom:12px">Store loading failed. Check your connection and try again.</p>
+<button class="btn btn-sm btn-warning" onclick="nav('/f/download?reload=1')">&#x21BB; Try again</button>
+</div>"""
     remote_vers = getattr(load_settings, 'remote_versions', {})
     sys_l = _app_ver("lib") or _app_ver("/")
     sys_r = remote_vers.get("/", "")
@@ -426,11 +527,7 @@ def list_available_apps(apps):
         sys_btn = '<button class="btn btn-sm" style="background:linear-gradient(135deg,#00c85d,#00e676);color:#000;border:2px solid #f0c800" onclick="installsystem(event)">&#x21BB; Update</button>'
     else:
         sys_btn = '<button class="btn btn-sm btn-warning" onclick="installsystem(event)">&#x21BB; Reinstall</button>'
-    applist = '<div class="download-item"><div><span class="download-name">&#x1F4E6; System</span><div style="font-size:.7rem;color:#f0c800;margin-top:2px">' + sys_ver + '</div></div>' + sys_btn + """\n    <script>function _busyWait(url,btn){
-    var old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite"></span>';
-    var w=document.createElement('div');w.className='busy-warn';w.textContent='\u26A0 Writing to disk \u2014 do not turn off!';document.body.appendChild(w);
-    fetch(url,{method:"POST"}).then(function(){w.remove();nav('/f/download')}).catch(function(){w.remove();btn.innerHTML=old;btn.disabled=false});}
-    function installsystem(e){_busyWait("/?install=system",e.currentTarget)}</script></div>"""
+    applist = '<div class="download-item"><div><span class="download-name">&#x1F4E6; System</span><div style="font-size:.7rem;color:#f0c800;margin-top:2px">' + sys_ver + '</div></div>' + sys_btn + """\n    <script>function installsystem(e){_busyWait("/?install=system",e.currentTarget)}</script></div>"""
 
     for dir in apps:
         if dir == "/" or dir == "lib": continue
@@ -854,7 +951,7 @@ def webinterface_post(request):
             pprint("Done." if error_color != "red" else "Error!", 1, color=error_color, _clearscreen=True)
         if "install" in request.params:
             print(request.params["install"])
-            install_app(request.params["install"])
+            install_app(request.params["install"], request.params.get("third_party") == "1")
     except Exception as e: print(e)
     return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
 
@@ -942,20 +1039,51 @@ def _save(request):
     savesettings(settings)
     return (200, {}, '{"ok":true}')
 
-def _download_content():
+def _download_content(force=False):
     free = _free_space()
     total = _total_space()
     free_s = _fmt_size(free)
     used_pct = int((total - free) * 100 // total) if total else 0
     bar = f'<div style="margin-top:8px;height:7px;border-radius:4px;background:var(--surface3);overflow:hidden"><div style="height:100%;width:{used_pct}%;background:linear-gradient(90deg,#7c6fff,#00d4ff);border-radius:4px"></div></div><div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--muted);margin-top:4px"><span>{used_pct}% used</span><span>{free_s} free</span></div>'
-    apps = list_available_apps(get_updates())
+    apps = list_available_apps(get_updates(force))
     return """<div class="logo"><h1>Apps</h1><p>Install or update apps</p></div>
 <div class="card" style="padding:12px"><span style="font-size:.8rem;color:var(--muted)">Storage</span>""" + bar + """</div>
-<div class="card"><div class="section-title">Available</div>""" + str(apps) + """</div>"""
+<div class="card"><div class="section-title">Available</div>""" + str(apps) + """</div>
+<div class="card"><div class="section-title">About 3rd party apps</div>
+<p id="third-party-readme" style="font-size:.85rem;color:var(--muted);line-height:1.6;white-space:pre-line">Loading notice...</p></div>
+<div class="card"><div class="section-title">3rd party apps</div>
+<div id="third-party-content"><button class="btn btn-sm btn-success" onclick="_loadThirdPartyApps(this)">Load 3rd party apps</button></div></div>
+<script>
+function _busyWait(url,btn){
+    var old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite"></span>';
+    var w=document.createElement('div');w.className='busy-warn';w.textContent='\\u26A0 Writing to disk \\u2014 do not turn off!';document.body.appendChild(w);
+    fetch(url,{method:"POST"}).then(function(){w.remove();nav('/f/download')}).catch(function(){w.remove();btn.innerHTML=old;btn.disabled=false});}
+function installthirdparty(app,e){_busyWait("/?install="+encodeURIComponent(app)+"&third_party=1",e.currentTarget)}
+function _loadThirdPartyApps(btn){
+    var box=document.getElementById('third-party-content');
+    btn.disabled=true;btn.textContent='Loading...';
+    fetch('/f/third-party').then(function(r){return r.text().then(function(h){if(!r.ok)throw new Error(h);return h;})})
+    .then(function(h){box.innerHTML=h;_run(box);})
+    .catch(function(){box.innerHTML='<p style="color:#ff7777;margin:8px 0">3rd party apps failed to load.</p><button class="btn btn-sm btn-warning" onclick="_loadThirdPartyApps(this)">Try again</button>';});
+}
+function _loadThirdPartyReadme(){
+    var notice=document.getElementById('third-party-readme');
+    if(!notice)return;
+    notice.textContent='Loading notice...';
+    fetch('/f/third-party-readme').then(function(r){
+        return r.text().then(function(text){if(!r.ok)throw new Error(text);return text;});
+    }).then(function(text){notice.textContent=text;})
+    .catch(function(){
+        notice.innerHTML='Notice could not be loaded. <button class="btn btn-sm btn-warning" onclick="_loadThirdPartyReadme()">Try again</button>';
+    });
+}
+_loadThirdPartyReadme();
+</script>"""
 
 @ampule.route('/download')
 def download(request):
-    return (200, {}, _shell(_download_content(), "Apps", "/f/download"))
+    force = request.params.get("reload") == "1"
+    return (200, {}, _shell(_download_content(force), "Apps", "/f/download"))
 
 @ampule.route("/f/apps")
 def _f_apps(request):
@@ -963,7 +1091,81 @@ def _f_apps(request):
 
 @ampule.route("/f/download")
 def _f_download(request):
-    return (200, {}, _download_content())
+    force = request.params.get("reload") == "1"
+    return (200, {}, _download_content(force))
+
+@ampule.route("/f/third-party")
+def _f_third_party(request):
+    try:
+        apps = _get_third_party_apps()
+    except Exception as e:
+        print("third-party app catalog error:", e)
+        return (503, {}, '<p style="color:#ff7777;margin:8px 0">3rd party apps failed to load.</p><button class="btn btn-sm btn-warning" onclick="_loadThirdPartyApps(this)">Try again</button>')
+    if not apps:
+        return (200, {}, '<p style="color:var(--muted);margin:8px 0">No 3rd party apps are available.</p>')
+    cards = ""
+    for app in apps:
+        try:
+            _, _, _, remote_version, metadata = _third_party_app_metadata(app)
+        except Exception as e:
+            print("third-party app metadata error for " + app + ":", e)
+            remote_version, metadata = "", {}
+        installed = False
+        try:
+            installed = "__init__.py" in os.listdir("/" + app)
+        except OSError:
+            pass
+        if installed:
+            local_version = _app_ver("/" + app)
+            version = "v" + local_version if local_version else _fmt_size(_dir_size("/" + app))
+            version_html = f'<span style="font-size:.75rem;color:#f0c800;font-weight:600;margin-left:6px">{version}</span>'
+            update_available = bool(remote_version and local_version != remote_version)
+            update_note = f'<div style="font-size:.7rem;color:#f0c800;margin-top:1px">&#x2192; v{remote_version} available</div>' if update_available else ""
+            install_label = "&#x21BB; Update" if update_available else "&#x21BB; Reinstall"
+            install_button = (
+                f"<button class=\"btn btn-sm\" style=\"background:linear-gradient(135deg,#00c85d,#00e676);color:#000;border:2px solid #f0c800\" onclick=\"installthirdparty('{app}',event)\">{install_label}</button>"
+                if update_available else
+                f"<button class=\"btn btn-sm btn-warning\" onclick=\"installthirdparty('{app}',event)\">{install_label}</button>"
+            )
+            actions = (
+                _run_button_html(app) +
+                install_button +
+                f"<button class=\"btn btn-sm\" style=\"background:#ff4b4b;color:#fff;padding:7px 9px\" onclick=\"if(confirm('Delete {app}?'))_busyWait('/?delete={app}',event.currentTarget)\">&#x2715;</button>"
+            )
+            size_html = f'<div style="font-size:.7rem;color:var(--muted);margin-top:1px">{_fmt_size(_dir_size("/" + app))}</div>'
+        else:
+            version_html = f'<span style="font-size:.75rem;color:#f0c800;font-weight:600;margin-left:6px">v{remote_version}</span>' if remote_version else ""
+            update_note = ""
+            actions = f"<button class=\"btn btn-sm btn-success\" onclick=\"installthirdparty('{app}',event)\">&#x2B07; Install</button>"
+            size_html = ""
+        icon = metadata.get("emoji", "")
+        icon_html = f'<span style="font-size:.95rem;margin-right:5px;flex-shrink:0">{icon}</span>' if icon else ""
+        details = _ver_detail_html(metadata, remote_version)
+        name_html = f'<div><span style="font-size:.92rem;font-weight:700;color:#fff">{app}</span>{version_html}</div>'
+        cards += (
+            '<div class="download-item" style="flex-direction:column;align-items:stretch">'
+            '<div style="display:flex;align-items:flex-start;justify-content:space-between">'
+            f'<div style="display:flex;min-width:0;flex:1">{icon_html}<div style="min-width:0">{name_html}{size_html}{update_note}</div></div>'
+            f'<div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px">{actions}</div></div>'
+            + details + '</div>'
+        )
+    return (200, {}, cards)
+
+@ampule.route("/f/third-party-readme")
+def _f_third_party_readme(request):
+    url = _THIRD_PARTY_APPS_RAW + "README.md"
+    try:
+        response = requests.get(url, headers={"User-Agent": "MatrixBox"}, timeout=10)
+        try:
+            if response.status_code != 200:
+                raise RuntimeError("third-party README request returned HTTP " + str(response.status_code))
+            readme = response.text
+        finally:
+            response.close()
+    except Exception as e:
+        print("third-party README error:", e)
+        return (503, {"Content-Type": "text/plain; charset=utf-8"}, "Notice could not be loaded.")
+    return (200, {"Content-Type": "text/plain; charset=utf-8"}, readme)
 
 # Under /system/, so it stays reachable from every navbar, app or not --
 # polled every 30s.
@@ -1012,7 +1214,7 @@ def led_toggle(request):
 
 
 def url_decoder(url):
-    url_decode = {"%C3A4":"�", "%20": " ", "%21": "!", "%22": "\"", "%23": "#", "%24": "$", "%25": "%", "%26": "&", "%27": "'", "%28": "(", "%29": ")", "%2A": "*", "%2B": "+", "%2C": ",", "%2D": "-", "%2E": ".", "%2F": "/", "%30": "0", "%31": "1", "%32": "2", "%33": "3", "%34": "4", "%35": "5", "%36": "6", "%37": "7", "%38": "8", "%39": "9", "%3A": ":", "%3B": ";", "%3C": "<", "%3D": "=", "%3E": ">", "%3F": "?", "%40": "@", "%41": "A", "%42": "B", "%43": "C", "%44": "D", "%45": "E", "%46": "F", "%47": "G", "%48": "H", "%49": "I", "%4A": "J", "%4B": "K", "%4C": "L", "%4D": "M", "%4E": "N", "%4F": "O", "%50": "P", "%51": "Q", "%52": "R", "%53": "S", "%54": "T", "%55": "U", "%56": "V", "%57": "W", "%58": "X", "%59": "Y", "%5A": "Z", "%5B": "[", "%5C": "\\", "%5D": "]", "%5E": "^", "%5F": "_", "%60": "`", "%61": "a", "%62": "b", "%63": "c", "%64": "d", "%65": "e", "%66": "f", "%67": "g", "%68": "h", "%69": "i", "%6A": "j", "%6B": "k", "%6C": "l", "%6D": "m", "%6E": "n", "%6F": "o", "%70": "p", "%71": "q", "%72": "r", "%73": "s", "%74": "t", "%75": "u", "%76": "v", "%77": "w", "%78": "x", "%79": "y", "%7A": "z", "%7B": "{", "%7C": "|", "%7D": "}", "%7E": "~", "%E2%82%AC": "\u20ac", "%E2%80%9A": "\u201a", "%C6%92": "\u0192", "%E2%80%9E": "\u201e", "%E2%80%A6": "\u2026", "%E2%80%A0": "\u2020", "%E2%80%A1": "\u2021", "%CB%86": "\u02c6", "%E2%80%B0": "\u2030", "%C5%A0": "\u0160", "%E2%80%B9": "\u2039", "%C5%92": "\u0152", "%C5%BD": "\u017d", "%E2%80%98": "\u2018", "%E2%80%99": "\u2019", "%E2%80%9C": "\u201c", "%E2%80%9D": "\u201d", "%E2%80%A2": "\u2022", "%E2%80%93": "\u2013", "%E2%80%94": "\u2014", "%CB%9C": "\u02dc", "%E2%84": "\u2122", "%C5%A1": "\u0161", "%E2%80": "\u203a", "%C5%93": "\u0153", "%C5%B8": "\u0178", "%C2%A1": "\u00a1", "%C2%A2": "\u00a2", "%C2%A3": "\u00a3", "%C2%A4": "\u00a4", "%C2%A5": "\u00a5", "%C2%A6": "\u00a6", "%C2%A7": "\u00a7", "%C2%A8": "\u00a8", "%C2%A9": "\u00a9", "%C2%AA": "\u00aa", "%C2%AB": "\u00ab", "%C2%AD": "\u00ac", "%C2%AE": "\u00ae", "%C2%AF": "\u00af", "%C2%B0": "\u00b0", "%C2%B1": "\u00b1", "%C2%B2": "\u00b2", "%C2%B3": "\u00b3", "%C2%B4": "\u00b4", "%C2%B5": "\u00b5", "%C2%B6": "\u00b6", "%C2%B7": "\u00b7", "%C2%B8": "\u00b8", "%C2%B9": "\u00b9", "%C2%BA": "\u00ba", "%C2%BB": "\u00bb", "%C2%BC": "\u00bc", "%C2%BD": "\u00bd", "%C2%BE": "\u00be", "%C2%BF": "\u00bf", "%C3%80": "\u00c0", "%C3%81": "\u00c1", "%C3%82": "\u00c2", "%C3%83": "\u00c3", "%C3%84": "\u00c4", "%C3%85": "\u00c5", "%C3%86": "\u00c6", "%C3%87": "\u00c7", "%C3%88": "\u00c8", "%C3%89": "\u00c9", "%C3%8A": "\u00ca", "%C3%8B": "\u00cb", "%C3%8C": "\u00cc", "%C3%8D": "\u00cd", "%C3%8E": "\u00ce", "%C3%8F": "\u00cf", "%C3%90": "\u00d0", "%C3%91": "\u00d1", "%C3%92": "\u00d2", "%C3%93": "\u00d3", "%C3%94": "\u00d4", "%C3%95": "\u00d5", "%C3%96": "\u00d6", "%C3%97": "\u00d7", "%C3%98": "\u00d8", "%C3%99": "\u00d9", "%C3%9A": "\u00da", "%C3%9B": "\u00db", "%C3%9C": "\u00dc", "%C3%9D": "\u00dd", "%C3%9E": "\u00de", "%C3%9F": "\u00df", "%C3%A0": "\u00e0", "%C3%A1": "\u00e1", "%C3%A2": "\u00e2", "%C3%A3": "\u00e3", "%C3%A4": "\u00e4", "%C3%A5": "\u00e5", "%C3%A6": "\u00e6", "%C3%A7": "\u00e7", "%C3%A8": "\u00e8", "%C3%A9": "\u00e9", "%C3%AA": "\u00ea", "%C3%AB": "\u00eb", "%C3%AC": "\u00ec", "%C3%AD": "\u00ed", "%C3%AE": "\u00ee", "%C3%AF": "\u00ef", "%C3%B0": "\u00f0", "%C3%B1": "\u00f1", "%C3%B2": "\u00f2", "%C3%B3": "\u00f3", "%C3%B4": "\u00f4", "%C3%B5": "\u00f5", "%C3%B6": "\u00f6", "%C3%B7": "\u00f7", "%C3%B8": "\u00f8", "%C3%B9": "\u00f9", "%C3%BA": "\u00fa", "%C3%BB": "\u00fb", "%C3%BC": "\u00fc", "%C3%BD": "\u00fd", "%C3%BE": "\u00fe", "%C3%BF": "\u00ff", 
+    url_decode = {"%C3A4":" ", "%20": " ", "%21": "!", "%22": "\"", "%23": "#", "%24": "$", "%25": "%", "%26": "&", "%27": "'", "%28": "(", "%29": ")", "%2A": "*", "%2B": "+", "%2C": ",", "%2D": "-", "%2E": ".", "%2F": "/", "%30": "0", "%31": "1", "%32": "2", "%33": "3", "%34": "4", "%35": "5", "%36": "6", "%37": "7", "%38": "8", "%39": "9", "%3A": ":", "%3B": ";", "%3C": "<", "%3D": "=", "%3E": ">", "%3F": "?", "%40": "@", "%41": "A", "%42": "B", "%43": "C", "%44": "D", "%45": "E", "%46": "F", "%47": "G", "%48": "H", "%49": "I", "%4A": "J", "%4B": "K", "%4C": "L", "%4D": "M", "%4E": "N", "%4F": "O", "%50": "P", "%51": "Q", "%52": "R", "%53": "S", "%54": "T", "%55": "U", "%56": "V", "%57": "W", "%58": "X", "%59": "Y", "%5A": "Z", "%5B": "[", "%5C": "\\", "%5D": "]", "%5E": "^", "%5F": "_", "%60": "`", "%61": "a", "%62": "b", "%63": "c", "%64": "d", "%65": "e", "%66": "f", "%67": "g", "%68": "h", "%69": "i", "%6A": "j", "%6B": "k", "%6C": "l", "%6D": "m", "%6E": "n", "%6F": "o", "%70": "p", "%71": "q", "%72": "r", "%73": "s", "%74": "t", "%75": "u", "%76": "v", "%77": "w", "%78": "x", "%79": "y", "%7A": "z", "%7B": "{", "%7C": "|", "%7D": "}", "%7E": "~", "%E2%82%AC": "\u20ac", "%E2%80%9A": "\u201a", "%C6%92": "\u0192", "%E2%80%9E": "\u201e", "%E2%80%A6": "\u2026", "%E2%80%A0": "\u2020", "%E2%80%A1": "\u2021", "%CB%86": "\u02c6", "%E2%80%B0": "\u2030", "%C5%A0": "\u0160", "%E2%80%B9": "\u2039", "%C5%92": "\u0152", "%C5%BD": "\u017d", "%E2%80%98": "\u2018", "%E2%80%99": "\u2019", "%E2%80%9C": "\u201c", "%E2%80%9D": "\u201d", "%E2%80%A2": "\u2022", "%E2%80%93": "\u2013", "%E2%80%94": "\u2014", "%CB%9C": "\u02dc", "%E2%84": "\u2122", "%C5%A1": "\u0161", "%E2%80": "\u203a", "%C5%93": "\u0153", "%C5%B8": "\u0178", "%C2%A1": "\u00a1", "%C2%A2": "\u00a2", "%C2%A3": "\u00a3", "%C2%A4": "\u00a4", "%C2%A5": "\u00a5", "%C2%A6": "\u00a6", "%C2%A7": "\u00a7", "%C2%A8": "\u00a8", "%C2%A9": "\u00a9", "%C2%AA": "\u00aa", "%C2%AB": "\u00ab", "%C2%AD": "\u00ac", "%C2%AE": "\u00ae", "%C2%AF": "\u00af", "%C2%B0": "\u00b0", "%C2%B1": "\u00b1", "%C2%B2": "\u00b2", "%C2%B3": "\u00b3", "%C2%B4": "\u00b4", "%C2%B5": "\u00b5", "%C2%B6": "\u00b6", "%C2%B7": "\u00b7", "%C2%B8": "\u00b8", "%C2%B9": "\u00b9", "%C2%BA": "\u00ba", "%C2%BB": "\u00bb", "%C2%BC": "\u00bc", "%C2%BD": "\u00bd", "%C2%BE": "\u00be", "%C2%BF": "\u00bf", "%C3%80": "\u00c0", "%C3%81": "\u00c1", "%C3%82": "\u00c2", "%C3%83": "\u00c3", "%C3%84": "\u00c4", "%C3%85": "\u00c5", "%C3%86": "\u00c6", "%C3%87": "\u00c7", "%C3%88": "\u00c8", "%C3%89": "\u00c9", "%C3%8A": "\u00ca", "%C3%8B": "\u00cb", "%C3%8C": "\u00cc", "%C3%8D": "\u00cd", "%C3%8E": "\u00ce", "%C3%8F": "\u00cf", "%C3%90": "\u00d0", "%C3%91": "\u00d1", "%C3%92": "\u00d2", "%C3%93": "\u00d3", "%C3%94": "\u00d4", "%C3%95": "\u00d5", "%C3%96": "\u00d6", "%C3%97": "\u00d7", "%C3%98": "\u00d8", "%C3%99": "\u00d9", "%C3%9A": "\u00da", "%C3%9B": "\u00db", "%C3%9C": "\u00dc", "%C3%9D": "\u00dd", "%C3%9E": "\u00de", "%C3%9F": "\u00df", "%C3%A0": "\u00e0", "%C3%A1": "\u00e1", "%C3%A2": "\u00e2", "%C3%A3": "\u00e3", "%C3%A4": "\u00e4", "%C3%A5": "\u00e5", "%C3%A6": "\u00e6", "%C3%A7": "\u00e7", "%C3%A8": "\u00e8", "%C3%A9": "\u00e9", "%C3%AA": "\u00ea", "%C3%AB": "\u00eb", "%C3%AC": "\u00ec", "%C3%AD": "\u00ed", "%C3%AE": "\u00ee", "%C3%AF": "\u00ef", "%C3%B0": "\u00f0", "%C3%B1": "\u00f1", "%C3%B2": "\u00f2", "%C3%B3": "\u00f3", "%C3%B4": "\u00f4", "%C3%B5": "\u00f5", "%C3%B6": "\u00f6", "%C3%B7": "\u00f7", "%C3%B8": "\u00f8", "%C3%B9": "\u00f9", "%C3%BA": "\u00fa", "%C3%BB": "\u00fb", "%C3%BC": "\u00fc", "%C3%BD": "\u00fd", "%C3%BE": "\u00fe", "%C3%BF": "\u00ff", 
 "%C4%8C":"\u010c",
 "%C4%86":"\u0106",
 "%C5%BD":"\u017d",
@@ -1201,5 +1403,3 @@ def _ai_refresh(request):
         return (200, {}, json.dumps({"ok": True, "result": r}))
     except Exception as e:
         return (200, {}, json.dumps({"ok": False, "result": str(e)}))
-
-
