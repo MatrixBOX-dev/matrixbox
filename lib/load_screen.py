@@ -1,5 +1,5 @@
 from __main__ import * # antingen denna rad eller #settings = load_settings etc
-import displayio, board, framebufferio, microcontroller, load_settings, os
+import displayio, board, framebufferio, microcontroller, load_settings, os, time
 from rgbmatrix import RGBMatrix
 from microcontroller import watchdog
 from font_mini import font_mini
@@ -232,6 +232,7 @@ def _clear_row_remainder(win, text_px_width, lin, fh, offs):
     refresh()"""
 
 def scroll_line(new_text, line_num=-1, color="yellow"):
+    """Replace a text row with an eight-frame vertical-blinds reveal."""
     _font = font_mini
     fh = _font["fontheight"]
     max_lines = int(5 * (display.height // 32))
@@ -240,7 +241,6 @@ def scroll_line(new_text, line_num=-1, color="yellow"):
     w = display.width
     _c = color if isinstance(color, int) else _color_map.get(color, 5)
     new_lower = new_text.lower()
-    step = max(2, w // 16)
     cols = []
     for ch in new_lower:
         if ch not in _font: ch = "_"
@@ -252,19 +252,12 @@ def scroll_line(new_text, line_num=-1, color="yellow"):
             for h in range(fh):
                 col.append(_c if (g[h + 1] >> inv_w) & 1 else 0)
             cols.append(col)
-    total = w
-    frame = 0
-    while frame < total:
-        s = min(step, total - frame)
-        frame += s
-        for y in range(y_base, y_base + fh):
-            hi = y - y_base
-            for x in range(w - s):
-                window[x, y] = window[x + s, y]
-            for x in range(w - s, w):
-                ci = x - (w - frame)
-                window[x, y] = cols[ci][hi] if 0 <= ci < len(cols) else 0
+    for frame in range(8):
+        for x in range(frame, w, 8):
+            for hi in range(fh):
+                window[x, y_base + hi] = cols[x][hi] if x < len(cols) else 0
         display.refresh()
+        time.sleep(0.02)
     global line_window
     while len(line_window) <= lin:
         line_window.append("")
