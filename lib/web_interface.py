@@ -510,6 +510,24 @@ def _ver_detail_html(data, ver):
         html += '<div style="font-size:.71rem;color:#888;margin-top:4px;line-height:1.6">' + lines + '</div>'
     return html
 
+def _app_icon_html(vd):
+    """Renders an app's icon as emoji, base64 raster image, or inline SVG --
+    shared by list_available_apps() (first-party) and _f_third_party() (3rd
+    party), which both receive the same {emoji, icon} metadata shape."""
+    emoji = vd.get('emoji', '')
+    if emoji:
+        return f'<span style="font-size:.95rem;margin-right:5px;flex-shrink:0">{emoji}</span>'
+    icon = vd.get('icon', 0)
+    if not (isinstance(icon, str) and icon):
+        return ''
+    if icon[:1] == '<':
+        return ('<div style="width:20px;height:20px;flex-shrink:0;margin-right:6px;border-radius:4px;overflow:hidden">'
+                + icon.replace('<svg ', '<svg width="100%" height="100%" ', 1) + '</div>')
+    mime = 'image/jpeg' if icon[:4] == '/9j/' else 'image/png'
+    return ('<img src="data:' + mime + ';base64,' + icon
+            + '" width="20" height="20" style="width:20px;height:20px;border-radius:4px;'
+              'object-fit:cover;flex-shrink:0;margin-right:6px;vertical-align:middle">')
+
 def list_available_apps(apps):
     print("Apps: ", apps)
     load_settings.latest_available_apps = apps if apps is not None else {}
@@ -546,9 +564,7 @@ def list_available_apps(apps):
             _vn = f'v{l_ver}' if l_ver else ''
             _vn_span = f'<span style="font-size:.75rem;color:#f0c800;font-weight:600;margin-left:6px">{_vn}</span>' if _vn else ''
             _upd_note = f'<div style="font-size:.7rem;color:#f0c800;margin-top:1px">&#x2192; v{r_ver} available</div>' if (r_ver and l_ver and r_ver != l_ver) else ''
-            _emoji = _vd.get('emoji', '')
-            _icon = _vd.get('icon', 0)
-            _icon_html = (f'<span style="font-size:.95rem;margin-right:5px;flex-shrink:0">{_emoji}</span>') if _emoji else (('<img src="data:' + ('image/jpeg' if _icon[:4]=='/9j/' else 'image/png') + ';base64,' + _icon + '" width="20" height="20" style="width:20px;height:20px;border-radius:4px;object-fit:cover;flex-shrink:0;margin-right:6px;vertical-align:middle">') if _icon[:1] != '<' else ('<div style="width:20px;height:20px;flex-shrink:0;margin-right:6px;border-radius:4px;overflow:hidden">' + _icon.replace('<svg ', '<svg width="100%" height="100%" ', 1) + '</div>')) if (isinstance(_icon, str) and _icon) else ''
+            _icon_html = _app_icon_html(_vd)
             _vrow = f'<div><span style="font-size:.92rem;font-weight:700;color:#fff">{dir}</span>{_vn_span}</div><div style="font-size:.7rem;color:var(--muted);margin-top:1px">{sz}</div>{_upd_note}'
             applist += f'<div class="download-item" style="flex-direction:column;align-items:stretch"><div style="display:flex;align-items:flex-start;justify-content:space-between"><div style="display:flex;min-width:0;flex:1">{_icon_html}<div style="min-width:0">{_vrow}</div></div><div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px">' + _run_button_html(dir) + upd_btn + """<button class="btn btn-sm" style="background:#ff4b4b;color:#fff;padding:7px 9px" onclick="if(confirm('Delete """+dir+"""?'))del"""+dir+"""(event)">&#x2715;</button>
 <script>function install"""+dir+"""(e){_busyWait("/?install="""+dir+"""",e.currentTarget)}
@@ -557,9 +573,7 @@ function del"""+dir+"""(e){_busyWait("/?delete="""+dir+"""",e.currentTarget)}</s
             _vd = getattr(load_settings, 'remote_ver_data', {}).get(dir, {})
             _vdh = _ver_detail_html(_vd, r_ver)
             _vn_span = f'<span style="font-size:.75rem;color:#f0c800;font-weight:600;margin-left:6px">v{r_ver}</span>' if r_ver else ''
-            _emoji = _vd.get('emoji', '')
-            _icon = _vd.get('icon', 0)
-            _icon_html = (f'<span style="font-size:.95rem;margin-right:5px;flex-shrink:0">{_emoji}</span>') if _emoji else (('<img src="data:' + ('image/jpeg' if _icon[:4]=='/9j/' else 'image/png') + ';base64,' + _icon + '" width="20" height="20" style="width:20px;height:20px;border-radius:4px;object-fit:cover;flex-shrink:0;margin-right:6px;vertical-align:middle">') if _icon[:1] != '<' else ('<div style="width:20px;height:20px;flex-shrink:0;margin-right:6px;border-radius:4px;overflow:hidden">' + _icon.replace('<svg ', '<svg width="100%" height="100%" ', 1) + '</div>')) if (isinstance(_icon, str) and _icon) else ''
+            _icon_html = _app_icon_html(_vd)
             _vrow = f'<div><span style="font-size:.92rem;font-weight:400;color:var(--muted)">{dir}</span>{_vn_span}</div>'
             applist += f'<div class="download-item" style="flex-direction:column;align-items:stretch"><div style="display:flex;align-items:flex-start;justify-content:space-between"><div style="display:flex;min-width:0;flex:1">{_icon_html}<div style="min-width:0">{_vrow}</div></div>' + """<button class="btn btn-sm btn-success" style="flex-shrink:0;margin-left:8px" onclick="install"""+dir+"""(event)">&#x2B07; Install</button>
 <script>function install"""+dir+"""(e){_busyWait("/?install="""+dir+"""",e.currentTarget)}</script></div>""" + _vdh + '</div>'
@@ -858,50 +872,44 @@ def _apps_content():
 def select_app():
     return _shell(_apps_content())
 
-@ampule.route('/settingsx')
-def _settings(request):
-    global settings
-    print(__main__.settings)
-    return (200, {}, str(settings))
-
 @ampule.route('/', method="POST")
 def webinterface_post(request):
     global settings
     print("POSTED! ", request.params)
-    try:
-        pairs = request.body.split('&')
-        parsed_data = {}
-        for pair in pairs:
-            key, value = pair.split('=')
-            parsed_data[key] = url_decoder(value)
-        request.params = parsed_data
-        print(parsed_data)
-        print("POSTED body:", request.body)
-        for setting in parsed_data:
-            if parsed_data[setting] or setting in ("autostart", "screensaver"):
-                try:
-                    val = parsed_data[setting]
-                    if setting not in ("autostart", "screensaver") and setting in settings and type(settings[setting]) is int:
-                        val = int(val)
-                    settings[setting] = val
-                except: pass
-        clearscreen(True)
-        if not savesettings(settings):
-            wlan.STATUS = "Couldn't save settings (read-only filesystem)"
-        clearscreen(False)
-        __main__.autostart = settings.get("autostart", False)
-        __main__.screensaver_app = settings.get("screensaver", "")
-        try: apply_display_settings()
-        except Exception as e: print("apply_display_settings:", e)
-        render_home_screen()
-        return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
-    except: pass
+    # Query actions must not be consumed by the settings-body parser.
+    if not any(key in request.params for key in ("unlock", "delete", "install")):
+        try:
+            parsed_data = ampule.parse_qs(request.body)
+            request.params = parsed_data
+            print(parsed_data)
+            print("POSTED body:", request.body)
+            for setting in parsed_data:
+                if parsed_data[setting] or setting in ("autostart", "screensaver"):
+                    try:
+                        val = parsed_data[setting]
+                        if setting not in ("autostart", "screensaver") and setting in settings and type(settings[setting]) is int:
+                            val = int(val)
+                        settings[setting] = val
+                    except: pass
+            clearscreen(True)
+            if not savesettings(settings):
+                wlan.STATUS = "Couldn't save settings (read-only filesystem)"
+            clearscreen(False)
+            __main__.autostart = settings.get("autostart", False)
+            __main__.screensaver_app = settings.get("screensaver", "")
+            try: apply_display_settings()
+            except Exception as e: print("apply_display_settings:", e)
+            render_home_screen()
+            return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
+        except: pass
 
     try: 
         if "unlock" in request.params:
             try: 
-                with open("unlock","w") as f: f.write("")
-            except: pass
+                with open("/unlock","w") as f: f.write("")
+            except OSError as e:
+                print("Unlock failed:", e)
+                return (500, {}, "Couldn't unlock filesystem: couldn't write /unlock")
             import safemode
         if "delete" in request.params:
             dir = request.params["delete"]
@@ -1027,10 +1035,7 @@ def settings_page(request):
 
 @ampule.route("/system/settings", method="POST")
 def _system_settings_save(request):
-    # webinterface_post is not settings-only -- it also handles wifi
-    # connect, unlock, and app delete/install, all chained as a fallback
-    # when the settings-body parse at its top fails -- so it stays whole,
-    # reused here rather than duplicated.
+    # Share settings saves and query actions with the home-page handler.
     return webinterface_post(request)
 
 @ampule.route("/save", method='POST')
@@ -1138,8 +1143,7 @@ def _f_third_party(request):
             update_note = ""
             actions = f"<button class=\"btn btn-sm btn-success\" onclick=\"installthirdparty('{app}',event)\">&#x2B07; Install</button>"
             size_html = ""
-        icon = metadata.get("emoji", "")
-        icon_html = f'<span style="font-size:.95rem;margin-right:5px;flex-shrink:0">{icon}</span>' if icon else ""
+        icon_html = _app_icon_html(metadata)
         details = _ver_detail_html(metadata, remote_version)
         name_html = f'<div><span style="font-size:.92rem;font-weight:700;color:#fff">{app}</span>{version_html}</div>'
         cards += (
@@ -1211,25 +1215,6 @@ def reset(request):
 def led_toggle(request):
     off = _led_toggle()
     return (200, {}, json.dumps({"off": off}))
-
-
-def url_decoder(url):
-    url_decode = {"%C3A4":" ", "%20": " ", "%21": "!", "%22": "\"", "%23": "#", "%24": "$", "%25": "%", "%26": "&", "%27": "'", "%28": "(", "%29": ")", "%2A": "*", "%2B": "+", "%2C": ",", "%2D": "-", "%2E": ".", "%2F": "/", "%30": "0", "%31": "1", "%32": "2", "%33": "3", "%34": "4", "%35": "5", "%36": "6", "%37": "7", "%38": "8", "%39": "9", "%3A": ":", "%3B": ";", "%3C": "<", "%3D": "=", "%3E": ">", "%3F": "?", "%40": "@", "%41": "A", "%42": "B", "%43": "C", "%44": "D", "%45": "E", "%46": "F", "%47": "G", "%48": "H", "%49": "I", "%4A": "J", "%4B": "K", "%4C": "L", "%4D": "M", "%4E": "N", "%4F": "O", "%50": "P", "%51": "Q", "%52": "R", "%53": "S", "%54": "T", "%55": "U", "%56": "V", "%57": "W", "%58": "X", "%59": "Y", "%5A": "Z", "%5B": "[", "%5C": "\\", "%5D": "]", "%5E": "^", "%5F": "_", "%60": "`", "%61": "a", "%62": "b", "%63": "c", "%64": "d", "%65": "e", "%66": "f", "%67": "g", "%68": "h", "%69": "i", "%6A": "j", "%6B": "k", "%6C": "l", "%6D": "m", "%6E": "n", "%6F": "o", "%70": "p", "%71": "q", "%72": "r", "%73": "s", "%74": "t", "%75": "u", "%76": "v", "%77": "w", "%78": "x", "%79": "y", "%7A": "z", "%7B": "{", "%7C": "|", "%7D": "}", "%7E": "~", "%E2%82%AC": "\u20ac", "%E2%80%9A": "\u201a", "%C6%92": "\u0192", "%E2%80%9E": "\u201e", "%E2%80%A6": "\u2026", "%E2%80%A0": "\u2020", "%E2%80%A1": "\u2021", "%CB%86": "\u02c6", "%E2%80%B0": "\u2030", "%C5%A0": "\u0160", "%E2%80%B9": "\u2039", "%C5%92": "\u0152", "%C5%BD": "\u017d", "%E2%80%98": "\u2018", "%E2%80%99": "\u2019", "%E2%80%9C": "\u201c", "%E2%80%9D": "\u201d", "%E2%80%A2": "\u2022", "%E2%80%93": "\u2013", "%E2%80%94": "\u2014", "%CB%9C": "\u02dc", "%E2%84": "\u2122", "%C5%A1": "\u0161", "%E2%80": "\u203a", "%C5%93": "\u0153", "%C5%B8": "\u0178", "%C2%A1": "\u00a1", "%C2%A2": "\u00a2", "%C2%A3": "\u00a3", "%C2%A4": "\u00a4", "%C2%A5": "\u00a5", "%C2%A6": "\u00a6", "%C2%A7": "\u00a7", "%C2%A8": "\u00a8", "%C2%A9": "\u00a9", "%C2%AA": "\u00aa", "%C2%AB": "\u00ab", "%C2%AD": "\u00ac", "%C2%AE": "\u00ae", "%C2%AF": "\u00af", "%C2%B0": "\u00b0", "%C2%B1": "\u00b1", "%C2%B2": "\u00b2", "%C2%B3": "\u00b3", "%C2%B4": "\u00b4", "%C2%B5": "\u00b5", "%C2%B6": "\u00b6", "%C2%B7": "\u00b7", "%C2%B8": "\u00b8", "%C2%B9": "\u00b9", "%C2%BA": "\u00ba", "%C2%BB": "\u00bb", "%C2%BC": "\u00bc", "%C2%BD": "\u00bd", "%C2%BE": "\u00be", "%C2%BF": "\u00bf", "%C3%80": "\u00c0", "%C3%81": "\u00c1", "%C3%82": "\u00c2", "%C3%83": "\u00c3", "%C3%84": "\u00c4", "%C3%85": "\u00c5", "%C3%86": "\u00c6", "%C3%87": "\u00c7", "%C3%88": "\u00c8", "%C3%89": "\u00c9", "%C3%8A": "\u00ca", "%C3%8B": "\u00cb", "%C3%8C": "\u00cc", "%C3%8D": "\u00cd", "%C3%8E": "\u00ce", "%C3%8F": "\u00cf", "%C3%90": "\u00d0", "%C3%91": "\u00d1", "%C3%92": "\u00d2", "%C3%93": "\u00d3", "%C3%94": "\u00d4", "%C3%95": "\u00d5", "%C3%96": "\u00d6", "%C3%97": "\u00d7", "%C3%98": "\u00d8", "%C3%99": "\u00d9", "%C3%9A": "\u00da", "%C3%9B": "\u00db", "%C3%9C": "\u00dc", "%C3%9D": "\u00dd", "%C3%9E": "\u00de", "%C3%9F": "\u00df", "%C3%A0": "\u00e0", "%C3%A1": "\u00e1", "%C3%A2": "\u00e2", "%C3%A3": "\u00e3", "%C3%A4": "\u00e4", "%C3%A5": "\u00e5", "%C3%A6": "\u00e6", "%C3%A7": "\u00e7", "%C3%A8": "\u00e8", "%C3%A9": "\u00e9", "%C3%AA": "\u00ea", "%C3%AB": "\u00eb", "%C3%AC": "\u00ec", "%C3%AD": "\u00ed", "%C3%AE": "\u00ee", "%C3%AF": "\u00ef", "%C3%B0": "\u00f0", "%C3%B1": "\u00f1", "%C3%B2": "\u00f2", "%C3%B3": "\u00f3", "%C3%B4": "\u00f4", "%C3%B5": "\u00f5", "%C3%B6": "\u00f6", "%C3%B7": "\u00f7", "%C3%B8": "\u00f8", "%C3%B9": "\u00f9", "%C3%BA": "\u00fa", "%C3%BB": "\u00fb", "%C3%BC": "\u00fc", "%C3%BD": "\u00fd", "%C3%BE": "\u00fe", "%C3%BF": "\u00ff", 
-"%C4%8C":"\u010c",
-"%C4%86":"\u0106",
-"%C5%BD":"\u017d",
-"%C4%90":"\u0110",
-"%C5%A0":"\u0160",
-"%C4%8D":"\u010d",
-"%C4%87":"\u0107",
-"%C5%BE":"\u017e",
-"%C4%91":"\u0111",
-"%C5%A1":"\u0161",
-"%E2%82%BF":"?"}
-
-    url = url.replace("+", " ")
-    for char in url_decode: url = url.replace(char, url_decode[char])
-    return url
 
 
 ####################################################
