@@ -373,7 +373,7 @@ def huvudsidan(request):
             try: port = int(port) if port else 90
             except ValueError: port = 0
             # strict host/port: the value is echoed back into the settings page HTML
-            if 0 < len(host) <= 253 and all(c in _HOST_CHARS for c in host) and 0 < port < 65536:
+            if 0 < len(host) <= 253 and not host.strip(_HOST_CHARS) and 0 < port < 65536:
                 varinit.settings["data_host"], varinit.settings["data_port"] = host, port
             else: print("Invalid data server:", value)
         return (200, {}, "")
