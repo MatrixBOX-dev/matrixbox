@@ -26,7 +26,7 @@ country_and_operators = {
   "at":[["wl","Vienna"]],
   "es":[["barcelona","Barcelona (AMB)"]],
   "ie":[["all","All real-time operators"]],
-  "de":[["local","Germany (gtfs.de)"],["db_trains","DB-trains (Deutsche Bahn)"],["be","Berlin (Unofficial API)"],["vbb","VBB/BVG (Berlin-Brandenburg)"],["vrr","VRR (Rhein-Ruhr)"],["kvv","KVV (Karlsruhe)"],["rmv","RMV (Frankfurt)"],["hochbahn","HVV (Hamburg etc.)"],["vrn","VRN (Rhein-Neckar)"],["vbn","VBN (Bremen-Niedersachsen)"],["vvo","VVO (Dresden)"],["gvh","GVH (Hannover)"]]
+  "de":[["local","Germany (gtfs.de)"],["db_trains","DB-trains (Deutsche Bahn)"],["be","Berlin (Unofficial API)"],["vbb","VBB/BVG (Berlin-Brandenburg)"],["vrr","VRR (Rhein-Ruhr)"],["kvv","KVV (Karlsruhe)"],["rmv","RMV (Frankfurt)"],["hochbahn","HVV (Hamburg etc.)"],["vrn","VRN (Rhein-Neckar)"],["vbn","VBN (Bremen-Niedersachsen)"],["vvo","VVO (Dresden)"],["bsvg","BSVG (Braunschweig)"],["gvh","GVH (Hannover)"]]
 }
 
 def _opt(val, cur, label):
