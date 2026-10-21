@@ -505,7 +505,7 @@ def huvudsidan(request):
     elif "dsa_api_provider" in request.params:
         try:
             v = int(request.params["dsa_api_provider"])
-            if v in (1, 2, 3): varinit.settings["dsa_api_provider"] = v
+            if v in (1, 2, 3, 4): varinit.settings["dsa_api_provider"] = v
         except: pass
         functions.switch(_screen=False)
         return (200, {}, "")
