@@ -515,6 +515,7 @@ def html():
         _opt(1, s.get("dsa_api_provider", 1), "Bahn.de: ICE/IC/Regional/SBahn")
         + _opt(2, s.get("dsa_api_provider", 1), "Bahn.de: all services")
         + _opt(3, s.get("dsa_api_provider", 1), "VVO Dresden (EFA)")
+        + _opt(4, s.get("dsa_api_provider", 1), "Germany (gtfs.de)")
     )
     _dsa_layout_opts = (
         _opt(1, s.get("dsa_layout", 1), "Layout 1")
