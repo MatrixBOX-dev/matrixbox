@@ -18,6 +18,32 @@ _loop_ms = 0
 def loop_time_ms():
     return round(_loop_ms, 1)
 
+def url_decoder(s):
+    """Decode a www-form-urlencoded string ('+' -> space, %XX -> byte).
+
+    Request.params values are left raw (see __parse_params below), so any
+    route handler that needs free-text input (query values that may contain
+    spaces, punctuation, or non-ASCII) should decode it with this first.
+    """
+    out = bytearray()
+    s = s.replace("+", " ")
+    i = 0
+    while i < len(s):
+        c = s[i]
+        if c == "%" and i + 2 < len(s):
+            try:
+                out.append(int(s[i + 1:i + 3], 16))
+                i += 3
+                continue
+            except ValueError:
+                pass
+        out.extend(c.encode("utf-8"))
+        i += 1
+    try:
+        return bytes(out).decode("utf-8")
+    except UnicodeError:
+        return s
+
 class Request:
     def __init__(self, method, full_path):
         self.method = method

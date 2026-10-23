@@ -287,7 +287,7 @@ def setup_page(title="WiFi Setup"):
 
 @ampule.route("/system/wifi/scan", method="GET")
 def _scan(request):
-    current = web_interface.url_decoder(request.params.get("current", ""))
+    current = ampule.url_decoder(request.params.get("current", ""))
     options = _scan_options(current)
     return (200, {}, options)
 
@@ -295,7 +295,7 @@ def _scan(request):
 @ampule.route("/system/wifi/ssid", method="POST")
 def _set_ssid(request):
     if request.params and "v" in request.params:
-        settings["ssid"] = web_interface.url_decoder(request.params["v"])
+        settings["ssid"] = ampule.url_decoder(request.params["v"])
     if request.params and "channel" in request.params:
         try:
             settings["channel"] = int(request.params["channel"])
@@ -315,7 +315,7 @@ def _set_power(request):
 @ampule.route("/system/wifi/password", method="POST")
 def _set_password(request):
     if request.params and "v" in request.params:
-        settings["password"] = web_interface.url_decoder(request.params["v"])
+        settings["password"] = ampule.url_decoder(request.params["v"])
     return (200, {}, "")
 
 
