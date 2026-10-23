@@ -1,4 +1,5 @@
 import sys, json, time
+import traceback
 import displayio
 import bitmaptools
 import gc
@@ -50,7 +51,9 @@ def save_settings():
         with open(SETTINGS_FILE, "w") as f:
             json.dump({"mode": scroll_mode, "align": static_align, "reverse": reverse_direction,
                         "shadow": shadow_color, "font": get_font_name(), "color": load_screen.currentcolor}, f)
-    except: pass
+    except Exception as e:
+        print("[DEBUG] save_settings() failed:")
+        traceback.print_exception(e)
 
 def load_settings():
     global scroll_mode, static_align, reverse_direction, shadow_color
@@ -64,14 +67,18 @@ def load_settings():
         fm = {"mini": font_mini, "small": font_small, "large": font_large}
         load_screen.currentfont = fm.get(s.get("font", "large"), font_large)
         load_screen.currentcolor = s.get("color", "white")
-    except: pass
+    except Exception as e:
+        print("[DEBUG] load_settings() failed:")
+        traceback.print_exception(e)
 
 with open("scroller.html") as f: html_body = f.read()
 
 try:
     with open("scroller.txt") as f:
         scroller_text = f.read()
-except:
+except Exception as e:
+    print("[DEBUG] reading scroller.txt failed:")
+    traceback.print_exception(e)
     scroller_text = "http://" + str(wifi.radio.ipv4_address)
 
 # ---------------------------------------------------------
@@ -101,6 +108,9 @@ def rebuild_scene():
     """Rebuild big bitmap, viewport, and display group based on current text/font/scale."""
     global big_bitmap, viewport_bitmap, viewport_tg
     global scroller_width, scroller_height, scroll_x, scroll_y
+
+    print("[DEBUG] rebuild_scene() start: mode=%r text=%r (len=%d)" % (
+        scroll_mode, scroller_text, len(scroller_text)))
 
     font = load_screen.currentfont
     lines = scroller_text.replace("\r", "").split("\n")
@@ -184,7 +194,13 @@ def rebuild_scene():
             color=load_screen.currentcolor, _refresh=False,
             window=big_bitmap, block=True, shadow_color=shadow_color,
         )
-        scroll_x = DISPLAY_WIDTH
+        # Start fully off-screen in the direction text will scroll from, matching
+        # the wrap-around reset values used in the main loop below. Previously this
+        # was hardcoded to DISPLAY_WIDTH, which put the viewport partway (or past)
+        # scroller_width right away -- fine for long text (just skips the lead-in),
+        # but for short text it immediately satisfied the "fully scrolled past"
+        # blank condition in blit_viewport(), so the display stayed black.
+        scroll_x = -scroller_width if reverse_direction else DISPLAY_WIDTH + scroller_width
 
     # Viewport bitmap (fixed display size)
     viewport_bitmap = displayio.Bitmap(DISPLAY_WIDTH, DISPLAY_HEIGHT, PALETTE_SIZE)
@@ -201,6 +217,12 @@ def rebuild_scene():
     group = displayio.Group(scale=default_scale)
     group.append(viewport_tg)
     display.root_group = group
+
+    print("[DEBUG] rebuild_scene() done: scroller_width=%s scroller_height=%s "
+          "scroll_x=%s scroll_y=%s DISPLAY_WIDTH=%s DISPLAY_HEIGHT=%s "
+          "reverse_direction=%s default_offset=%s default_scale=%s" % (
+        scroller_width, scroller_height, scroll_x, scroll_y,
+        DISPLAY_WIDTH, DISPLAY_HEIGHT, reverse_direction, default_offset, default_scale))
 
 def blit_viewport():
     """Copy the visible slice from big_bitmap into viewport_bitmap."""
@@ -256,91 +278,103 @@ def scroller_post(request):
     global scroller_text, exit, default_offset, default_scale, shadow_color
     global btc, scroll_mode, padding_length, scroll_x, scroll_y, reverse_direction, static_align
 
-    if "btc" in request.params:
-        btc = 1 - btc
+    print("[DEBUG] scroller_post() params=%r" % (dict(request.params),))
 
-    if "mode" in request.params:
-        m = request.params["mode"]
-        if m in ("h", "v", "s"):
-            scroll_mode = m
-            rebuild_scene()
-        save_settings()
-        return (200, {}, "OK")
+    try:
+        if "btc" in request.params:
+            btc = 1 - btc
 
-    if "scroll" in request.params:
-        if scroll_mode == "s":
-            scroll_mode = "h"
-        else:
-            scroll_mode = "s"
-        rebuild_scene()
-        save_settings()
-        return (200, {}, "OK")
-
-    if "text" in request.params:
-        scroller_text = url_decoder(request.params["text"]).replace("\\n", "\n").replace("\r", "")
-    if "reverse" in request.params:
-        try:
-            reverse_direction = int(request.params["reverse"])
-        except:
-            reverse_direction = 1 - reverse_direction
-        save_settings()
-        return (200, {}, "OK")
-
-    if "size" in request.params:
-        size = request.params["size"]
-        if size == "mini":
-            load_screen.currentfont = font_mini
-        if size == "small":
-            load_screen.currentfont = font_small
-        if size == "large":
-            load_screen.currentfont = font_large
-
-    if "color" in request.params:
-        load_screen.currentcolor = request.params["color"]
-
-    if "rgb" in request.params:
-        try:
-            raw = request.params["rgb"].replace("%23", "").replace("#", "")
-            r = int(raw[0:2], 16)
-            g = int(raw[2:4], 16)
-            b = int(raw[4:6], 16)
-            palette[5] = (r, g, b)
-            load_screen.currentcolor = "white"
-        except:
-            pass
-
-    if "align" in request.params:
-        a = request.params["align"]
-        if a in ("left", "center", "right"):
-            static_align = a
-            if scroll_mode == "s":
+        if "mode" in request.params:
+            m = request.params["mode"]
+            if m in ("h", "v", "s"):
+                scroll_mode = m
                 rebuild_scene()
             save_settings()
             return (200, {}, "OK")
 
-    if "offset" in request.params:
-        default_offset = int(request.params["offset"])
+        if "scroll" in request.params:
+            if scroll_mode == "s":
+                scroll_mode = "h"
+            else:
+                scroll_mode = "s"
+            rebuild_scene()
+            save_settings()
+            return (200, {}, "OK")
 
-    if "scale" in request.params:
-        default_scale = int(request.params["scale"])
+        if "text" in request.params:
+            decoded = ampule.url_decoder(request.params["text"])
+            print("[DEBUG] text param raw=%r decoded=%r" % (request.params["text"], decoded))
+            scroller_text = decoded.replace("\\n", "\n").replace("\r", "")
+            print("[DEBUG] scroller_text set to %r (len=%d)" % (scroller_text, len(scroller_text)))
+        if "reverse" in request.params:
+            try:
+                reverse_direction = int(request.params["reverse"])
+            except Exception as e:
+                print("[DEBUG] reverse param parse failed:")
+                traceback.print_exception(e)
+                reverse_direction = 1 - reverse_direction
+            save_settings()
+            return (200, {}, "OK")
 
-    if "shadow_color" in request.params:
-        name = request.params["shadow_color"]
-        if name in shadow_color_map:
-            shadow_color = shadow_color_map[name]
-        rebuild_scene()
+        if "size" in request.params:
+            size = request.params["size"]
+            if size == "mini":
+                load_screen.currentfont = font_mini
+            if size == "small":
+                load_screen.currentfont = font_small
+            if size == "large":
+                load_screen.currentfont = font_large
+
+        if "color" in request.params:
+            load_screen.currentcolor = request.params["color"]
+
+        if "rgb" in request.params:
+            try:
+                raw = request.params["rgb"].replace("%23", "").replace("#", "")
+                r = int(raw[0:2], 16)
+                g = int(raw[2:4], 16)
+                b = int(raw[4:6], 16)
+                palette[5] = (r, g, b)
+                load_screen.currentcolor = "white"
+            except Exception as e:
+                print("[DEBUG] rgb param parse failed:")
+                traceback.print_exception(e)
+
+        if "align" in request.params:
+            a = request.params["align"]
+            if a in ("left", "center", "right"):
+                static_align = a
+                if scroll_mode == "s":
+                    rebuild_scene()
+                save_settings()
+                return (200, {}, "OK")
+
+        if "offset" in request.params:
+            default_offset = int(request.params["offset"])
+
+        if "scale" in request.params:
+            default_scale = int(request.params["scale"])
+
+        if "shadow_color" in request.params:
+            name = request.params["shadow_color"]
+            if name in shadow_color_map:
+                shadow_color = shadow_color_map[name]
+            rebuild_scene()
+            save_settings()
+            return (200, {}, "OK")
+
+        if btc:
+            set_btc()
+        else:
+            rebuild_scene()
+
         save_settings()
+        print("[DEBUG] scroller_post() completed OK")
         return (200, {}, "OK")
-
-
-
-    if btc:
-        set_btc()
-    else:
-        rebuild_scene()
-
-    save_settings()
-    return (200, {}, "OK")
+    except Exception as e:
+        print("[DEBUG] scroller_post() RAISED an exception:")
+        traceback.print_exception(e)
+        raise
 
 @ampule.route("/", method="GET")
 def scroller_get(request):
@@ -359,6 +393,8 @@ def set_btc():
         data = json.loads(data)
         scroller_text = "₿ $" + data["DISPLAY"]["PRICE"].replace("$ ", "").split(".")[0]
     except Exception as e:
+        print("[DEBUG] set_btc() failed:")
+        traceback.print_exception(e)
         scroller_text = str(e)
 
     rebuild_scene()
@@ -371,9 +407,14 @@ clearscreen()
 load_settings()
 rebuild_scene()
 
+print("[DEBUG] display.auto_refresh=%r display.root_group=%r" % (
+    getattr(display, "auto_refresh", "n/a"), display.root_group))
+
 # ---------------------------------------------------------
 #  MAIN LOOP
 # ---------------------------------------------------------
+
+_debug_frame = 0
 
 while not exit:
     ampule.listen(socket)
@@ -394,7 +435,30 @@ while not exit:
             if scroll_y <= -DISPLAY_HEIGHT: scroll_y = scroller_height
 
     blit_viewport()
-    refresh()
+    refresh_result = display.refresh()
+
+    _debug_frame += 1
+    if _debug_frame % 60 == 0:
+        vp_nonzero = 0
+        for y in range(DISPLAY_HEIGHT):
+            for x in range(DISPLAY_WIDTH):
+                if viewport_bitmap[x, y] != 0:
+                    vp_nonzero += 1
+        big_nonzero = 0
+        if big_bitmap is not None:
+            for y in range(big_bitmap.height):
+                for x in range(big_bitmap.width):
+                    if big_bitmap[x, y] != 0:
+                        big_nonzero += 1
+        print("[DEBUG] loop frame=%d mode=%s scroll_x=%s scroll_y=%s scroller_width=%s "
+              "big_bitmap=%s root_group_len=%s refresh_result=%r "
+              "viewport_total_nonzero_px=%d big_bitmap_total_nonzero_px=%d root_group_is_current=%s" % (
+            _debug_frame, scroll_mode, scroll_x, scroll_y, scroller_width,
+            big_bitmap is not None,
+            len(display.root_group) if display.root_group is not None else None,
+            refresh_result, vp_nonzero, big_nonzero,
+            display.root_group[0] is viewport_tg if len(display.root_group) else None))
+
 
     b = check_if_button_pressed()
     if b == 1:
@@ -409,3 +473,4 @@ while not exit:
         sys.exit()
 
 clearscreen()
+
