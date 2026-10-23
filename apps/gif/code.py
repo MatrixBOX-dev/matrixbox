@@ -32,7 +32,7 @@ def list_gifs():
     return sorted(names)
 
 def safe_gif_name(name):
-    name = url_decoder(name or "").replace("\\", "/").split("/")[-1].strip()
+    name = ampule.url_decoder(name or "").replace("\\", "/").split("/")[-1].strip()
     name = name.lstrip(".")
     if not name:
         name = "uploaded.gif"

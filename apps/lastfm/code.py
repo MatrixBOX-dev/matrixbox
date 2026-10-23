@@ -15,7 +15,6 @@ from __main__ import (
     requests,
     settings,
     socket,
-    url_decoder,
 )
 from check_button import check_if_button_pressed
 from load_screen import font_large, pprint, refresh, strlen, window
@@ -263,10 +262,10 @@ def update_settings(request):
     p = request.params
 
     if "username" in p:
-        config["username"] = url_decoder(p["username"])
+        config["username"] = ampule.url_decoder(p["username"])
 
     if "api_key" in p:
-        config["api_key"] = url_decoder(p["api_key"])
+        config["api_key"] = ampule.url_decoder(p["api_key"])
 
     for color_type in ["artist", "song", "dash", "shadow"]:
         color = f"{color_type}_color"
