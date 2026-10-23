@@ -10,7 +10,17 @@ class AutoWriteFile:
         try: display.root_group.hidden = True; refresh()
         except: print("Disp fail")
 
-        self._f = _real_open(*args, **kwargs)
+        try:
+            self._f = _real_open(*args, **kwargs)
+        except Exception:
+            # If the open itself fails (e.g. read-only filesystem), the display
+            # was already hidden above but __exit__ will never run to unhide it
+            # (we never got far enough to enter the `with` block). Restore
+            # visibility here before propagating the original error.
+            try: display.root_group.hidden = False; refresh()
+            except: print("Disp fail")
+            raise
+
         self._run_hook(args, kwargs)
 
 
