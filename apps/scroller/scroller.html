@@ -3,7 +3,7 @@
 <div style="display:flex;gap:8px">
 <textarea id="text" rows="3" placeholder="Enter message… (line breaks add gaps)" style="flex:1;resize:vertical"></textarea>
 <button class="btn btn-sm" onclick="send()">&#9654; Send</button>
-<button class="btn btn-sm" onclick="fetch('/save',{method:'POST'}).then(function(){this.textContent='\u2713 Saved'}.bind(this));" style="background:#285">&#128190; Save</button>
+<button class="btn btn-sm" id="save-btn" onclick="saveText()" style="background:#285">&#128190; Save</button>
 </div>
 </div>
 
@@ -95,5 +95,20 @@ function pr(v){p("reverse="+v);document.getElementById("dir_rtl").classList.togg
 function pm(m){p("mode="+m);document.querySelectorAll("#mode-seg button").forEach(function(b){b.classList.toggle("on",b.id==="mode_"+m)});var r=document.getElementById("dir_rtl"),l=document.getElementById("dir_ltr");if(m==="v"){r.innerHTML="&#8593; Bottom to Top";l.innerHTML="Top to Bottom &#8595;"}else{r.innerHTML="&#8592; Right to Left";l.innerHTML="Left to Right &#8594;"}document.getElementById("align-seg").style.display=m==="s"?"":"none"}
 function pa(a){p("align="+a);document.querySelectorAll("#align-seg button").forEach(function(b){b.classList.toggle("on",b.id==="al_"+a)})}
 function pu(){var v=document.getElementById("url").value;if(v)fetch("/",{method:"POST",body:"url="+v})}
+function saveText(){
+    var btn=document.getElementById("save-btn");
+    var original=btn.textContent;
+    fetch("/save",{method:"POST"}).then(function(resp){
+        return resp.text().then(function(body){return {ok:resp.ok,body:body};});
+    }).then(function(result){
+        btn.textContent=result.ok?"\u2713 Saved":"\u2717 Error";
+        if(!result.ok) console.error("Save failed:",result.body);
+    }).catch(function(err){
+        btn.textContent="\u2717 Error";
+        console.error("Save request failed:",err);
+    }).finally(function(){
+        setTimeout(function(){btn.textContent=original;},2000);
+    });
+}
 document.getElementById("sz_large").classList.add("on");
 </script>

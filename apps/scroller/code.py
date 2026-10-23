@@ -253,8 +253,11 @@ def web_exit(request):
 
 @ampule.route("/save", method="POST")
 def web_save(request):
-    with open("scroller.txt", "w") as f:
-        f.write(scroller_text)
+    try:
+        with open("scroller.txt", "w") as f:
+            f.write(scroller_text)
+    except Exception as e:
+        return (500, {}, "ERROR: " + str(e))
     return (200, {}, "OK")
 
 @ampule.route("/", method="POST")
