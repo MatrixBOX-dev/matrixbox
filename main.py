@@ -96,6 +96,8 @@ def initialize_app():
         import __init__
     except Exception as e:
         print(f"{e}")
+        pprint(f"{e}")
+        time.sleep(1)
         settings["autostart"] = 0
     finally:
         for i, backup in enumerate(palette_backup):
