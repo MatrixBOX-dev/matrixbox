@@ -1249,9 +1249,9 @@ def _repl(request):
 def _ai_content():
     from load_settings import settings as _s
     _sets = _s()
-    _aip = _sets.get("ai_provider", "github")
-    _aik = _sets.get("ai_key", "")
-    _aim = _sets.get("ai_model", "openai/gpt-4o-mini")
+    _aip = _sets.get("ai_provider") or "openai"
+    _aim = json.dumps(_sets.get("ai_model") or "").replace("<", "\\u003c")
+    _key_status = "A key is stored. Leave blank to keep it for this provider." if _sets.get("ai_key") else "No key stored."
     def _sel(v): return ' selected' if _aip == v else ''
     return f"""<div class="logo"><h1>&#x1F916; AI Agent</h1><p>Chat with AI to modify your MatrixBox</p></div>
 <div class="card" id="ai-chat">
@@ -1261,28 +1261,45 @@ style="width:100%;background:var(--surface2);border:1.5px solid var(--border);bo
 <div style="display:flex;gap:8px;margin-top:8px">
 <button class="btn btn-full" id="ai-send" onclick="_aiSend()">&#x2728; Send</button>
 <button class="btn btn-sm btn-ghost" onclick="_aiClear()">Clear</button>
-<button class="btn btn-sm btn-ghost" onclick="_aiSync('refresh')" title="Download latest prompt from repo">&#x2B07; Pull</button>
-<button class="btn btn-sm btn-ghost" onclick="_aiSync('push')" title="Upload prompt to repo (owner only)">&#x2B06; Push</button>
+<button class="btn btn-sm btn-ghost" onclick="_aiSync(this)" title="Download latest prompt from repo">&#x2B07; Pull prompt</button>
+<button class="btn btn-sm btn-ghost" id="ai-restart" style="display:none" onclick="if(confirm('Restart device?'))fetch('/reset',{{method:'POST'}})">Restart device</button>
 </div>
+<p>Tools can change files and execute code on this device. Use only on a trusted network.
+Requests may take a minute per step; the device loop waits during cloud calls. Never run an unbounded loop.</p>
 </div>
 <div class="card" style="margin-top:12px"><div class="section-title">AI Settings</div>
+<p>GitHub Models was retired July 30, 2026. Neither classic nor fine-grained PATs can restore its inference API.
+GitHub Copilot access is separate. Use a provider API key, not a GitHub PAT.</p>
+<p>For OpenAI: open <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">API keys</a>,
+create a project key, configure API billing and usage alerts, then enter it below.
+A ChatGPT subscription does not include API billing. Use a tool-capable Chat Completions model available to your account.</p>
 <label>Provider</label>
 <select id="ai_prov" onchange="_aip2()">
-<option value="github"{_sel('github')}>GitHub Models</option>
+<option value="github"{_sel('github')}>GitHub Models (retired)</option>
 <option value="anthropic"{_sel('anthropic')}>Anthropic (Claude)</option>
 <option value="openai"{_sel('openai')}>OpenAI</option>
 <option value="gemini"{_sel('gemini')}>Google Gemini</option>
 <option value="openrouter"{_sel('openrouter')}>OpenRouter</option>
 </select>
 <label>API Key</label>
-<input type="password" id="ai_key" placeholder="Enter API key..." value="{_aik}">
+<input type="password" id="ai_key" autocomplete="new-password" placeholder="Enter provider API key...">
+<p>{_key_status}</p>
 <label>Model</label>
-<select id="ai_model"></select>
-<button class="btn btn-full" style="margin-top:8px" onclick="_aisave()">Save AI Settings</button>
+<input type="text" id="ai_model" placeholder="Provider model ID">
+<p>OpenAI/OpenRouter use native tool calling. Anthropic/Gemini retain the legacy JSON tool protocol.
+Keys are stored in settings.txt on device flash, not encrypted. Do not share that file.</p>
+<button class="btn btn-full" style="margin-top:8px" onclick="_aisave(this)">Save AI Settings</button>
+<button class="btn btn-full" style="margin-top:8px" onclick="_aiTest(this)">Test saved connection (no device tools)</button>
 </div>
 <script>
 var _aiLog=document.getElementById('ai-log');
 var _aiIn=document.getElementById('ai-input');
+var _aiBusy=false;
+function _aiJSON(url,options){{
+return fetch(url,options).then(function(r){{return r.json().then(function(d){{
+if(!r.ok)throw new Error(d.error||'HTTP '+r.status);return d;
+}})}});
+}}
 function _aiMsg(role,text){{
 var d=document.createElement('div');
 d.style.cssText='padding:8px 10px;margin:4px 0;border-radius:8px;white-space:pre-wrap;word-break:break-word;';
@@ -1293,11 +1310,16 @@ else{{d.style.background='var(--surface2)';d.style.borderLeft='3px solid var(--a
 d.textContent=text;_aiLog.appendChild(d);_aiLog.scrollTop=_aiLog.scrollHeight;}}
 function _aiSend(){{
 var msg=_aiIn.value.trim();if(!msg)return;
+if(_aiBusy)return;
+if(msg.length>4000){{_aiMsg('error','Message exceeds 4000 characters.');return;}}
+_aiBusy=true;
 _aiMsg('user',msg);_aiIn.value='';
 var btn=document.getElementById('ai-send');btn.disabled=true;btn.textContent='Thinking...';
-fetch('/ai/chat',{{method:'POST',body:msg}}).then(function(r){{return r.json()}}).then(function(d){{
+_aiJSON('/ai/chat',{{method:'POST',body:msg}}).then(function(d){{
 if(d.reply)_aiMsg('assistant',d.reply);
-else if(d.error)_aiMsg('error',d.error);
+if(d.error)_aiMsg('error',d.error);
+if(d.complete===false&&!d.error)_aiMsg('error','Task incomplete.');
+document.getElementById('ai-restart').style.display=d.restart_required?'':'none';
 if(d.results&&d.results.length){{
 d.results.forEach(function(r){{
 var s=r.tool+(r.path?' '+r.path:'')+(r.ok?' OK':' FAILED');
@@ -1309,27 +1331,38 @@ if(r.content)s+='\\n'+r.content.substring(0,500);
 _aiMsg('tool',s);
 }});}}
 }}).catch(function(e){{_aiMsg('error','Connection error: '+e.message);
-}}).finally(function(){{btn.disabled=false;btn.innerHTML='&#x2728; Send';}});
+}}).finally(function(){{_aiBusy=false;btn.disabled=false;btn.innerHTML='&#x2728; Send';}});
 }}
 function _aiClear(){{
 if(!confirm('Clear conversation history?'))return;
-fetch('/ai/clear',{{method:'POST'}}).then(function(){{_aiLog.innerHTML='';_aiMsg('assistant','History cleared. How can I help?');}});
+if(_aiBusy){{_aiMsg('error','Wait for the current request to finish.');return;}}
+_aiJSON('/ai/clear',{{method:'POST'}}).then(function(){{_aiLog.innerHTML='';_aiMsg('assistant','History cleared. How can I help?');}}).catch(function(e){{_aiMsg('error',e.message);}});
 }}
-function _aiSync(action){{
-var btn=event.target;btn.disabled=true;var t=btn.textContent;btn.textContent='...';
-fetch('/ai/'+action+'-prompt',{{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{
-_aiMsg(d.ok?'assistant':'error',(action==='push'?'Push':'Pull')+': '+d.result);
+function _aiSync(btn){{
+btn.disabled=true;var t=btn.textContent;btn.textContent='...';
+_aiJSON('/ai/refresh-prompt',{{method:'POST'}}).then(function(d){{
+_aiMsg(d.ok?'assistant':'error','Pull: '+d.result);
 }}).catch(function(e){{_aiMsg('error',e.message);}}).finally(function(){{btn.disabled=false;btn.textContent=t;}});
 }}
-var _aim2={{github:[['openai/gpt-4o-mini','GPT-4o Mini'],['openai/gpt-4o','GPT-4o'],['openai/gpt-4.1-nano','GPT-4.1 Nano'],['openai/gpt-4.1-mini','GPT-4.1 Mini'],['meta/Llama-4-Scout-17B-16E-Instruct','Llama 4 Scout']],anthropic:[['claude-sonnet-4-20250514','Claude Sonnet 4'],['claude-haiku-4-20250414','Claude Haiku 4']],openai:[['gpt-4o-mini','GPT-4o Mini'],['gpt-4o','GPT-4o']],gemini:[['gemini-2.0-flash','Gemini 2.0 Flash'],['gemini-2.5-flash','Gemini 2.5 Flash']],openrouter:[['google/gemini-2.0-flash-exp:free','Gemini Flash (Free)'],['meta-llama/llama-4-scout-17b-16e-instruct:free','Llama 4 Scout (Free)']]}};
-function _aip2(){{var p=document.getElementById('ai_prov').value,s=document.getElementById('ai_model');s.innerHTML='';_aim2[p].forEach(function(m){{var o=document.createElement('option');o.value=m[0];o.textContent=m[1];s.appendChild(o)}});var cur='{_aim}';s.querySelectorAll('option').forEach(function(o){{if(o.value==cur)o.selected=true}})}}
-_aip2();
-function _aisave(){{var b='ai_provider='+document.getElementById('ai_prov').value+'&ai_key='+encodeURIComponent(document.getElementById('ai_key').value)+'&ai_model='+encodeURIComponent(document.getElementById('ai_model').value);fetch('/',{{method:'POST',body:b,headers:{{'Content-Type':'application/x-www-form-urlencoded'}}}}).then(function(){{document.getElementById('ai_key').style.borderColor='var(--accent)';setTimeout(function(){{document.getElementById('ai_key').style.borderColor=''}},1500)}})}}
+function _aip2(){{document.getElementById('ai_model').value='';document.getElementById('ai_key').value='';}}
+document.getElementById('ai_model').value={_aim};
+function _aisave(btn){{
+btn.disabled=true;
+var b={{provider:document.getElementById('ai_prov').value,key:document.getElementById('ai_key').value.trim(),model:document.getElementById('ai_model').value.trim()}};
+_aiJSON('/ai/settings',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(b)}}).then(function(){{
+document.getElementById('ai_key').value='';_aiMsg('assistant','AI settings saved. Test the connection next.');
+}}).catch(function(e){{_aiMsg('error',e.message);}}).finally(function(){{btn.disabled=false;}});
+}}
+function _aiTest(btn){{
+btn.disabled=true;
+_aiJSON('/ai/test',{{method:'POST'}}).then(function(d){{_aiMsg(d.ok?'assistant':'error',d.ok?'Connection OK: '+d.reply:d.error);
+}}).catch(function(e){{_aiMsg('error',e.message);}}).finally(function(){{btn.disabled=false;}});
+}}
 _aiIn.addEventListener('keydown',function(e){{if(e.key==='Enter'&&!e.shiftKey){{e.preventDefault();_aiSend();}}}});
-fetch('/ai/history').then(function(r){{return r.json()}}).then(function(h){{
+_aiJSON('/ai/history').then(function(h){{
 if(h.length===0){{_aiMsg('assistant','Hello! I can read, write, and modify any file on your MatrixBox. What would you like to do?');return;}}
 h.forEach(function(m){{_aiMsg(m.role,m.content);}});
-}});
+}}).catch(function(e){{_aiMsg('error','History: '+e.message);}});
 </script>"""
 
 @ampule.route('/ai')
@@ -1346,29 +1379,75 @@ def _ai_chat(request):
     import gc
     gc.collect()
     try:
-        provider = settings.get("ai_provider", "github")
+        provider = settings.get("ai_provider", "")
         key = settings.get("ai_key", "")
-        model = settings.get("ai_model", "openai/gpt-4o-mini")
+        model = settings.get("ai_model", "")
         result = ai_agent.chat(request.body, provider, key, model)
         return (200, {}, json.dumps(result))
     except Exception as e:
-        return (200, {}, json.dumps({"error": str(e)}))
+        print("AI chat error:", type(e).__name__)
+        return (500, {}, json.dumps({"error": str(e)}))
+
+@ampule.route('/ai/settings', method='POST')
+def _ai_settings(request):
+    try:
+        data = json.loads(request.body)
+        if not isinstance(data, dict):
+            raise ValueError("Expected AI settings object")
+        provider, key, model = data.get("provider"), data.get("key", ""), data.get("model")
+        if provider == "github":
+            raise ValueError("GitHub Models is retired. Choose another provider; do not enter a PAT.")
+        if provider not in ("openai", "openrouter", "anthropic", "gemini"):
+            raise ValueError("Unknown AI provider")
+        if not isinstance(key, str) or not isinstance(model, str) or not model.strip():
+            raise ValueError("Enter a valid API key and model")
+        key, model = key.strip(), model.strip()
+        if not key and provider == settings.get("ai_provider"):
+            key = settings.get("ai_key", "")
+        if not key:
+            raise ValueError("Enter an API key for the selected provider")
+        if any(key.startswith(prefix) for prefix in ("github_pat_", "ghp_", "gho_")):
+            raise ValueError("A GitHub token cannot authenticate this provider")
+        if len(key) > 1024 or len(model) > 200:
+            raise ValueError("API key or model is too long")
+        updated = dict(settings)
+        updated.update({"ai_provider": provider, "ai_key": key, "ai_model": model})
+        if not savesettings(updated):
+            return (500, {}, json.dumps({"error": "Could not save settings. The device filesystem may be read-only."}))
+        settings.update(updated)
+        return (200, {}, '{"ok":true}')
+    except (ValueError, TypeError) as e:
+        return (400, {}, json.dumps({"error": str(e)}))
+
+@ampule.route('/ai/test', method='POST')
+def _ai_test(request):
+    try:
+        import ai_agent
+        result = ai_agent.test_connection(settings.get("ai_provider", ""),
+                                          settings.get("ai_key", ""), settings.get("ai_model", ""))
+        return (200, {}, json.dumps(result))
+    except Exception as e:
+        print("AI connection test error:", type(e).__name__)
+        return (500, {}, json.dumps({"error": str(e)}))
 
 @ampule.route('/ai/history')
 def _ai_history(request):
     try:
         import ai_agent
-        return (200, {}, json.dumps(ai_agent._history))
-    except:
-        return (200, {}, "[]")
+        return (200, {}, json.dumps(ai_agent.get_history()))
+    except Exception as e:
+        print("AI history error:", type(e).__name__)
+        return (500, {}, json.dumps({"error": str(e)}))
 
 @ampule.route('/ai/clear', method='POST')
 def _ai_clear(request):
     try:
         import ai_agent
-        ai_agent._history.clear()
+        ai_agent.clear_history()
         import gc; gc.collect()
-    except: pass
+    except Exception as e:
+        print("AI history clear error:", type(e).__name__)
+        return (500, {}, json.dumps({"error": str(e)}))
     return (200, {}, '{"ok":true}')
 
 @ampule.route('/ai/push-prompt', method='POST')
@@ -1376,7 +1455,7 @@ def _ai_push(request):
     try:
         import ai_agent
         r = ai_agent._push_prompt()
-        return (200, {}, json.dumps({"ok": True, "result": r}))
+        return (200, {}, json.dumps({"ok": r == "ok", "result": r}))
     except Exception as e:
         return (200, {}, json.dumps({"ok": False, "result": str(e)}))
 
@@ -1385,6 +1464,6 @@ def _ai_refresh(request):
     try:
         import ai_agent
         r = ai_agent._refresh_prompt()
-        return (200, {}, json.dumps({"ok": True, "result": r}))
+        return (200, {}, json.dumps({"ok": r == "ok", "result": r}))
     except Exception as e:
         return (200, {}, json.dumps({"ok": False, "result": str(e)}))
