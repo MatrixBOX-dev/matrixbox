@@ -767,7 +767,7 @@ def wx_post(request):
     global last_fetch
     params = request.params
     if "city" in params:
-        city = url_decoder(params["city"])
+        city = ampule.url_decoder(params["city"])
         try:
             lat, lon, name = geocode(city)
             cfg["city"] = name

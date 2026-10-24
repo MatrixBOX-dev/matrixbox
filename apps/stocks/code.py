@@ -385,7 +385,7 @@ def stock_post(request):
     print("POST:", request.params)
     rebuild = False
     if "symbols" in request.params:
-        cfg["symbols"] = url_decoder(request.params["symbols"]).upper()
+        cfg["symbols"] = ampule.url_decoder(request.params["symbols"]).upper()
         fetch_quotes()
         rebuild = True
     if "speed" in request.params:
