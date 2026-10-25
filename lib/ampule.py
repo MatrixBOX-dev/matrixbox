@@ -44,6 +44,28 @@ def url_decoder(s):
     except UnicodeError:
         return s
 
+def parse_qs(body):
+    """Parse an application/x-www-form-urlencoded body into a dict.
+
+    Both keys and values are decoded with url_decoder(). For a repeated
+    key, the last occurrence wins -- this matches web_components.checkbox()'s
+    zero_fallback pattern, where a checked box's own "1" is placed after its
+    always-present hidden "0" in form/DOM order, so FormData submits
+    "field=0&field=1" when checked and only "field=0" when unchecked.
+    """
+    params = {}
+    if not body:
+        return params
+    for pair in body.split("&"):
+        if not pair:
+            continue
+        key, sep, value = pair.partition("=")
+        key = url_decoder(key)
+        if sep:
+            value = url_decoder(value)
+        params[key] = value
+    return params
+
 class Request:
     def __init__(self, method, full_path):
         self.method = method
