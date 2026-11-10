@@ -85,7 +85,7 @@ def initialize_app():
 
     try:
         clearscreen(lines=True)
-        pprint(f"Starting {load_settings.app_running}...")
+        pprint(f">> {load_settings.app_running}...")
         os.chdir(load_settings.app_running)
         time.sleep(0.5)
 
