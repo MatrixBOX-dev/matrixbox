@@ -187,7 +187,8 @@ def set_skin(skin_id):
 
 def load_text():
     
-    http = "" if int(varinit.settings["long"]) == -1 else "http://"
+    #http = "" if int(varinit.settings["long"]) == -1 else "http://"
+    http = "" if varinit.matrix.width == 64 else"http://"
     if not varinit.settings["no_more_departures"]: varinit.settings["no_more_departures"] = dicts.language[settings["language"]]["display"]["no_more_departures"]
     _logo = (BLANK * 2) + LOGO_CHAR + " "
     return [_logo+dicts.language[settings["language"]]["display"]["sign"],#+" v" + settings["version"] + "     ",
