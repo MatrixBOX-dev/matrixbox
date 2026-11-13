@@ -3,6 +3,7 @@ import load_settings
 import digitalio, board
 import adafruit_connection_manager, adafruit_requests
 settings =  load_settings.settings()
+import load_screen
 from load_screen import *
 from check_button import *
 import patches
@@ -55,7 +56,7 @@ def webinterface(request):
 def initialize_app():
     global autostart
     ampule_routes_backup = ampule.routes.copy()
-    palette_backup = [palette[i] for i in range(12)]  # restored on exit
+    palette_backup = [load_screen.palette[i] for i in range(12)]  # restored on exit
 
     try:
         clearscreen(lines=True)
@@ -74,13 +75,22 @@ def initialize_app():
         time.sleep(1)
         settings["autostart"] = 0
     finally:
-        # Apps that bump the matrix's color bit depth (e.g. flights needs 6)
-        # are expected to restore it themselves, but this is the safety net
-        # for every app regardless -- a no-op rebuild if it's already 4.
-        try: set_bit_depth(4)
-        except Exception as e: print("set_bit_depth:", e)
+        # Apps that change the matrix's color bit depth (e.g. flights needs
+        # 6) are expected to restore it themselves, but this is the safety
+        # net for every app regardless -- a no-op if it's already 4 (and
+        # nothing else needs rebuilding either).
+        init_display(bit_depth=4)
+
+        # Bare `palette`/`display`/`rf_group` below were only ever a
+        # one-time copy from `from load_screen import *` at this file's own
+        # import -- if the app that just ran rebuilt the matrix (bit depth,
+        # or even just the safety-net call above), those names are stale,
+        # orphaned objects that are no longer what's actually on screen.
+        # Fetching them from load_screen directly guarantees these lines
+        # operate on the real, current display (same bug/fix as
+        # flights/code.py's window/display/palette references).
         for i, backup in enumerate(palette_backup):
-            palette[i] = backup
+            load_screen.palette[i] = backup
         try: microcontroller.cpu.frequency = 160000000
         except: pass
         autostart = False
@@ -91,7 +101,7 @@ def initialize_app():
                 except: pass
         except: pass
         gc.collect()  # reclaim the exited app's bitmaps so the next launch is clean
-        display.root_group = rf_group
+        load_screen.display.root_group = load_screen.rf_group
         os.chdir("/")
         render_home_screen()
         return False
