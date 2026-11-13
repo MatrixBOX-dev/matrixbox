@@ -9,7 +9,7 @@ from font_large import font_large
 #settings =  load_settings.settings() # behövs för boot.py
 _cc = str(settings.get("color_correct","")).lower() not in ("","false","0")
 _sw = lambda p: [p[0],p[2],p[1],p[3],p[5],p[4]] if _cc else p
-_bit_depth = 4  # default color bit depth; apps can bump this via set_bit_depth()
+_bit_depth = 4  # current color bit depth; pass bit_depth=N to init_display() to change it
 
 
 
@@ -18,12 +18,12 @@ _bit_depth = 4  # default color bit depth; apps can bump this via set_bit_depth(
 #watchdog.mode = WatchDogMode.RESET
 #def wd(): return watchdog.feed()
 
-def _build_matrix():
+def _build_matrix(bit_depth):
     try: RGBMatrix.deinit(matrix)
     except: print("First instance")
     # Builds a fresh RGBMatrix wired per the current board + settings (width/
-    # height/tiles/color_correct). Called from init_display(), both at import
-    # time and again at runtime whenever those settings change.
+    # height/tiles/color_correct/bit_depth). Called from init_display(), both
+    # at import time and again at runtime whenever those change.
     machine = os.uname().machine
     if machine == "Waveshare ESP32-S3-Zero with ESP32S3":
         addr_pins_placeholder = [board.IO7, board.IO8, board.IO9, board.IO10]
@@ -31,7 +31,7 @@ def _build_matrix():
         if settings["height"] == 64 or settings["height"] == 128: 
             addr_pins_placeholder.append(board.IO17)
             rgb_pins_placeholder = [board.IO1,board.IO2,board.IO3, board.IO4,board.IO5,board.IO6]
-        return RGBMatrix(width=settings["width"], height=settings["height"], bit_depth=_bit_depth,
+        return RGBMatrix(width=settings["width"], height=settings["height"], bit_depth=bit_depth,
                         rgb_pins=_sw(rgb_pins_placeholder),
                         addr_pins = addr_pins_placeholder,
                         clock_pin=board.IO11, latch_pin=board.IO12, output_enable_pin=board.IO13, tile=settings["tiles"],
@@ -39,7 +39,7 @@ def _build_matrix():
     elif "N8R8" in machine: 
         addr_pins_placeholder = [board.GPIO3, board.GPIO8, board.GPIO18, board.GPIO17]
         if settings["height"] == 64: addr_pins_placeholder.append(board.GPIO21)
-        return RGBMatrix(width=settings["width"], height=settings["height"], bit_depth=_bit_depth,
+        return RGBMatrix(width=settings["width"], height=settings["height"], bit_depth=bit_depth,
                         rgb_pins=_sw([board.GPIO1,board.GPIO2,board.GPIO42, board.GPIO41,board.GPIO40,board.GPIO39]),
                         addr_pins = addr_pins_placeholder,
                         clock_pin=board.GPIO12, latch_pin=board.GPIO13, output_enable_pin=board.GPIO14, tile=settings["tiles"],
@@ -58,7 +58,7 @@ def _build_matrix():
             a4pin = (board.IO40)
         _rgb_pins = [board.IO1,board.IO2,board.IO3,board.IO4,board.IO5,board.IO6] if not "reverse" in os.listdir() else [board.IO1,board.IO3,board.IO2, board.IO4,board.IO6,board.IO5]
         return RGBMatrix(
-                        width=settings["width"], height=settings["height"], bit_depth=_bit_depth,
+                        width=settings["width"], height=settings["height"], bit_depth=bit_depth,
                         rgb_pins=_rgb_pins,
                         addr_pins=[a1pin, a2pin, a3pin, a4pin],
                         clock_pin=board.IO11, latch_pin=board.IO12, output_enable_pin=board.IO13, tile=1,
@@ -68,10 +68,10 @@ def _geometry():
     # The subset of settings that are baked into the RGBMatrix at construction
     # time -- changing any of these means the matrix/display must be rebuilt,
     # unlike rotation which framebufferio can change on the existing display.
-    # _bit_depth isn't a persisted setting (apps override it via
-    # set_bit_depth()), but it's just as fixed at construction time, so it has
-    # to be tracked here too -- otherwise apply_display_settings() would see
-    # no settings change and skip rebuilding, leaving an app's bit depth
+    # _bit_depth isn't a persisted setting (apps pass it to init_display()
+    # directly), but it's just as fixed at construction time, so it has to be
+    # tracked here too -- otherwise apply_display_settings() would see no
+    # settings change and skip rebuilding, leaving an app's bit depth
     # override in place after e.g. a rotation change.
     return (int(settings["width"]), int(settings["height"]), int(settings["tiles"]), _cc, _bit_depth)
 
@@ -93,17 +93,28 @@ def _sync_dependent_modules():
         for name, value in live.items():
             if name in d: d[name] = value
 
-def init_display():
+def init_display(bit_depth=None):
     """(Re)builds the RGB matrix, display and drawing surfaces from the
-    current settings. Called once at import time, and safe to call again at
-    runtime -- this is what changing width/height/tiles/color_correct in
-    Settings does now instead of rebooting the whole device."""
-    global matrix, display, window, palette, rf_group, tile_groupgroup, line_window, _overlays, _cc, _last_geometry
+    current settings -- the exact same mechanism Settings' width/height/
+    tiles/color_correct controls use (via apply_display_settings()), just
+    callable directly. Called once at import time, and safe to call again at
+    runtime.
+
+    `bit_depth` defaults to whatever is already set; pass an explicit value
+    (e.g. init_display(bit_depth=6)) for an app that needs deeper color at
+    the cost of max refresh rate -- main.py's initialize_app() calls
+    init_display(bit_depth=4) on every app exit as a safety net. A no-op if
+    the requested bit_depth already matches and nothing else
+    (width/height/tiles/color_correct) changed either."""
+    global matrix, display, window, palette, rf_group, tile_groupgroup, line_window, _overlays, _cc, _last_geometry, _bit_depth
+    if bit_depth is not None: _bit_depth = bit_depth
+    _cc = str(settings.get("color_correct","")).lower() not in ("","false","0")
+    if _last_geometry is not None and _geometry() == _last_geometry:
+        return
     try:
         displayio.release_displays()  # frees the previous matrix's pins/framebuffer, if any
-        _cc = str(settings.get("color_correct","")).lower() not in ("","false","0")
 
-        matrix = _build_matrix()
+        matrix = _build_matrix(_bit_depth)
 
         try: microcontroller.cpu.frequency = 180000000
         except: pass
@@ -145,6 +156,12 @@ def init_display():
         palette[11] = (50,30,0)    # orange
         palette[12] = (0,0,100)    # orange
 
+        # doublebuffer=True needs a frame actually pushed into BOTH internal
+        # buffers before the physical LEDs reliably show new content -- the
+        # single refresh() above (right after the first, near-empty
+        # `rf_group`) only primes one of them.
+        display.refresh()
+
         _last_geometry = _geometry()
         _sync_dependent_modules()
     except Exception as e:
@@ -156,17 +173,6 @@ def init_display():
 
 init_display()
 
-def set_bit_depth(bit_depth=4):
-    """Rebuilds the matrix/display with a different color bit depth -- e.g.
-    the flights app needs bit_depth=6 for smoother map gradients, at the
-    cost of max refresh rate. Call again with the default (4) to restore
-    normal operation; main.py's initialize_app() already does this for every
-    app on exit as a safety net, so apps don't strictly have to clean up
-    after themselves, but should still call it on their own exit path too."""
-    global _bit_depth
-    if bit_depth == _bit_depth: return
-    _bit_depth = bit_depth
-    init_display()
 
 currentfont = font_mini 
 currentcolor = "white"
