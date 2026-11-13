@@ -400,15 +400,8 @@ def get_updates(force=False):
                     _remote_vers[k] = fn[1:]
                     break
         load_settings.remote_versions = _remote_vers
-        _remote_ver_data = {}
-        for k, ver in _remote_vers.items():
-            if k in ("/", "lib"): continue
-            try:
-                vr = requests.get(settings["repository_url"] + "apps/" + k + "/v" + ver, headers={"User-Agent": "MatrixBox"}, timeout=5)
-                _remote_ver_data[k] = json.loads(vr.text)
-                vr.close()
-            except: pass
-        load_settings.remote_ver_data = _remote_ver_data
+        # App metadata (description, icon, changelog) is loaded lazily per app by the page
+        load_settings.remote_ver_data = {}
         _cached_apps = apps
     except Exception as e:
         print("get_updates error:", e)
@@ -534,7 +527,7 @@ def list_available_apps(apps):
     if apps is None:
         return """<div style="text-align:center;padding:16px">
 <p style="color:#ff7777;margin-bottom:12px">Store loading failed. Check your connection and try again.</p>
-<button class="btn btn-sm btn-warning" onclick="nav('/f/download?reload=1')">&#x21BB; Try again</button>
+<button class="btn btn-sm btn-warning" onclick="_loadStore(true)">&#x21BB; Try again</button>
 </div>"""
     remote_vers = getattr(load_settings, 'remote_versions', {})
     sys_l = _app_ver("lib") or _app_ver("/")
@@ -546,6 +539,13 @@ def list_available_apps(apps):
     else:
         sys_btn = '<button class="btn btn-sm btn-warning" onclick="installsystem(event)">&#x21BB; Reinstall</button>'
     applist = '<div class="download-item"><div><span class="download-name">&#x1F4E6; System</span><div style="font-size:.7rem;color:#f0c800;margin-top:2px">' + sys_ver + '</div></div>' + sys_btn + """\n    <script>function installsystem(e){_busyWait("/?install=system",e.currentTarget)}</script></div>"""
+
+    pending = []
+    _rvd = getattr(load_settings, 'remote_ver_data', {})
+    for dir in apps:
+        if dir == "/" or dir == "lib": continue
+        r_ver = remote_vers.get(dir, "")
+        if r_ver and dir not in _rvd: pending.append([dir, r_ver])
 
     for dir in apps:
         if dir == "/" or dir == "lib": continue
@@ -564,19 +564,21 @@ def list_available_apps(apps):
             _vn = f'v{l_ver}' if l_ver else ''
             _vn_span = f'<span style="font-size:.75rem;color:#f0c800;font-weight:600;margin-left:6px">{_vn}</span>' if _vn else ''
             _upd_note = f'<div style="font-size:.7rem;color:#f0c800;margin-top:1px">&#x2192; v{r_ver} available</div>' if (r_ver and l_ver and r_ver != l_ver) else ''
-            _icon_html = _app_icon_html(_vd)
+            _icon_html = '<span id="ic-' + dir + '" style="display:contents">' + _app_icon_html(_vd) + '</span>'
             _vrow = f'<div><span style="font-size:.92rem;font-weight:700;color:#fff">{dir}</span>{_vn_span}</div><div style="font-size:.7rem;color:var(--muted);margin-top:1px">{sz}</div>{_upd_note}'
             applist += f'<div class="download-item" style="flex-direction:column;align-items:stretch"><div style="display:flex;align-items:flex-start;justify-content:space-between"><div style="display:flex;min-width:0;flex:1">{_icon_html}<div style="min-width:0">{_vrow}</div></div><div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px">' + _run_button_html(dir) + upd_btn + """<button class="btn btn-sm" style="background:#ff4b4b;color:#fff;padding:7px 9px" onclick="if(confirm('Delete """+dir+"""?'))del"""+dir+"""(event)">&#x2715;</button>
 <script>function install"""+dir+"""(e){_busyWait("/?install="""+dir+"""",e.currentTarget)}
-function del"""+dir+"""(e){_busyWait("/?delete="""+dir+"""",e.currentTarget)}</script></div></div>""" + _vdh + '</div>'
+function del"""+dir+"""(e){_busyWait("/?delete="""+dir+"""",e.currentTarget)}</script></div></div>""" + '<div id="dt-' + dir + '" data-ver="' + (l_ver or r_ver) + '">' + _vdh + '</div></div>'
         else:
             _vd = getattr(load_settings, 'remote_ver_data', {}).get(dir, {})
             _vdh = _ver_detail_html(_vd, r_ver)
             _vn_span = f'<span style="font-size:.75rem;color:#f0c800;font-weight:600;margin-left:6px">v{r_ver}</span>' if r_ver else ''
-            _icon_html = _app_icon_html(_vd)
+            _icon_html = '<span id="ic-' + dir + '" style="display:contents">' + _app_icon_html(_vd) + '</span>'
             _vrow = f'<div><span style="font-size:.92rem;font-weight:400;color:var(--muted)">{dir}</span>{_vn_span}</div>'
             applist += f'<div class="download-item" style="flex-direction:column;align-items:stretch"><div style="display:flex;align-items:flex-start;justify-content:space-between"><div style="display:flex;min-width:0;flex:1">{_icon_html}<div style="min-width:0">{_vrow}</div></div>' + """<button class="btn btn-sm btn-success" style="flex-shrink:0;margin-left:8px" onclick="install"""+dir+"""(event)">&#x2B07; Install</button>
-<script>function install"""+dir+"""(e){_busyWait("/?install="""+dir+"""",e.currentTarget)}</script></div>""" + _vdh + '</div>'
+<script>function install"""+dir+"""(e){_busyWait("/?install="""+dir+"""",e.currentTarget)}</script></div>""" + '<div id="dt-' + dir + '" data-ver="' + r_ver + '">' + _vdh + '</div></div>'
+    if pending:
+        applist += "<div id='sd-pending' hidden data-base='" + settings["repository_url"] + "' data-apps='" + json.dumps(pending) + "'></div>"
     return applist
 
 
@@ -1050,10 +1052,18 @@ def _download_content(force=False):
     free_s = _fmt_size(free)
     used_pct = int((total - free) * 100 // total) if total else 0
     bar = f'<div style="margin-top:8px;height:7px;border-radius:4px;background:var(--surface3);overflow:hidden"><div style="height:100%;width:{used_pct}%;background:linear-gradient(90deg,#7c6fff,#00d4ff);border-radius:4px"></div></div><div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--muted);margin-top:4px"><span>{used_pct}% used</span><span>{free_s} free</span></div>'
-    apps = list_available_apps(get_updates(force))
+    # Render instantly from the in-RAM catalog; otherwise the page loads first and
+    # the slow GitHub fetch happens in /f/store while a spinner is shown.
+    if _cached_apps is not None and not force:
+        apps = list_available_apps(_cached_apps)
+        # cached list is already in the page; start detail loading once the helpers below exist
+        store_js = "_sdStart();"
+    else:
+        apps = '<div style="display:flex;justify-content:center;align-items:center;gap:10px;padding:24px 0;color:var(--muted);font-size:.85rem"><span style="display:inline-block;width:18px;height:18px;border:2px solid var(--surface3);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite"></span>Loading apps...</div>'
+        store_js = "_loadStore(" + ("true" if force else "false") + ");"
     return """<div class="logo"><h1>Apps</h1><p>Install or update apps</p></div>
 <div class="card" style="padding:12px"><span style="font-size:.8rem;color:var(--muted)">Storage</span>""" + bar + """</div>
-<div class="card"><div class="section-title">Available</div>""" + str(apps) + """</div>
+<div class="card"><div class="section-title">Available</div><div id="store-list">""" + apps + """</div></div>
 <div class="card"><div class="section-title">About 3rd party apps</div>
 <p id="third-party-readme" style="font-size:.85rem;color:var(--muted);line-height:1.6;white-space:pre-line">Loading notice...</p></div>
 <div class="card"><div class="section-title">3rd party apps</div>
@@ -1064,6 +1074,60 @@ function _busyWait(url,btn){
     var w=document.createElement('div');w.className='busy-warn';w.textContent='\\u26A0 Writing to disk \\u2014 do not turn off!';document.body.appendChild(w);
     fetch(url,{method:"POST"}).then(function(){w.remove();nav('/f/download')}).catch(function(){w.remove();btn.innerHTML=old;btn.disabled=false});}
 function installthirdparty(app,e){_busyWait("/?install="+encodeURIComponent(app)+"&third_party=1",e.currentTarget)}
+function _sdIcon(v){
+    var e=v.emoji||'',i=v.icon,n;
+    if(e){n=document.createElement('span');n.style.cssText='font-size:.95rem;margin-right:5px;flex-shrink:0';n.textContent=e;return n;}
+    if(typeof i!=='string'||!i)return null;
+    if(i.charAt(0)==='<'){n=document.createElement('div');n.style.cssText='width:20px;height:20px;flex-shrink:0;margin-right:6px;border-radius:4px;overflow:hidden';n.innerHTML=i.replace('<svg ','<svg width="100%" height="100%" ');return n;}
+    n=document.createElement('img');n.src='data:'+(i.indexOf('/9j/')===0?'image/jpeg':'image/png')+';base64,'+i;n.width=20;n.height=20;
+    n.style.cssText='width:20px;height:20px;border-radius:4px;object-fit:cover;flex-shrink:0;margin-right:6px;vertical-align:middle';return n;
+}
+function _sdApply(a,v){
+    var ic=document.getElementById('ic-'+a),dt=document.getElementById('dt-'+a);
+    if(!ic||!dt||!v||typeof v!=='object')return;
+    var n=_sdIcon(v),p,c,k;
+    ic.textContent='';if(n)ic.appendChild(n);
+    dt.textContent='';
+    if(v.description){p=document.createElement('div');p.style.cssText='font-size:.75rem;color:var(--muted);margin-top:3px';p.textContent=v.description;dt.appendChild(p);}
+    c=v['v'+dt.getAttribute('data-ver')];
+    if(c&&c.length){
+        p=document.createElement('div');p.style.cssText='font-size:.71rem;color:#888;margin-top:4px;line-height:1.6';
+        p.appendChild(document.createTextNode('v'+dt.getAttribute('data-ver')+':'));
+        for(k=0;k<c.length;k++){p.appendChild(document.createElement('br'));p.appendChild(document.createTextNode('-'+c[k]));}
+        dt.appendChild(p);
+    }
+}
+function _sdStart(){
+    var m=document.getElementById('sd-pending');
+    if(!m)return;
+    var apps=JSON.parse(m.getAttribute('data-apps'));
+    m.removeAttribute('id');
+    _sdRun(m.getAttribute('data-base'),apps);
+}
+function _sdRun(base,apps){
+    var miss=[];
+    function get(u){return fetch(u).then(function(r){
+        if(r.status===404)return null;
+        if(!r.ok)throw new Error(r.status);
+        return r.text().then(function(t){try{return JSON.parse(t)}catch(e){return null}});
+    });}
+    function slow(i){
+        if(i>=miss.length)return;
+        if(!document.getElementById('dt-'+miss[i]))return;
+        get('/f/store-detail?app='+encodeURIComponent(miss[i])).then(function(d){_sdApply(miss[i],d)}).catch(function(){}).then(function(){slow(i+1)});
+    }
+    Promise.all(apps.map(function(x){
+        return get(base+'apps/'+x[0]+'/v'+x[1]).then(function(d){_sdApply(x[0],d)}).catch(function(){miss.push(x[0])});
+    })).then(function(){slow(0)});
+}
+function _loadStore(force){
+    var box=document.getElementById('store-list');
+    if(!box)return;
+    box.innerHTML='<div style="display:flex;justify-content:center;align-items:center;gap:10px;padding:24px 0;color:var(--muted);font-size:.85rem"><span style="display:inline-block;width:18px;height:18px;border:2px solid var(--surface3);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite"></span>Loading apps...</div>';
+    fetch('/f/store'+(force?'?reload=1':'')).then(function(r){return r.text().then(function(h){if(!r.ok)throw new Error(h);return h;})})
+    .then(function(h){if(!document.body.contains(box))return;box.innerHTML=h;_run(box);_sdStart();})
+    .catch(function(){if(!document.body.contains(box))return;box.innerHTML='<div style="text-align:center;padding:16px"><p style="color:#ff7777;margin-bottom:12px">Store loading failed. Check your connection and try again.</p><button class="btn btn-sm btn-warning" onclick="_loadStore(true)">&#x21BB; Try again</button></div>';});
+}
 function _loadThirdPartyApps(btn){
     var box=document.getElementById('third-party-content');
     btn.disabled=true;btn.textContent='Loading...';
@@ -1082,7 +1146,7 @@ function _loadThirdPartyReadme(){
         notice.innerHTML='Notice could not be loaded. <button class="btn btn-sm btn-warning" onclick="_loadThirdPartyReadme()">Try again</button>';
     });
 }
-_loadThirdPartyReadme();
+""" + store_js + """_loadThirdPartyReadme();
 </script>"""
 
 @ampule.route('/download')
@@ -1098,6 +1162,33 @@ def _f_apps(request):
 def _f_download(request):
     force = request.params.get("reload") == "1"
     return (200, {}, _download_content(force))
+
+@ampule.route("/f/store")
+def _f_store(request):
+    force = request.params.get("reload") == "1"
+    return (200, {}, list_available_apps(get_updates(force)))
+
+@ampule.route("/f/store-detail")
+def _f_store_detail(request):
+    # Fallback for browsers that cannot reach raw.githubusercontent.com directly
+    app = request.params.get("app", "")
+    ver = getattr(load_settings, 'remote_versions', {}).get(app, "")
+    if not ver or app in ("/", "lib"):
+        return (404, {}, "{}")
+    cache = getattr(load_settings, 'remote_ver_data', None)
+    if cache is None:
+        cache = load_settings.remote_ver_data = {}
+    if app not in cache:
+        try:
+            vr = requests.get(settings["repository_url"] + "apps/" + app + "/v" + ver, headers={"User-Agent": "MatrixBox"}, timeout=5)
+            try:
+                cache[app] = json.loads(vr.text)
+            finally:
+                vr.close()
+        except Exception as e:
+            print("store detail error for " + app + ":", e)
+            return (503, {}, "{}")
+    return (200, {}, json.dumps(cache[app]))
 
 @ampule.route("/f/third-party")
 def _f_third_party(request):
