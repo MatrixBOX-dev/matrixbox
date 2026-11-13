@@ -818,7 +818,7 @@ function sav(e){{e.preventDefault();var b=new URLSearchParams(new FormData(e.tar
 def _preset_buttons():
     def _pbtn(label, s, w, h, svg, rot=None):
         rot_js = f"var _r=document.getElementById('rotation');if(_r){{_r.value={rot};var _rv=document.getElementById('v_rotation');if(_rv)_rv.textContent={rot};}}" if rot is not None else ""
-        return f'<button class="btn btn-sm" onclick="if(confirm(\'Switch to {label} ({w}x{h})? Device will reboot.\')){{var _ew=document.getElementById(\'width\');if(_ew){{_ew.value={w};var _vw=document.getElementById(\'v_width\');if(_vw)_vw.textContent={w};}}var _eh=document.getElementById(\'height\');if(_eh){{_eh.value={h};var _vh=document.getElementById(\'v_height\');if(_vh)_vh.textContent={h};}}{rot_js}fetch(\'/system/preset?s={s}\',{{method:\'POST\'}})}}" title="{label} {w}x{h}">{svg}<br><span style="font-size:.6rem">{label}</span></button>'
+        return f'<button class="btn btn-sm" onclick="if(confirm(\'Switch to {label} ({w}x{h})?\')){{var _ew=document.getElementById(\'width\');if(_ew){{_ew.value={w};var _vw=document.getElementById(\'v_width\');if(_vw)_vw.textContent={w};}}var _eh=document.getElementById(\'height\');if(_eh){{_eh.value={h};var _vh=document.getElementById(\'v_height\');if(_vh)_vh.textContent={h};}}{rot_js}fetch(\'/system/preset?s={s}\',{{method:\'POST\'}})}}" title="{label} {w}x{h}">{svg}<br><span style="font-size:.6rem">{label}</span></button>'
     return ''.join([
         _pbtn('XS','xs',64,32,'<svg width="20" height="16" viewBox="0 0 20 16"><rect x="4" y="4" width="12" height="8" rx="1" fill="black" stroke="currentColor" stroke-width="1.5"/></svg>'),
         _pbtn('X','x',128,32,'<svg width="28" height="16" viewBox="0 0 28 16"><rect x="2" y="4" width="24" height="8" rx="1" fill="black" stroke="currentColor" stroke-width="1.5"/></svg>'),
@@ -984,7 +984,9 @@ def preset(request):
             settings["tiles"] = 1
             if p == "xl": settings["rotation"] = 180
             savesettings(settings)
-            microcontroller.reset()
+            try: apply_display_settings()
+            except Exception as e: print("apply_display_settings:", e)
+            render_home_screen()
     return (200, {}, "")
 
 @ampule.route("/system/color_correct", method='POST')
@@ -992,7 +994,9 @@ def color_correct(request):
     if request.params and "v" in request.params:
         settings["color_correct"] = request.params["v"] == "true"
         savesettings(settings)
-        microcontroller.reset()
+        try: apply_display_settings()
+        except Exception as e: print("apply_display_settings:", e)
+        render_home_screen()
     return (200, {}, "")
 
 @ampule.route("/system/rotate", method='POST')

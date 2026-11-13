@@ -1,5 +1,5 @@
 from __main__ import * # antingen denna rad eller #settings = load_settings etc
-import displayio, board, framebufferio, microcontroller, load_settings, os, time
+import displayio, board, framebufferio, microcontroller, load_settings, os, sys, time
 from rgbmatrix import RGBMatrix
 from microcontroller import watchdog
 from font_mini import font_mini
@@ -7,7 +7,6 @@ from font_small import font_small
 from font_large import font_large
 
 #settings =  load_settings.settings() # behövs för boot.py
-displayio.release_displays()
 _cc = str(settings.get("color_correct","")).lower() not in ("","false","0")
 _sw = lambda p: [p[0],p[2],p[1],p[3],p[5],p[4]] if _cc else p
 
@@ -17,86 +16,139 @@ _sw = lambda p: [p[0],p[2],p[1],p[3],p[5],p[4]] if _cc else p
 #watchdog.timeout = 60
 #watchdog.mode = WatchDogMode.RESET
 #def wd(): return watchdog.feed()
-if os.uname().machine == "Waveshare ESP32-S3-Zero with ESP32S3": 
-    _bit_depth = 4
-    addr_pins_placeholder = [board.IO7, board.IO8, board.IO9, board.IO10]
-    rgb_pins_placeholder = [board.IO1,board.IO3,board.IO2, board.IO4,board.IO6,board.IO5]
-    if settings["height"] == 64 or settings["height"] == 128: 
-        addr_pins_placeholder.append(board.IO17)
-        rgb_pins_placeholder = [board.IO1,board.IO2,board.IO3, board.IO4,board.IO5,board.IO6]
-    matrix = RGBMatrix(width=settings["width"], height=settings["height"], bit_depth=_bit_depth,
-                    rgb_pins=_sw(rgb_pins_placeholder),
-                    addr_pins = addr_pins_placeholder,
-                    clock_pin=board.IO11, latch_pin=board.IO12, output_enable_pin=board.IO13, tile=settings["tiles"],
-                    serpentine=False, doublebuffer=True)
-elif "N8R8" in os.uname().machine: 
-    _bit_depth = 4
-    addr_pins_placeholder = [board.GPIO3, board.GPIO8, board.GPIO18, board.GPIO17]
-    if settings["height"] == 64: addr_pins_placeholder.append(board.GPIO21)
-    matrix = RGBMatrix(width=settings["width"], height=settings["height"], bit_depth=_bit_depth,
-                    rgb_pins=_sw([board.GPIO1,board.GPIO2,board.GPIO42, board.GPIO41,board.GPIO40,board.GPIO39]),
-                    addr_pins = addr_pins_placeholder,
-                    clock_pin=board.GPIO12, latch_pin=board.GPIO13, output_enable_pin=board.GPIO14, tile=settings["tiles"],
-                    serpentine=False, doublebuffer=True)
-elif "S2" in os.uname().machine:  # Träskylt
-    xpin = (board.IO9)
-    if "21" in os.listdir(): xpin = (board.IO21)
-    a1pin = (board.IO7)
-    a2pin = (board.IO8)
-    a3pin = xpin
-    a4pin = (board.IO10)
-    if "806599e1c20" in os.listdir():
-        a1pin = (board.IO37)
-        a2pin = (board.IO38)
-        a3pin = (board.IO39)
-        a4pin = (board.IO40)
-    _rgb_pins = [board.IO1,board.IO2,board.IO3,board.IO4,board.IO5,board.IO6] if not "reverse" in os.listdir() else [board.IO1,board.IO3,board.IO2, board.IO4,board.IO6,board.IO5]
-    #if 
-    matrix, ccol = RGBMatrix(
-                    width=settings["width"], height=settings["height"], bit_depth=4,
-                    rgb_pins=_rgb_pins,
-                    addr_pins=[a1pin, a2pin, a3pin, a4pin],
-                    clock_pin=board.IO11, latch_pin=board.IO12, output_enable_pin=board.IO13, tile=1,
-                    serpentine=False, doublebuffer=True), 20
-    
-try: microcontroller.cpu.frequency = 180000000
-except: pass
-print("--------------------------------------------------------- ")
-print(" CHIP:           ", os.uname().machine)
-print(" FREQUENCY:      ", microcontroller.cpu.frequency)
-print("--------------------------------------------------------- ")
 
-display = framebufferio.FramebufferDisplay(matrix, auto_refresh=False, rotation=settings["rotation"])
-rf_group = displayio.Group()
-display.root_group = rf_group
-display.refresh()
-display.root_group.hidden = True
-rows = int((settings["height"]*1/32))
-print(rows)
-_max_dim = max(settings["width"], settings["height"] * rows)
-window = displayio.Bitmap(_max_dim, _max_dim, 16) # viewport large enough for any rotation
-line_window = [] # en lista för multi-line printout till skärmen
-palette = displayio.Palette(20, dither=False)
+def _build_matrix():
+    # Builds a fresh RGBMatrix wired per the current board + settings (width/
+    # height/tiles/color_correct). Called from init_display(), both at import
+    # time and again at runtime whenever those settings change.
+    machine = os.uname().machine
+    if machine == "Waveshare ESP32-S3-Zero with ESP32S3":
+        _bit_depth = 4
+        addr_pins_placeholder = [board.IO7, board.IO8, board.IO9, board.IO10]
+        rgb_pins_placeholder = [board.IO1,board.IO3,board.IO2, board.IO4,board.IO6,board.IO5]
+        if settings["height"] == 64 or settings["height"] == 128: 
+            addr_pins_placeholder.append(board.IO17)
+            rgb_pins_placeholder = [board.IO1,board.IO2,board.IO3, board.IO4,board.IO5,board.IO6]
+        return RGBMatrix(width=settings["width"], height=settings["height"], bit_depth=_bit_depth,
+                        rgb_pins=_sw(rgb_pins_placeholder),
+                        addr_pins = addr_pins_placeholder,
+                        clock_pin=board.IO11, latch_pin=board.IO12, output_enable_pin=board.IO13, tile=settings["tiles"],
+                        serpentine=False, doublebuffer=True)
+    elif "N8R8" in machine: 
+        _bit_depth = 4
+        addr_pins_placeholder = [board.GPIO3, board.GPIO8, board.GPIO18, board.GPIO17]
+        if settings["height"] == 64: addr_pins_placeholder.append(board.GPIO21)
+        return RGBMatrix(width=settings["width"], height=settings["height"], bit_depth=_bit_depth,
+                        rgb_pins=_sw([board.GPIO1,board.GPIO2,board.GPIO42, board.GPIO41,board.GPIO40,board.GPIO39]),
+                        addr_pins = addr_pins_placeholder,
+                        clock_pin=board.GPIO12, latch_pin=board.GPIO13, output_enable_pin=board.GPIO14, tile=settings["tiles"],
+                        serpentine=False, doublebuffer=True)
+    elif "S2" in machine:  # Träskylt
+        xpin = (board.IO9)
+        if "21" in os.listdir(): xpin = (board.IO21)
+        a1pin = (board.IO7)
+        a2pin = (board.IO8)
+        a3pin = xpin
+        a4pin = (board.IO10)
+        if "806599e1c20" in os.listdir():
+            a1pin = (board.IO37)
+            a2pin = (board.IO38)
+            a3pin = (board.IO39)
+            a4pin = (board.IO40)
+        _rgb_pins = [board.IO1,board.IO2,board.IO3,board.IO4,board.IO5,board.IO6] if not "reverse" in os.listdir() else [board.IO1,board.IO3,board.IO2, board.IO4,board.IO6,board.IO5]
+        return RGBMatrix(
+                        width=settings["width"], height=settings["height"], bit_depth=4,
+                        rgb_pins=_rgb_pins,
+                        addr_pins=[a1pin, a2pin, a3pin, a4pin],
+                        clock_pin=board.IO11, latch_pin=board.IO12, output_enable_pin=board.IO13, tile=1,
+                        serpentine=False, doublebuffer=True)
 
-tile_group = displayio.TileGrid(window, pixel_shader=palette)
-rf_group = displayio.Group()
-tile_groupgroup = displayio.Group()
-tile_groupgroup.append(tile_group)
-rf_group.append(tile_groupgroup)
-display.root_group = rf_group
+def _geometry():
+    # The subset of settings that are baked into the RGBMatrix at construction
+    # time -- changing any of these means the matrix/display must be rebuilt,
+    # unlike rotation which framebufferio can change on the existing display.
+    return (int(settings["width"]), int(settings["height"]), int(settings["tiles"]), _cc)
 
-palette[0] = (0)    # vit
-palette[1] = (50,50,00)    # vit
-palette[2] = (100,100,100)    # bright white
-palette[3] = (0, 59, 122)      # morkbla
-palette[4] = (100,0,0)     # rod
-palette[5] = (20,20,20)    # grey
-palette[6] = (20,20,40)    #  ?
-palette[7] = (0, 100, 10)      # green
-palette[8] = (0, 0, 100)    # pink
-palette[9] = (0, 30, 3)    # dark green
-palette[11] = (50,30,0)    # orange
-palette[12] = (0,0,100)    # orange
+_last_geometry = None
+
+def _sync_dependent_modules():
+    # main.py, web_interface.py, filemanager.py, patches.py, cmd.py etc. all
+    # grab matrix/display/window/palette/rf_group/tile_groupgroup by name
+    # (`from __main__ import *` / `from load_screen import *`), which only
+    # copies whatever object existed at import time. After rebuilding them
+    # below, push the fresh objects into every already-imported module still
+    # holding one of those names so nothing is left pointing at the released
+    # display.
+    live = {"matrix": matrix, "display": display, "window": window,
+            "palette": palette, "rf_group": rf_group, "tile_groupgroup": tile_groupgroup}
+    for mod in sys.modules.values():
+        d = getattr(mod, "__dict__", None)
+        if not d: continue
+        for name, value in live.items():
+            if name in d: d[name] = value
+
+def init_display():
+    """(Re)builds the RGB matrix, display and drawing surfaces from the
+    current settings. Called once at import time, and safe to call again at
+    runtime -- this is what changing width/height/tiles/color_correct in
+    Settings does now instead of rebooting the whole device."""
+    global matrix, display, window, palette, rf_group, tile_groupgroup, line_window, _overlays, _cc, _last_geometry
+    try:
+        displayio.release_displays()  # frees the previous matrix's pins/framebuffer, if any
+        _cc = str(settings.get("color_correct","")).lower() not in ("","false","0")
+
+        matrix = _build_matrix()
+
+        try: microcontroller.cpu.frequency = 180000000
+        except: pass
+        print("--------------------------------------------------------- ")
+        print(" CHIP:           ", os.uname().machine)
+        print(" FREQUENCY:      ", microcontroller.cpu.frequency)
+        print("--------------------------------------------------------- ")
+
+        display = framebufferio.FramebufferDisplay(matrix, auto_refresh=False, rotation=settings["rotation"])
+        rf_group = displayio.Group()
+        display.root_group = rf_group
+        display.refresh()
+        display.root_group.hidden = True
+        rows = int((settings["height"]*1/32))
+        print(rows)
+        _max_dim = max(settings["width"], settings["height"] * rows)
+        window = displayio.Bitmap(_max_dim, _max_dim, 16) # viewport large enough for any rotation
+        line_window = [] # en lista för multi-line printout till skärmen
+        _overlays = []
+        palette = displayio.Palette(20, dither=False)
+
+        tile_group = displayio.TileGrid(window, pixel_shader=palette)
+        rf_group = displayio.Group()
+        tile_groupgroup = displayio.Group()
+        tile_groupgroup.append(tile_group)
+        rf_group.append(tile_groupgroup)
+        display.root_group = rf_group
+
+        palette[0] = (0)    # vit
+        palette[1] = (50,50,00)    # vit
+        palette[2] = (100,100,100)    # bright white
+        palette[3] = (0, 59, 122)      # morkbla
+        palette[4] = (100,0,0)     # rod
+        palette[5] = (20,20,20)    # grey
+        palette[6] = (20,20,40)    #  ?
+        palette[7] = (0, 100, 10)      # green
+        palette[8] = (0, 0, 100)    # pink
+        palette[9] = (0, 30, 3)    # dark green
+        palette[11] = (50,30,0)    # orange
+        palette[12] = (0,0,100)    # orange
+
+        _last_geometry = _geometry()
+        _sync_dependent_modules()
+    except Exception as e:
+        # Hot reinit is best-effort -- if the matrix/display can't be rebuilt
+        # cleanly (e.g. a board quirk releasing pins), fall back to the old
+        # behavior rather than leaving the screen half-initialized.
+        print("init_display failed, falling back to full reset:", e)
+        microcontroller.reset()
+
+init_display()
 
 currentfont = font_mini 
 currentcolor = "white"
@@ -281,11 +333,13 @@ def apply_display_settings():
     try: wifi.radio.tx_power = float(settings["wifi_power"])
     except: pass
 
-    new_r = int(settings["rotation"])
-    if display.rotation != new_r:
-        display.rotation = new_r
-
-    needs_reboot = (matrix.width != int(settings["width"]) or
-                    matrix.height != int(settings["height"]))
-    if needs_reboot:
-        microcontroller.reset()
+    if _geometry() != _last_geometry:
+        # width/height/tiles/color_correct are fixed at RGBMatrix construction
+        # time, so the matrix+display have to be torn down and rebuilt.
+        # init_display() also picks up the current rotation, so there's
+        # nothing left to do below in that case.
+        init_display()
+    else:
+        new_r = int(settings["rotation"])
+        if display.rotation != new_r:
+            display.rotation = new_r
