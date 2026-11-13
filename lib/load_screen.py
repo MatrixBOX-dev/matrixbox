@@ -21,6 +21,8 @@ def _build_matrix():
     # Builds a fresh RGBMatrix wired per the current board + settings (width/
     # height/tiles/color_correct). Called from init_display(), both at import
     # time and again at runtime whenever those settings change.
+    try: RGBMatrix.deinit(matrix)
+    except: print("First instance")
     machine = os.uname().machine
     if machine == "Waveshare ESP32-S3-Zero with ESP32S3":
         _bit_depth = 4
