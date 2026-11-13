@@ -21,32 +21,8 @@ def show_logo():
     #pprint("", line=0, color="brightwhite", overlay=True)
     pprint(readonly + "Matrix", line=0, color="brightwhite", overlay=True)
 
-_anim_x = display.width+1
-def logo_anim_step():
-    global _anim_x
-    W = display.width
-    if _anim_x >= W:
-        #_anim_x = 0
-        return
-    x = _anim_x
-    saved = []
-    for y in (2, 4):
-        old = window[x, y]
-        saved.append(old)
-        if old == 7:
-            window[x, y] = 9
-        elif old == 5:
-            window[x, y] = 2
-        elif old == 2:
-            window[x, y] = 5
-        elif old == 1:
-            window[x, y] = 2
-    refresh()
-    for i, y in enumerate((2, 4)):
-        window[x, y] = saved[i]
-    _anim_x += 1
-    if _anim_x >= W:
-        refresh()
+
+
 
 show_logo()
 
@@ -70,8 +46,6 @@ def webinterface(request):
 
 @ampule.route("/", method="GET")
 def webinterface(request):
-    global _anim_x
-    _anim_x = 0
     if load_settings.app_running: 
         return (200, {}, str(exitbutton) + f"""<br> running app {load_settings.app_running}""")
     if request.params:
@@ -222,7 +196,7 @@ while 1:
                 load_settings.app_running = autostart
             elif not load_settings.app_running: ampule.listen(socket)
             check_for_button_next_program()
-            logo_anim_step()
+            
 
             if screensaver_app and time.monotonic() > screensaver + 60:
                 try: load_settings.app_running = screensaver_app
