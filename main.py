@@ -74,6 +74,11 @@ def initialize_app():
         time.sleep(1)
         settings["autostart"] = 0
     finally:
+        # Apps that bump the matrix's color bit depth (e.g. flights needs 6)
+        # are expected to restore it themselves, but this is the safety net
+        # for every app regardless -- a no-op rebuild if it's already 4.
+        try: set_bit_depth(4)
+        except Exception as e: print("set_bit_depth:", e)
         for i, backup in enumerate(palette_backup):
             palette[i] = backup
         try: microcontroller.cpu.frequency = 160000000
