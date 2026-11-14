@@ -1,10 +1,22 @@
 import os
 import ampule
 import load_settings
+import load_screen
 import web_interface
 
 _cmd_buf = []
 _cmd_env = None
+
+# These get wholesale REPLACED every time init_display() rebuilds the matrix
+# (width/height/tiles/color_correct/bit_depth changes -- see
+# lib/load_screen.py), which now happens routinely (e.g. every flights app
+# launch/exit), not just on rare manual preset changes. _cmd_env below is
+# otherwise a one-time snapshot of __main__'s namespace built on the
+# terminal's first use each power session, so these particular names have
+# to be refreshed from load_screen directly before every command runs, or
+# e.g. editing `palette` here would silently mutate a long-orphaned object
+# that's no longer actually on screen.
+_LIVE_NAMES = ("matrix", "display", "window", "palette", "rf_group", "tile_groupgroup")
 
 
 def _cmd_print(*args, **kwargs):
@@ -34,9 +46,10 @@ def _wrap_text(text, max_w, strlen, font):
     return result
 
 
-def _make_wrapped_pprint(real_pprint, strlen, display, font_mini):
+def _make_wrapped_pprint(real_pprint, strlen, font_mini):
     def _wrapped(string, line=None, color="white", font=None, **kwargs):
         f = font if font is not None else font_mini
+        display = load_screen.display  # fetched fresh each call -- see _LIVE_NAMES above
         max_lines = display.height // f["fontheight"]
         base = line if isinstance(line, int) else 0
         for i, wl in enumerate(_wrap_text(str(string), display.width - 2, strlen, f)[:max_lines]):
@@ -53,10 +66,11 @@ def _run_command(command):
         _cmd_env["print"] = _cmd_print
         real_pprint = _main_dict.get("pprint")
         strlen = _main_dict.get("strlen")
-        display = _main_dict.get("display")
         font_mini = _main_dict.get("font_mini")
-        if real_pprint and strlen and display and font_mini:
-            _cmd_env["pprint"] = _make_wrapped_pprint(real_pprint, strlen, display, font_mini)
+        if real_pprint and strlen and font_mini:
+            _cmd_env["pprint"] = _make_wrapped_pprint(real_pprint, strlen, font_mini)
+    for _name in _LIVE_NAMES:
+        _cmd_env[_name] = getattr(load_screen, _name)
     _cmd_buf = []
     try:
         result = eval(command, _cmd_env)
