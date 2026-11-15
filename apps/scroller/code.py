@@ -3,6 +3,7 @@ import displayio
 import bitmaptools
 import gc
 import wifi
+import storage
 
 import load_screen
 from __main__ import *
@@ -70,7 +71,16 @@ def save_settings():
                         "shadow": shadow_color, "font": get_font_name(), "color": load_screen.currentcolor,
                         "offset": default_offset, "scale": default_scale, "custom_rgb": custom_rgb,
                         "custom_shadow_rgb": custom_shadow_rgb}, f)
-    except: pass
+    except Exception as e:
+        # Was previously a bare "except: pass" -- silently swallowed every
+        # write failure, including a read-only filesystem, with zero way to
+        # tell afterward why settings weren't actually persisted.
+        print("scroller: save_settings() failed:", e)
+        try:
+            if storage.getmount("/").readonly:
+                print("scroller: filesystem is read-only -- unlock it to persist settings")
+        except Exception:
+            pass
 
 def load_settings():
     global scroll_mode, static_align, reverse_direction, shadow_color, default_offset, default_scale
@@ -96,7 +106,8 @@ def load_settings():
             custom_shadow_rgb = tuple(shadow_rgb)
             palette[_SHADOW_RGB_INDEX] = custom_shadow_rgb
             shadow_color = _SHADOW_RGB_INDEX
-    except: pass
+    except Exception as e:
+        print("scroller: load_settings() failed (using defaults):", e)
 
 with open("scroller.html") as f: html_body = f.read()
 
