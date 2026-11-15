@@ -56,7 +56,19 @@ shadow_color_map = {
 
 load_screen.currentfont = font_large
 
-SETTINGS_FILE = "scroller_settings.json"
+# Reusing the filename the original app shipped with (a pre-existing file on
+# the device, not a new JSON-specific name) is deliberate, not cosmetic: on
+# this device, creating a brand-new file reliably fails with "stream
+# operation not supported" -- confirmed by testing both a direct write to a
+# new "scroller_settings.json" and a new ".tmp" file for an atomic rename,
+# both of which hit the exact same error a plain overwrite of this
+# pre-existing file does not. So there's no working way to create a new
+# file here at all, which also rules out the usual temp-file-then-rename
+# safety net below (the temp file would itself be a new file). A write that
+# fails or is interrupted partway through can still corrupt this file, same
+# as before, but it's the only option that can actually persist anything on
+# this particular filesystem.
+SETTINGS_FILE = "scroller.txt"
 
 def get_font_name():
     f = load_screen.currentfont
@@ -65,31 +77,25 @@ def get_font_name():
     return "large"
 
 def save_settings():
-    # Write to a temp file and rename over the real one, instead of
-    # truncating scroller_settings.json directly -- if the write fails
-    # partway through (as it currently is, see below), the previous good
-    # settings file is left intact instead of becoming corrupted/truncated,
-    # which is exactly what made load_settings() start failing with a JSON
-    # syntax error on top of saves not landing at all.
-    tmp = SETTINGS_FILE + ".tmp"
     try:
-        with open(tmp, "w") as f:
-            json.dump({"mode": scroll_mode, "align": static_align, "reverse": reverse_direction,
+        # json.dump(obj, f) streams the serialization into f via repeated
+        # internal .write() calls as it walks the object -- on this device
+        # that's exactly what raises "stream operation not supported",
+        # regardless of filename. json.dumps(obj) + a single f.write() call
+        # is the pattern already proven to work here (same as this app's
+        # old plain-text scroller.txt save, and main.py's own
+        # savesettings()), so build the full string first and write it once.
+        with open(SETTINGS_FILE, "w") as f:
+            f.write(json.dumps({"mode": scroll_mode, "align": static_align, "reverse": reverse_direction,
                         "shadow": shadow_color, "font": get_font_name(), "color": load_screen.currentcolor,
                         "offset": default_offset, "scale": default_scale, "custom_rgb": custom_rgb,
-                        "custom_shadow_rgb": custom_shadow_rgb, "text": scroller_text}, f)
-        os.rename(tmp, SETTINGS_FILE)
+                        "custom_shadow_rgb": custom_shadow_rgb, "text": scroller_text}))
     except Exception as e:
-        # Was previously a bare "except: pass" -- silently swallowed every
-        # write failure, including a read-only filesystem, with zero way to
-        # tell afterward why settings weren't actually persisted.
         print("scroller: save_settings() failed:", e)
         try:
             print("scroller: filesystem readonly =", storage.getmount("/").readonly)
         except Exception:
             pass
-        try: os.remove(tmp)
-        except Exception: pass
 
 def load_settings():
     global scroll_mode, static_align, reverse_direction, shadow_color, default_offset, default_scale
@@ -299,6 +305,15 @@ def web_exit(request):
     global exit
     exit = True
     return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
+
+@ampule.route("/save", method="POST")
+def web_save(request):
+    try:
+        with open("scroller.txt", "w") as f:
+            f.write(scroller_text)
+    except Exception as e:
+        return (500, {}, "ERROR: " + str(e))
+    return (200, {}, "OK")
 
 @ampule.route("/", method="POST")
 def scroller_post(request):
