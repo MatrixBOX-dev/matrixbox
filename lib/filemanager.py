@@ -249,7 +249,7 @@ function go(path){location.hash=enc(path||"/");}
 function doList(path){
  cwd=path||"/";
  document.getElementById("editor").style.display="none";
- document.getElementById("listing").style.display="block";
+ document.getElementById("listing-wrap").style.display="flex";
  renderPath();
  api("/system/fm/ls",cwd).then(function(d){
   if(d.error){alert(d.error);return}
@@ -281,7 +281,7 @@ function openEditor(fp){
  renderPath();
  api("/system/fm/read",fp).then(function(d){
   if(d.error){alert(d.error);return}
-  document.getElementById("listing").style.display="none";
+  document.getElementById("listing-wrap").style.display="none";
   document.getElementById("editor").style.display="flex";
   document.getElementById("editor-name").textContent=fp;
   document.getElementById("editor-area").value=d.text;
@@ -490,7 +490,7 @@ function initDnD(){
  wrap.addEventListener("drop",function(e){
   e.preventDefault();e.stopPropagation();
   wrap.classList.remove("dragover");
-  if(document.getElementById("listing").style.display==="none")return; // editor open, not browsing
+  if(document.getElementById("listing-wrap").style.display==="none")return; // editor open, not browsing
   var items=e.dataTransfer&&e.dataTransfer.items;
   if(!items||!items.length)return;
   var entries=[];
