@@ -1,5 +1,6 @@
 import os
 import json
+import binascii
 import ampule
 import load_settings
 import web_interface
@@ -73,6 +74,37 @@ def _fm_write(request):
         _show_display(str(e), "red")
         return (200, {}, json.dumps({"error": str(e)}))
 
+@ampule.route("/system/fm/upload", method="POST")
+def _fm_upload(request):
+    # Drag-and-drop upload (see fm.html). request.body is always decoded as
+    # UTF-8 text by ampule's request parser (and would also be corrupted by
+    # its NUL-byte truncation if sent raw), so arbitrary binary file content
+    # can't go through as-is -- the browser base64-encodes it first (pure
+    # ASCII, always valid UTF-8, never contains a NUL byte), and this
+    # decodes it back to real bytes before writing. binascii.a2b_base64()
+    # is the same proven pattern web_interface.py's /repl route already
+    # uses for the same reason.
+    #
+    # Large files are sent in sequential chunks (X-Append absent/0 for the
+    # first chunk, which creates/truncates the file; "1" for every chunk
+    # after, which appends) rather than as one request, since this device's
+    # RAM can't hold a multi-MB file (plus its base64 and decoded copies)
+    # all at once -- each chunk's memory footprint is bounded by the
+    # chunk size instead of the whole file.
+    path = _norm(request.headers.get("x-path", ""))
+    append = request.headers.get("x-append", "0") in ("1", "true")
+    try:
+        data = binascii.a2b_base64(request.body) if request.body else b""
+        _hide_display()
+        with open(path, "ab" if append else "wb") as f:
+            f.write(data)
+        display.root_group.hidden = False
+        refresh()
+        return (200, {}, json.dumps({"ok": True}))
+    except Exception as e:
+        _show_display(str(e), "red")
+        return (200, {}, json.dumps({"error": str(e)}))
+
 @ampule.route("/system/fm/mkdir", method="POST")
 def _fm_mkdir(request):
     path = _norm(request.headers.get("x-path", ""))
@@ -126,7 +158,15 @@ body{display:flex;flex-direction:column;height:100vh;overflow:hidden;padding-bot
 #path-bar{background:var(--surface);padding:6px 14px;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap}
 #path-bar span{cursor:pointer;padding:2px 6px;border-radius:6px}
 #path-bar span:hover{color:var(--text);background:var(--surface2)}
+#listing-wrap{flex:1;min-height:0;position:relative;display:flex;flex-direction:column}
 #listing{flex:1;overflow-y:auto;padding:0;min-height:0}
+#listing-wrap.dragover{outline:2px dashed var(--accent);outline-offset:-2px}
+#listing-wrap.dragover #listing{background:var(--surface2)}
+#drop-hint{display:none;position:absolute;inset:0;align-items:center;justify-content:center;pointer-events:none;background:rgba(124,111,255,.1);color:var(--accent);font-size:.9rem;font-weight:700;z-index:5}
+#listing-wrap.dragover #drop-hint{display:flex}
+#upload-bar{display:none;background:var(--surface);padding:8px 14px;border-bottom:1px solid var(--border);font-size:.78rem;color:var(--muted);flex-shrink:0;align-items:center;gap:10px}
+#upload-bar .ubar-track{flex:1;height:6px;border-radius:4px;background:var(--surface2);overflow:hidden}
+#upload-bar .ubar-fill{height:100%;width:0;background:var(--accent);transition:width .15s}
 .row{display:flex;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;gap:10px;font-size:.88rem}
 .row:hover{background:var(--surface2)}
 .row .icon{width:20px;text-align:center;flex-shrink:0;font-size:1rem}
@@ -154,7 +194,8 @@ body{display:flex;flex-direction:column;height:100vh;overflow:hidden;padding-bot
 <button class="btn btn-sm" onclick="newDir()">&#x1F4C1;+ Dir</button>
 </div>
 <div id="path-bar"></div>
-<div id="listing"></div>
+<div id="upload-bar"><span id="upload-label">Uploading...</span><div class="ubar-track"><div class="ubar-fill" id="upload-fill"></div></div></div>
+<div id="listing-wrap"><div id="listing"></div><div id="drop-hint">&#x2B07; Drop files or a folder here</div></div>
 <div id="editor">
 <div id="editor-bar">
 <span id="editor-name"></span>
@@ -297,6 +338,170 @@ function newDir(){
   });
  });
 }
+
+// ---- Drag & drop upload -------------------------------------------------
+// request.body on this server is always decoded as UTF-8 text (and a raw
+// binary body would also get corrupted by a NUL-byte-truncation quirk in
+// the receive loop -- see lib/ampule.py), so files are base64-encoded here
+// and decoded back to bytes by /system/fm/upload. Each file is sent in
+// fixed-size chunks (append=false for the first, true for the rest)
+// instead of one request, since the device can't hold a whole multi-MB
+// file (plus its base64 and decoded copies) in RAM at once -- only the
+// current chunk's memory footprint matters that way, not the file's.
+var UPLOAD_CHUNK = 4096;
+
+function arrayBufferToBase64(buf){
+ var bytes=new Uint8Array(buf),binary="",step=0x8000;
+ for(var i=0;i<bytes.length;i+=step){
+  binary+=String.fromCharCode.apply(null,bytes.subarray(i,i+step));
+ }
+ return btoa(binary);
+}
+
+function apiUpload(path,b64,append){
+ var h={"X-Path":path};
+ if(append)h["X-Append"]="1";
+ return fetch("/system/fm/upload",{method:"POST",headers:h,body:b64}).then(function(r){return r.json()});
+}
+
+function uploadFileChunked(file,destPath,onChunk){
+ return file.arrayBuffer().then(function(buf){
+  var bytes=new Uint8Array(buf),total=bytes.length,offset=0;
+  function nextChunk(){
+   var end=Math.min(offset+UPLOAD_CHUNK,total);
+   var slice=bytes.subarray(offset,end);
+   var b64=arrayBufferToBase64(slice.buffer.slice(slice.byteOffset,slice.byteOffset+slice.byteLength));
+   return apiUpload(destPath,b64,offset>0).then(function(d){
+    if(d.error)throw new Error(d.error);
+    offset=end;
+    if(onChunk)onChunk(offset,total);
+    if(offset<total)return nextChunk();
+   });
+  }
+  return total===0?apiUpload(destPath,"",false):nextChunk();
+ });
+}
+
+// readEntries() can return entries in batches and must be called
+// repeatedly until it returns an empty array -- a single call is not
+// guaranteed to return everything in the directory.
+function readAllDirEntries(reader){
+ return new Promise(function(resolve,reject){
+  var all=[];
+  function readBatch(){
+   reader.readEntries(function(batch){
+    if(!batch.length){resolve(all);return}
+    all=all.concat(batch);
+    readBatch();
+   },reject);
+  }
+  readBatch();
+ });
+}
+
+// Walks a dropped file/directory entry, collecting every file found (with
+// its path relative to the dropped item) into fileList, and every
+// directory found (so they can be created on the device before any file
+// inside them is uploaded) into dirList.
+function walkEntry(entry,relPath,fileList,dirList){
+ if(entry.isFile){
+  return new Promise(function(resolve){
+   entry.file(function(file){fileList.push({file:file,rel:relPath+entry.name});resolve()},function(){resolve()});
+  });
+ }
+ if(entry.isDirectory){
+  var myRel=relPath+entry.name;
+  dirList.push(myRel);
+  return readAllDirEntries(entry.createReader()).then(function(children){
+   var p=Promise.resolve();
+   children.forEach(function(child){
+    p=p.then(function(){return walkEntry(child,myRel+"/",fileList,dirList)});
+   });
+   return p;
+  });
+ }
+ return Promise.resolve();
+}
+
+function showUploadBar(label,pct){
+ var bar=document.getElementById("upload-bar");
+ bar.style.display="flex";
+ document.getElementById("upload-label").textContent=label;
+ document.getElementById("upload-fill").style.width=pct+"%";
+}
+function hideUploadBar(){document.getElementById("upload-bar").style.display="none"}
+
+function uploadEntries(entries){
+ var fileList=[],dirList=[];
+ var walk=Promise.resolve();
+ entries.forEach(function(entry){
+  walk=walk.then(function(){return walkEntry(entry,"",fileList,dirList)});
+ });
+ walk.then(function(){
+  // shortest paths (parents) first, so a subdirectory's own mkdir never
+  // runs before the directory that will contain it
+  dirList.sort(function(a,b){return a.split("/").length-b.split("/").length});
+  var mk=Promise.resolve();
+  dirList.forEach(function(rel){
+   mk=mk.then(function(){
+    return api("/system/fm/mkdir",cwd.replace(/\\/$/,"")+"/"+rel).catch(function(){});
+   });
+  });
+  return mk;
+ }).then(function(){
+  var total=fileList.length,done=0;
+  if(!total){hideUploadBar();return}
+  showUploadBar("Uploading 1 / "+total,0);
+  var up=Promise.resolve();
+  fileList.forEach(function(item){
+   up=up.then(function(){
+    showUploadBar("Uploading "+(done+1)+" / "+total+": "+item.rel,Math.round(done/total*100));
+    var fp=cwd.replace(/\\/$/,"")+"/"+item.rel;
+    return uploadFileChunked(item.file,fp,function(sent,fileTotal){
+     var filePct=fileTotal?sent/fileTotal:1;
+     showUploadBar("Uploading "+(done+1)+" / "+total+": "+item.rel,Math.round((done+filePct)/total*100));
+    });
+   }).then(function(){done++});
+  });
+  return up;
+ }).then(function(){
+  hideUploadBar();
+  doList(cwd);
+ }).catch(function(e){
+  hideUploadBar();
+  alert("Upload failed: "+(e&&e.message?e.message:e));
+  doList(cwd);
+ });
+}
+
+function initDnD(){
+ var wrap=document.getElementById("listing-wrap");
+ ["dragenter","dragover"].forEach(function(evt){
+  wrap.addEventListener(evt,function(e){
+   if(!e.dataTransfer||!e.dataTransfer.types||e.dataTransfer.types.indexOf("Files")<0)return;
+   e.preventDefault();e.stopPropagation();wrap.classList.add("dragover");
+  });
+ });
+ ["dragleave","dragend"].forEach(function(evt){
+  wrap.addEventListener(evt,function(e){
+   if(e.target===wrap||!wrap.contains(e.relatedTarget))wrap.classList.remove("dragover");
+  });
+ });
+ wrap.addEventListener("drop",function(e){
+  e.preventDefault();e.stopPropagation();
+  wrap.classList.remove("dragover");
+  if(document.getElementById("listing").style.display==="none")return; // editor open, not browsing
+  var items=e.dataTransfer&&e.dataTransfer.items;
+  if(!items||!items.length)return;
+  var entries=[];
+  for(var i=0;i<items.length;i++){
+   var entry=items[i].webkitGetAsEntry&&items[i].webkitGetAsEntry();
+   if(entry)entries.push(entry);
+  }
+  if(entries.length)uploadEntries(entries);
+ });
+}
+
 document.addEventListener("keydown",function(e){
  if(e.ctrlKey&&e.key==="s"){
   e.preventDefault();
@@ -309,6 +514,7 @@ function router(){
  else doList(h||"/");
 }
 window.addEventListener("hashchange",router);
+initDnD();
 if(location.hash.length>1)router();else go("/");
 </script>"""
     return (200, {}, web_interface._shell(content, "File Manager", "/system/fm", app=in_app))
