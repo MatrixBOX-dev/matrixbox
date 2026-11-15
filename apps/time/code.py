@@ -36,7 +36,7 @@ _DEFAULTS = {"function": "clock", "mode": "digital",
     "show_border": 1, "h12": 0, "blink_colon": 1, "rainbow": 0,
     "accent": 0, "accent_hex": "#4488ff", "show_dots": 1, "dots_hex": "#ffffff",
     "shadow_hex": "", "frame_hex": "", "show_shadow": 1,
-    "preset_ms": 60000, "show_tenths": 1}
+    "preset_ms": 60000, "show_tenths": 1, "show_progress": 0}
 for _k, _v in _DEFAULTS.items():
     if _k not in cfg: cfg[_k] = _v
 
@@ -183,13 +183,13 @@ def get_state(request):
 # POST param handlers: (param_name, action)
 #   "int"  -> store as int
 #   "hex"  -> store as "#" + value
-_INT_PARAMS = ["show_date", "show_day", "show_seconds", "h12", "blink_colon", "accent", "show_shadow", "show_tenths"]
+_INT_PARAMS = ["show_date", "show_day", "show_seconds", "h12", "blink_colon", "accent", "show_shadow", "show_tenths", "show_progress"]
 _HEX_PARAMS = ["f_hex", "b_hex", "hour_hex", "min_hex", "sec_hex", "accent_hex", "dots_hex", "shadow_hex", "frame_hex"]
 _ANALOG_RESET = ["show_border", "show_dots"]
 
 @ampule.route("/", method="POST")
 def time_webinterface_post(request):
-    global cfg, delay, temp_string, _last_analog
+    global cfg, delay, temp_string, _last_analog, _last_tstr
     p = request.params
     if "save" in p:
         display.root_group.hidden = True; refresh()
@@ -237,6 +237,12 @@ def time_webinterface_post(request):
         if k in p:
             cfg[k] = int(p[k])
             delay = 0
+    if "show_progress" in p:
+        # Toggling this alone doesn't change the displayed time/hands, so
+        # draw_time()/draw_analog()'s own redraw-skip cache would otherwise
+        # leave the bar showing (or missing) until the next natural tick.
+        _last_tstr = ""
+        _last_analog = ""
     for k in _HEX_PARAMS:
         if k in p:
             cfg[k] = "#" + p[k]
@@ -402,7 +408,7 @@ def draw_analog_rect(h, m, s):
     sec_a = _angle(s, 60)
     _draw_hand(screen, cx, cy, sec_a, int(R * 0.9), 17, thick=False)
     screen[cx, cy] = 5
-    if cfg["function"] == "countdown" and int(cfg["preset_ms"]) > 0:
+    if cfg["function"] == "countdown" and cfg.get("show_progress") and int(cfg["preset_ms"]) > 0:
         draw_progress_bar(_now_ms(), int(cfg["preset_ms"]))
 
 def draw_analog(h, m, s):
@@ -454,7 +460,7 @@ def draw_analog(h, m, s):
             if text_x < DISP_W and ty + 5 <= DISP_H:
                 _render_dim_text(part, text_x, ty)
                 ty += 8
-    if cfg["function"] == "countdown" and int(cfg["preset_ms"]) > 0:
+    if cfg["function"] == "countdown" and cfg.get("show_progress") and int(cfg["preset_ms"]) > 0:
         draw_progress_bar(_now_ms(), int(cfg["preset_ms"]))
 
 def draw_progress_bar(ms, total):
@@ -584,7 +590,7 @@ def draw_time(timestring, colon_vis=True):
                              x1=0, y1=0, x2=info_tmp.width, y2=info_tmp.height,
                              skip_source_index=0)
 
-    if cfg["function"] == "countdown" and int(cfg["preset_ms"]) > 0:
+    if cfg["function"] == "countdown" and cfg.get("show_progress") and int(cfg["preset_ms"]) > 0:
         draw_progress_bar(_now_ms(), int(cfg["preset_ms"]))
 
 dt = update_datetime()

@@ -83,6 +83,11 @@
       <div class="setting-row"><span>Show tenths</span><label class="sw"><input type="checkbox" id="show_tenths" onchange="sendToggle(this)"><span class="sl"></span></label></div>
     </section>
 
+    <section class="clock-panel func-only countdown-only">
+      <h2 class="panel-title">Countdown</h2>
+      <div class="setting-row"><span class="setting-copy">Progress bar<small>A thin bar along the bottom edge -- off by default</small></span><label class="sw"><input type="checkbox" id="show_progress" onchange="sendToggle(this)"><span class="sl"></span></label></div>
+    </section>
+
     <section class="clock-panel mode-only digital-only">
       <h2 class="panel-title">Typography</h2>
       <div class="seg" id="font-seg"><button id="fb_mini" onclick="setFont('mini')">Fine</button><button id="fb_small" onclick="setFont('small')">Classic</button><button id="fb_large" onclick="setFont('large')">Bold</button></div>
@@ -264,7 +269,7 @@ function updatePreview(){
 }
 
 fetch("/settings").then(function(response){return response.json()}).then(function(s){
-  ["show_day","show_date","show_seconds","show_border","show_dots","show_temp","h12","blink_colon","rainbow","accent","show_shadow","show_tenths"].forEach(function(key){document.getElementById(key).checked=s[key]==1});syncAnalogSeconds();
+  ["show_day","show_date","show_seconds","show_border","show_dots","show_temp","h12","blink_colon","rainbow","accent","show_shadow","show_tenths","show_progress"].forEach(function(key){document.getElementById(key).checked=s[key]==1});syncAnalogSeconds();
   ["f_hex","b_hex","hour_hex","min_hex","sec_hex","dots_hex","shadow_hex","frame_hex","accent_hex"].forEach(function(key){
     var fallback={f_hex:"#ffffff",b_hex:"#000000",hour_hex:"#ffffff",min_hex:"#4488ff",sec_hex:"#ff4444",dots_hex:"#ffffff",shadow_hex:"#333333",frame_hex:"#2a2a2a",accent_hex:"#4488ff"}[key];
     var input=document.getElementById(key);input.value=s[key]||fallback;var label=input.parentNode.querySelector("b");if(label)label.textContent=input.value;
