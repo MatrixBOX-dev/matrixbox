@@ -74,6 +74,22 @@ def _fm_write(request):
         _show_display(str(e), "red")
         return (200, {}, json.dumps({"error": str(e)}))
 
+@ampule.route("/system/fm/rename", method="POST")
+def _fm_rename(request):
+    old_path = _norm(request.headers.get("x-path", ""))
+    new_name = (request.body or "").strip()
+    try:
+        if not new_name or "/" in new_name or new_name in (".", ".."):
+            return (200, {}, json.dumps({"error": "Invalid name"}))
+        new_path = old_path.rsplit("/", 1)[0] + "/" + new_name
+        _hide_display()
+        os.rename(old_path, new_path)
+        _show_display("Renamed: " + new_name)
+        return (200, {}, json.dumps({"ok": True, "path": new_path}))
+    except Exception as e:
+        _show_display(str(e), "red")
+        return (200, {}, json.dumps({"error": str(e)}))
+
 @ampule.route("/system/fm/upload", method="POST")
 def _fm_upload(request):
     # Drag-and-drop upload (see fm.html). request.body is always decoded as
@@ -178,7 +194,7 @@ body{display:flex;flex-direction:column;height:100vh;overflow:hidden;padding-bot
 .abtn.del:hover{color:#ff6060;border-color:#ff6060}
 #editor{display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0}
 #editor-bar{background:var(--surface);padding:8px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);flex-shrink:0}
-#editor-bar span{color:var(--text);font-size:.82rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#path-bar .path-file{color:var(--accent);font-weight:700}
 #editor-area{flex:1;background:var(--bg);color:var(--text);border:none;padding:12px 14px;font-family:'Cascadia Mono','Fira Code','Consolas',monospace;font-size:.84rem;resize:none;outline:none;tab-size:4;line-height:1.5}
 #modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center}
 #modal{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;width:280px;box-shadow:var(--shadow)}
@@ -198,7 +214,7 @@ body{display:flex;flex-direction:column;height:100vh;overflow:hidden;padding-bot
 <div id="listing-wrap"><div id="listing"></div><div id="drop-hint">&#x2B07; Drop files or a folder here</div></div>
 <div id="editor">
 <div id="editor-bar">
-<span id="editor-name"></span>
+<div style="flex:1"></div>
 <button class="btn btn-sm btn-success" onclick="saveFile()" id="saveBtn">&#x1F4BE; Save</button>
 <button class="btn btn-sm btn-ghost" onclick="closeEditor()">&#x2715; Close</button>
 </div>
@@ -222,6 +238,7 @@ body{display:flex;flex-direction:column;height:100vh;overflow:hidden;padding-bot
 // full document and nesting a second navbar inside the current one.
 window.addEventListener('popstate', function(e){ e.stopImmediatePropagation(); }, true);
 var cwd="/";
+var editingFile=null; // full path of the file currently open in the editor, or null when just browsing
 function api(ep,path,body){
  var h={"X-Path":path||"/"};
  var opts={method:"POST",headers:h};
@@ -240,7 +257,22 @@ function renderPath(){
  var p="";
  for(var i=0;i<parts.length;i++){
   p+="/"+parts[i];
-  html+=' / <span onclick="go(\\''+p+'\\')">'+parts[i]+'</span>';
+  if(i===parts.length-1 && !editingFile){
+   // The current (last) folder segment does nothing useful on click when
+   // just browsing it -- navigating to the directory you're already in --
+   // so it doubles as the rename target there. Not while a file from
+   // it is open in the editor, though: then navigating back to the
+   // listing is the more useful click, and the open file (appended
+   // below, as the one and only path row -- no separate editor label)
+   // is the rename target instead.
+   html+=' / <span onclick="renamePathSegment(\\''+p+'\\')" title="Click to rename this folder">'+parts[i]+'</span>';
+  }else{
+   html+=' / <span onclick="go(\\''+p+'\\')">'+parts[i]+'</span>';
+  }
+ }
+ if(editingFile){
+  var fname=editingFile.split("/").pop();
+  html+=' / <span class="path-file" onclick="renamePathSegment(\\''+editingFile+'\\')" title="Click to rename this file">'+fname+'</span>';
  }
  el.innerHTML=html;
 }
@@ -248,6 +280,7 @@ function enc(p){return p.split("/").map(encodeURIComponent).join("/");}
 function go(path){location.hash=enc(path||"/");}
 function doList(path){
  cwd=path||"/";
+ editingFile=null;
  document.getElementById("editor").style.display="none";
  document.getElementById("listing-wrap").style.display="flex";
  renderPath();
@@ -256,7 +289,7 @@ function doList(path){
   var el=document.getElementById("listing");
   var html="";
   if(cwd!=="/"){
-   html+='<div class="row" ondblclick="go(\\''+parentDir()+'\\')" onclick="go(\\''+parentDir()+'\\')"><span class="icon">&#x1F4C2;</span><span class="name" style="color:#7c7cff">..</span><span class="size"></span><span class="acts"></span></div>';
+   html+='<div class="row" ondblclick="go(\\''+parentDir()+'\\')" onclick="go(\\''+parentDir()+'\\')"><span class="icon">&#x1F4C1;</span><span class="name" style="color:#7c7cff">..</span><span class="size"></span><span class="acts"></span></div>';
   }
   for(var i=0;i<d.items.length;i++){
    var it=d.items[i];
@@ -278,12 +311,12 @@ function parentDir(){
 function edit(fp){location.hash="f:"+enc(fp);}
 function openEditor(fp){
  cwd=fp.substring(0,fp.lastIndexOf("/"))||"/";
+ editingFile=fp;
  renderPath();
  api("/system/fm/read",fp).then(function(d){
-  if(d.error){alert(d.error);return}
+  if(d.error){editingFile=null;renderPath();alert(d.error);return}
   document.getElementById("listing-wrap").style.display="none";
   document.getElementById("editor").style.display="flex";
-  document.getElementById("editor-name").textContent=fp;
   document.getElementById("editor-area").value=d.text;
   document.getElementById("editor-area").dataset.path=fp;
  });
@@ -306,12 +339,35 @@ function del(fp){
   else doList(cwd);
  });
 }
-function showModal(title,cb){
+function renamePathSegment(fp){
+ var currentName=fp.split("/").pop();
+ var isOpenFile=(fp===editingFile);
+ showModal("Rename to:",function(newName){
+  if(newName===currentName)return;
+  api("/system/fm/rename",fp,newName).then(function(d){
+   if(d.error){alert(d.error);return}
+   var newPath=d.path||(fp.substring(0,fp.lastIndexOf("/"))+"/"+newName);
+   if(isOpenFile){
+    // Still the same open file, just under a new name -- stay in the
+    // editor (no navigation), only update what now refers to it.
+    editingFile=newPath;
+    document.getElementById("editor-area").dataset.path=newPath;
+    renderPath();
+   }else{
+    // cwd itself just got renamed out from under us -- navigate to the
+    // new path instead of refreshing the (now nonexistent) old one.
+    go(newPath);
+   }
+  });
+ },currentName);
+}
+function showModal(title,cb,defaultValue){
  document.getElementById("modal-title").textContent=title;
  var inp=document.getElementById("modal-input");
- inp.value="";
+ inp.value=defaultValue||"";
  document.getElementById("modal-bg").style.display="flex";
  inp.focus();
+ if(defaultValue)inp.select();
  document.getElementById("modal-ok").onclick=function(){
   var v=inp.value.trim();
   if(v)cb(v);
