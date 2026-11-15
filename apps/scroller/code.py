@@ -65,22 +65,31 @@ def get_font_name():
     return "large"
 
 def save_settings():
+    # Write to a temp file and rename over the real one, instead of
+    # truncating scroller_settings.json directly -- if the write fails
+    # partway through (as it currently is, see below), the previous good
+    # settings file is left intact instead of becoming corrupted/truncated,
+    # which is exactly what made load_settings() start failing with a JSON
+    # syntax error on top of saves not landing at all.
+    tmp = SETTINGS_FILE + ".tmp"
     try:
-        with open(SETTINGS_FILE, "w") as f:
+        with open(tmp, "w") as f:
             json.dump({"mode": scroll_mode, "align": static_align, "reverse": reverse_direction,
                         "shadow": shadow_color, "font": get_font_name(), "color": load_screen.currentcolor,
                         "offset": default_offset, "scale": default_scale, "custom_rgb": custom_rgb,
                         "custom_shadow_rgb": custom_shadow_rgb}, f)
+        os.rename(tmp, SETTINGS_FILE)
     except Exception as e:
         # Was previously a bare "except: pass" -- silently swallowed every
         # write failure, including a read-only filesystem, with zero way to
         # tell afterward why settings weren't actually persisted.
         print("scroller: save_settings() failed:", e)
         try:
-            if storage.getmount("/").readonly:
-                print("scroller: filesystem is read-only -- unlock it to persist settings")
+            print("scroller: filesystem readonly =", storage.getmount("/").readonly)
         except Exception:
             pass
+        try: os.remove(tmp)
+        except Exception: pass
 
 def load_settings():
     global scroll_mode, static_align, reverse_direction, shadow_color, default_offset, default_scale
