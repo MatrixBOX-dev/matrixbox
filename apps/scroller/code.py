@@ -77,7 +77,7 @@ def save_settings():
             json.dump({"mode": scroll_mode, "align": static_align, "reverse": reverse_direction,
                         "shadow": shadow_color, "font": get_font_name(), "color": load_screen.currentcolor,
                         "offset": default_offset, "scale": default_scale, "custom_rgb": custom_rgb,
-                        "custom_shadow_rgb": custom_shadow_rgb}, f)
+                        "custom_shadow_rgb": custom_shadow_rgb, "text": scroller_text}, f)
         os.rename(tmp, SETTINGS_FILE)
     except Exception as e:
         # Was previously a bare "except: pass" -- silently swallowed every
@@ -93,7 +93,7 @@ def save_settings():
 
 def load_settings():
     global scroll_mode, static_align, reverse_direction, shadow_color, default_offset, default_scale
-    global custom_rgb, custom_shadow_rgb
+    global custom_rgb, custom_shadow_rgb, scroller_text
     try:
         with open(SETTINGS_FILE) as f:
             s = json.load(f)
@@ -103,6 +103,7 @@ def load_settings():
         shadow_color = s.get("shadow", 0)
         default_offset = s.get("offset", default_offset)
         default_scale = s.get("scale", default_scale)
+        scroller_text = s.get("text", scroller_text)
         fm = {"mini": font_mini, "small": font_small, "large": font_large}
         load_screen.currentfont = fm.get(s.get("font", "large"), font_large)
         load_screen.currentcolor = s.get("color", "white")
@@ -120,11 +121,7 @@ def load_settings():
 
 with open("scroller.html") as f: html_body = f.read()
 
-try:
-    with open("scroller.txt") as f:
-        scroller_text = f.read()
-except:
-    scroller_text = "http://" + str(wifi.radio.ipv4_address)
+scroller_text = "http://" + str(wifi.radio.ipv4_address)  # overridden by load_settings() below if saved
 
 # ---------------------------------------------------------
 #  GLOBALS FOR SCROLLER
@@ -302,15 +299,6 @@ def web_exit(request):
     global exit
     exit = True
     return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
-
-@ampule.route("/save", method="POST")
-def web_save(request):
-    try:
-        with open("scroller.txt", "w") as f:
-            f.write(scroller_text)
-    except Exception as e:
-        return (500, {}, "ERROR: " + str(e))
-    return (200, {}, "OK")
 
 @ampule.route("/", method="POST")
 def scroller_post(request):
