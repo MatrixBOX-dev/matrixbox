@@ -6,6 +6,21 @@ import wifi
 
 import load_screen
 from __main__ import *
+
+# `from __main__ import *` above only copies whatever display/palette/etc.
+# objects existed in __main__'s namespace at this exact moment -- a one-time
+# snapshot, not a live reference. scroller/__init__.py just rebuilt all of
+# these (init_display(bit_depth=5)) before importing this file, so fetching
+# them directly from load_screen guarantees this file draws into the
+# Bitmap/Palette that are actually on screen right now, not a stale,
+# orphaned pre-rebuild one (see the same bug/fix in flights/code.py).
+display = load_screen.display
+window = load_screen.window
+palette = load_screen.palette
+matrix = load_screen.matrix
+rf_group = load_screen.rf_group
+tile_groupgroup = load_screen.tile_groupgroup
+
 microcontroller.cpu.frequency = 240000000
 exit = False
 padding_length = 20
@@ -18,6 +33,9 @@ currency = "usd"
 delay = 30
 reverse_direction = 1   # 0 = left-to-right (normal), 1 = right-to-left
 shadow_color = 0
+custom_rgb = None  # (r, g, b) when a custom text color was picked via the color picker; None = never set
+custom_shadow_rgb = None  # (r, g, b) when a custom shadow color was picked; None = never set
+_SHADOW_RGB_INDEX = 13  # dedicated palette slot for the custom shadow color -- unused elsewhere in this app
 
 shadow_color_map = {
     "black": 0,
@@ -49,11 +67,14 @@ def save_settings():
     try:
         with open(SETTINGS_FILE, "w") as f:
             json.dump({"mode": scroll_mode, "align": static_align, "reverse": reverse_direction,
-                        "shadow": shadow_color, "font": get_font_name(), "color": load_screen.currentcolor}, f)
+                        "shadow": shadow_color, "font": get_font_name(), "color": load_screen.currentcolor,
+                        "offset": default_offset, "scale": default_scale, "custom_rgb": custom_rgb,
+                        "custom_shadow_rgb": custom_shadow_rgb}, f)
     except: pass
 
 def load_settings():
-    global scroll_mode, static_align, reverse_direction, shadow_color
+    global scroll_mode, static_align, reverse_direction, shadow_color, default_offset, default_scale
+    global custom_rgb, custom_shadow_rgb
     try:
         with open(SETTINGS_FILE) as f:
             s = json.load(f)
@@ -61,9 +82,20 @@ def load_settings():
         static_align = s.get("align", "center")
         reverse_direction = s.get("reverse", 1)
         shadow_color = s.get("shadow", 0)
+        default_offset = s.get("offset", default_offset)
+        default_scale = s.get("scale", default_scale)
         fm = {"mini": font_mini, "small": font_small, "large": font_large}
         load_screen.currentfont = fm.get(s.get("font", "large"), font_large)
         load_screen.currentcolor = s.get("color", "white")
+        rgb = s.get("custom_rgb")
+        if rgb:
+            custom_rgb = tuple(rgb)  # JSON gives a list back, not a tuple
+            palette[5] = custom_rgb
+        shadow_rgb = s.get("custom_shadow_rgb")
+        if shadow_rgb:
+            custom_shadow_rgb = tuple(shadow_rgb)
+            palette[_SHADOW_RGB_INDEX] = custom_shadow_rgb
+            shadow_color = _SHADOW_RGB_INDEX
     except: pass
 
 with open("scroller.html") as f: html_body = f.read()
@@ -264,6 +296,7 @@ def web_save(request):
 def scroller_post(request):
     global scroller_text, exit, default_offset, default_scale, shadow_color
     global btc, scroll_mode, padding_length, scroll_x, scroll_y, reverse_direction, static_align
+    global custom_rgb, custom_shadow_rgb
 
     if "btc" in request.params:
         btc = 1 - btc
@@ -315,6 +348,7 @@ def scroller_post(request):
             b = int(raw[4:6], 16)
             palette[5] = (r, g, b)
             load_screen.currentcolor = "white"
+            custom_rgb = (r, g, b)
         except:
             pass
 
@@ -341,6 +375,21 @@ def scroller_post(request):
         save_settings()
         return (200, {}, "OK")
 
+    if "shadow_rgb" in request.params:
+        try:
+            raw = request.params["shadow_rgb"].replace("%23", "").replace("#", "")
+            r = int(raw[0:2], 16)
+            g = int(raw[2:4], 16)
+            b = int(raw[4:6], 16)
+            palette[_SHADOW_RGB_INDEX] = (r, g, b)
+            shadow_color = _SHADOW_RGB_INDEX
+            custom_shadow_rgb = (r, g, b)
+        except:
+            pass
+        rebuild_scene()
+        save_settings()
+        return (200, {}, "OK")
+
     if btc:
         set_btc()
     else:
@@ -351,7 +400,10 @@ def scroller_post(request):
 
 @ampule.route("/", method="GET")
 def scroller_get(request):
-    return (200, {}, header("Scroller", app=True) + html_body + footer())
+    text_hex = "#%02x%02x%02x" % custom_rgb if custom_rgb else "#ffffff"
+    shadow_hex = "#%02x%02x%02x" % custom_shadow_rgb if custom_shadow_rgb else "#000000"
+    page = html_body.replace("__CURRENT_COLOR__", text_hex).replace("__CURRENT_SHADOW__", shadow_hex)
+    return (200, {}, header("Scroller", app=True) + page + footer())
 
 # ---------------------------------------------------------
 #  BTC TEXT

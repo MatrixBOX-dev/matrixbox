@@ -31,33 +31,14 @@
 </div>
 
 <div class="card">
-<div class="section-title">Text Color</div>
+<div class="section-title">Colors</div>
 <div class="swatch-row">
-<input type="color" id="rgbpick" value="#ffffff" class="color-swatch" style="padding:0;border:2px solid rgba(255,255,255,.3);cursor:pointer" onchange="fetch('/?rgb='+this.value.substring(1),{method:'POST'})">
-<div class="color-swatch" style="background:#fff" onclick="pc('white')"></div>
-<div class="color-swatch" style="background:#4488ff" onclick="pc('blue')"></div>
-<div class="color-swatch" style="background:#ff4444" onclick="pc('red')"></div>
-<div class="color-swatch" style="background:#ffff44" onclick="pc('yellow')"></div>
-<div class="color-swatch" style="background:#ff8800" onclick="pc('orange')"></div>
-<div class="color-swatch" style="background:#44ff44" onclick="pc('green')"></div>
-</div>
-</div>
-
-<div class="card">
-<div class="section-title">Shadow Color</div>
-<div class="swatch-row">
-<div class="color-swatch" style="background:#000;border-color:rgba(255,255,255,.2)" onclick="psc('black')"></div>
-<div class="color-swatch" style="background:#ffff44" onclick="psc('yellow')"></div>
-<div class="color-swatch" style="background:#fff" onclick="psc('brightwhite')"></div>
-<div class="color-swatch" style="background:#4488ff" onclick="psc('blue')"></div>
-<div class="color-swatch" style="background:#ff4444" onclick="psc('red')"></div>
-<div class="color-swatch" style="background:#ddd" onclick="psc('white')"></div>
-<div class="color-swatch" style="background:#add8e6" onclick="psc('light_blue')"></div>
-<div class="color-swatch" style="background:#44ff44" onclick="psc('green')"></div>
-<div class="color-swatch" style="background:#888" onclick="psc('grey')"></div>
-<div class="color-swatch" style="background:#222" onclick="psc('black2')"></div>
-<div class="color-swatch" style="background:#ffb6c1" onclick="psc('pink')"></div>
-<div class="color-swatch" style="background:#ff8800" onclick="psc('orange')"></div>
+<label style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:.7rem;color:var(--muted)">Text
+<input type="color" id="rgbpick" value="__CURRENT_COLOR__" class="color-swatch" style="padding:0;border:2px solid rgba(255,255,255,.3);cursor:pointer" onchange="fetch('/?rgb='+this.value.substring(1),{method:'POST'})">
+</label>
+<label style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:.7rem;color:var(--muted)">Shadow
+<input type="color" id="shadowpick" value="__CURRENT_SHADOW__" class="color-swatch" style="padding:0;border:2px solid rgba(255,255,255,.3);cursor:pointer" onchange="fetch('/?shadow_rgb='+this.value.substring(1),{method:'POST'})">
+</label>
 </div>
 </div>
 
@@ -88,8 +69,6 @@
 <script>
 function p(q){fetch("/?"+q,{method:"POST"})}
 function send(){var t=document.getElementById("text").value;if(t)p("text="+encodeURIComponent(t.replace(/\r?\n/g,"\\n")))}
-function pc(c){p("color="+c)}
-function psc(c){p("shadow_color="+c)}
 function pf(s){p("size="+s);document.querySelectorAll("#font-size-seg button").forEach(function(b){b.classList.toggle("on",b.id==="sz_"+s)})}
 function pr(v){p("reverse="+v);document.getElementById("dir_rtl").classList.toggle("on",v===1);document.getElementById("dir_ltr").classList.toggle("on",v===0)}
 function pm(m){p("mode="+m);document.querySelectorAll("#mode-seg button").forEach(function(b){b.classList.toggle("on",b.id==="mode_"+m)});var r=document.getElementById("dir_rtl"),l=document.getElementById("dir_ltr");if(m==="v"){r.innerHTML="&#8593; Bottom to Top";l.innerHTML="Top to Bottom &#8595;"}else{r.innerHTML="&#8592; Right to Left";l.innerHTML="Left to Right &#8594;"}document.getElementById("align-seg").style.display=m==="s"?"":"none"}
