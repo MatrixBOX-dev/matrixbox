@@ -1,1 +1,0 @@
-{"accent_hex": "#1c1c1c", "bg_hex": "#171717", "show_tenths": 0, "preset_ms": 10000, "scale": 2, "mode": "countdown", "fg_hex": "#000000"}
