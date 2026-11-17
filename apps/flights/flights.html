@@ -1,0 +1,167 @@
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+input[type="number"]{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-size:.93rem;outline:none;transition:border-color .15s,box-shadow .15s}
+input[type="number"]:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,111,255,.15)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#locmap{height:280px;border-radius:var(--r);margin-bottom:8px;border:1px solid var(--border)}
+.mapbox{position:relative}
+.crosshair{position:absolute;top:50%;left:50%;width:16px;height:16px;margin:-8px 0 0 -8px;pointer-events:none;z-index:1000}
+.crosshair::before,.crosshair::after{content:"";position:absolute;background:#ff3b3b}
+.crosshair::before{left:7px;top:0;width:2px;height:16px}
+.crosshair::after{top:7px;left:0;height:2px;width:16px}
+#loccoords{font-family:'Cascadia Mono','Consolas',monospace;font-size:.78rem;color:var(--muted);margin-bottom:4px}
+.hint{color:var(--muted);font-size:.78rem;margin-top:6px;line-height:1.4}
+.hidden{display:none}
+#msg{font-size:.84rem;margin-top:10px;text-align:center;min-height:1.2em}
+#msg.ok{color:#00e676}
+#msg.err{color:#ff7070}
+.status-line{font-size:.82rem;color:var(--text);line-height:1.5;word-break:break-word}
+</style>
+
+<div class="card">
+  <div class="section-title">&#9992; Display mode</div>
+  <div class="seg" id="modeseg">
+    <button type="button" data-mode="departures">Departures</button>
+    <button type="button" data-mode="arrivals">Arrivals</button>
+    <button type="button" data-mode="both">Both</button>
+    <button type="button" data-mode="map">Live map</button>
+  </div>
+  <label for="refresh">Refresh (seconds)</label>
+  <input type="number" id="refresh" value="{REFRESH}" min="10" max="300">
+</div>
+
+<div class="card" id="c_board">
+  <div class="section-title">Airport board</div>
+  <label for="airport">Airport IATA code</label>
+  <input type="text" id="airport" value="{AIRPORT}" maxlength="4" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+  <div class="cols">
+    <div>
+      <label for="font">Font</label>
+      <select id="font">
+        <option value="mini" {SEL_MINI}>Mini</option>
+        <option value="small" {SEL_SMALL}>Small</option>
+        <option value="large" {SEL_LARGE}>Large</option>
+      </select>
+    </div>
+    <div>
+      <label for="tz">UTC offset (h)</label>
+      <input type="number" id="tz" value="{TZ_OFFSET}" min="-12" max="14">
+    </div>
+  </div>
+  <div class="toggle-row" style="margin-top:8px">
+    <label for="title" class="toggle-label">Show title row</label>
+    <label class="switch"><input type="checkbox" id="title" {CHK_TITLE}><span class="slider"></span></label>
+  </div>
+  <details style="margin-top:8px">
+    <summary><span class="caret">&#9656;</span> Advanced</summary>
+    <label for="endpoint">API endpoint</label>
+    <input type="text" id="endpoint" value="{ENDPOINT}" placeholder="https://...">
+    <label for="apikey">API key</label>
+    <input type="text" id="apikey" value="{APIKEY}" placeholder="your key here">
+  </details>
+</div>
+
+<div class="card hidden" id="c_map">
+  <div class="section-title">Live map</div>
+  <div class="mapbox">
+    <div id="locmap"></div>
+    <div class="crosshair"></div>
+  </div>
+  <div id="loccoords">lat {MAP_LAT}, lon {MAP_LON}, zoom {MAP_ZOOM}</div>
+  <div class="hint">Pan and zoom so the red cross is on your spot, then save. The display shows exactly this view.</div>
+  <div class="toggle-row" style="margin-top:8px">
+    <label for="map_grayscale" class="toggle-label">Grayscale basemap</label>
+    <label class="switch"><input type="checkbox" id="map_grayscale" {CHK_GRAYSCALE}><span class="slider"></span></label>
+  </div>
+  <label for="map_radius">Aircraft search radius (nm)</label>
+  <input type="number" id="map_radius" value="{MAP_RADIUS}" min="5" max="250">
+  <details style="margin-top:8px">
+    <summary><span class="caret">&#9656;</span> OpenSky API key (optional)</summary>
+    <div class="hint">Aircraft positions work anonymously, but with a much lower rate limit. Create a free API client on <a href="https://opensky-network.org/my-opensky/account" target="_blank" rel="noopener">opensky-network.org</a> and paste its client ID/secret below to raise it. Leave both blank to stay anonymous.</div>
+    <label for="opensky_client_id">Client ID</label>
+    <input type="text" id="opensky_client_id" value="{OPENSKY_CLIENT_ID}" placeholder="e.g. you@example.com-api-client">
+    <label for="opensky_client_secret">Client secret</label>
+    <input type="text" id="opensky_client_secret" value="{OPENSKY_CLIENT_SECRET}" placeholder="your client secret">
+  </details>
+</div>
+
+<button type="button" class="btn btn-full btn-success" onclick="save()">&#128190; Save Settings</button>
+<div id="msg">{NOTE}</div>
+
+<div class="card" style="margin-top:12px">
+  <div class="section-title">Status</div>
+  <div class="status-line">{STATUS}</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var mode='{MODE}';
+var locmap=null;
+function $(id){return document.getElementById(id)}
+
+function setMode(m){
+  mode=m;
+  var bs=document.querySelectorAll('#modeseg button');
+  for(var i=0;i<bs.length;i++){bs[i].classList.toggle('on',bs[i].getAttribute('data-mode')===m)}
+  var isMap=(m==='map');
+  $('c_map').classList.toggle('hidden',!isMap);
+  $('c_board').classList.toggle('hidden',isMap);
+  if(isMap){
+    if(!locmap){initMap()}
+    setTimeout(function(){locmap.invalidateSize()},50);
+  }
+}
+document.querySelectorAll('#modeseg button').forEach(function(b){
+  b.addEventListener('click',function(){setMode(b.getAttribute('data-mode'))});
+});
+
+function initMap(){
+  locmap=L.map('locmap',{zoomControl:true,minZoom:2,maxZoom:14}).setView([{MAP_LAT},{MAP_LON}],{MAP_ZOOM});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:14,
+    attribution:'&copy; OpenStreetMap contributors'
+  }).addTo(locmap);
+  locmap.on('move zoom',updateCoords);
+  updateCoords();
+}
+function updateCoords(){
+  var c=locmap.getCenter();
+  $('loccoords').innerText='lat '+c.lat.toFixed(6)+', lon '+c.lng.toFixed(6)+', zoom '+locmap.getZoom();
+}
+
+function show(text,ok){
+  var m=$('msg');
+  m.innerText=text;
+  m.className=ok?'ok':'err';
+}
+
+function save(){
+  var url='/?mode='+mode+'&refresh='+$('refresh').value;
+  if(mode==='map'){
+    // Read the live map view directly, so what you see is what gets saved.
+    var c=locmap.getCenter();
+    url+='&map_lat='+c.lat+'&map_lon='+c.lng+'&map_zoom='+locmap.getZoom();
+    url+='&map_radius='+$('map_radius').value;
+    url+='&map_grayscale='+($('map_grayscale').checked?'1':'0');
+  }else{
+    var a=$('airport').value.trim();
+    if(!a){alert('Enter airport code');return}
+    url+='&airport='+encodeURIComponent(a)+'&font='+$('font').value;
+    url+='&show_title='+($('title').checked?'1':'0')+'&tz='+$('tz').value;
+    var ep=$('endpoint').value.trim(),key=$('apikey').value.trim();
+    if(ep)url+='&endpoint='+encodeURIComponent(ep);
+    if(key)url+='&apikey='+encodeURIComponent(key);
+  }
+  // Always sent regardless of the currently selected mode -- these inputs
+  // live in the "Live map" card's DOM either way, so saving while on the
+  // airport board shouldn't silently drop a just-entered OpenSky key.
+  url+='&opensky_client_id='+encodeURIComponent($('opensky_client_id').value.trim());
+  url+='&opensky_client_secret='+encodeURIComponent($('opensky_client_secret').value.trim());
+  show('Saving...',true);
+  fetch(url).then(function(r){return r.text()}).then(function(t){
+    show(t.replace(/^(OK|ERR): /,''),t.indexOf('OK')===0);
+  }).catch(function(){show('Could not reach the device',false)});
+}
+
+setMode(mode);
+</script>
