@@ -1,0 +1,1 @@
+{"refresh": 60, "api_endpoint": "https://api.swedavia.se/flightinfo/v2", "tz_offset": 1, "map_lat": 59.6525, "mode": "map", "map_grayscale": 1, "airport": "ARN", "map_zoom": 8, "opensky_client_id": "", "api_key": "", "show_title": 1, "map_radius_nm": 150, "font": "small", "opensky_client_secret": "", "map_lon": 17.9187}
