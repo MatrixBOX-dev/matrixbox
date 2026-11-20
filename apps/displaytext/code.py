@@ -129,7 +129,8 @@ def load_settings():
 with open("displaytext.html") as f: html_body = f.read()
 
 scroller_text = "http://" + str(wifi.radio.ipv4_address)  # overridden by load_settings() below if saved
-tw_lines = []  # typewriter mode: list of lines, each a list of {"t": text, "c": color name} segments
+tw_lines = []  # typewriter mode: list of lines, each a list of {"t": text, "c": "#rrggbb" | "white" (= Text color)} segments
+_say_count = 0  # sentences dictated so far; parity picks the alternating color
 
 # ---------------------------------------------------------
 #  GLOBALS FOR SCROLLER
@@ -231,6 +232,59 @@ def _tw_render(bmp, font):
         x = 1
         for seg in segs:
             x = _tw_draw_seg(bmp, x, y, seg.get("t", ""), font, _tw_color_index(seg.get("c"), slots))
+
+def _tw_text_width(text, font):
+    if font is font_mini:
+        text = text.lower()
+    w = 0
+    for ch in text:
+        if ch == " ":
+            w += _TW_SPACE
+            continue
+        g = font.get(ch) or font.get("?")
+        w += g[0] if g else 4
+    return w
+
+def _tw_wrap(text, font, max_w):
+    lines = []
+    cur = ""
+    for word in text.split():
+        test = cur + " " + word if cur else word
+        if _tw_text_width(test, font) <= max_w:
+            cur = test
+            continue
+        if cur:
+            lines.append(cur)
+        cur = word
+        while len(cur) > 1 and _tw_text_width(cur, font) > max_w:  # a single word wider than the screen
+            n = len(cur) - 1
+            while n > 1 and _tw_text_width(cur[:n], font) > max_w:
+                n -= 1
+            lines.append(cur[:n])
+            cur = cur[n:]
+    if cur:
+        lines.append(cur)
+    return lines
+
+def add_dictation(text):
+    """Append a spoken sentence to the typewriter text: word-wrapped to the screen,
+    alternating between the Text color and a dimmer shade per sentence, and
+    scrolled up once the screen is full."""
+    global tw_lines, _say_count
+    text = text.strip()
+    if not text:
+        return
+    if text[-1] not in ".!?":
+        text += "."
+    if _say_count % 2 == 0:
+        color = "white"
+    else:
+        color = "#%02x%02x%02x" % tuple(c // 2 for c in (custom_rgb or (20, 20, 20)))
+    _say_count += 1
+    rows = DISPLAY_HEIGHT // _TW_PITCH[get_font_name()]
+    for ln in _tw_wrap(text, load_screen.currentfont, DISPLAY_WIDTH - 2):
+        tw_lines.append([{"t": ln, "c": color}])
+    tw_lines = tw_lines[-rows:]
 
 def tw_info(with_text=False):
     name = get_font_name()
@@ -422,9 +476,11 @@ def web_typewriter(request):
     # Body is the JSON line/segment list from the page's live editor. It's
     # re-rendered on every call but only written to flash when the page
     # signals the typing pause with ?save=1.
-    global tw_lines
+    global tw_lines, _say_count
     try:
         tw_lines = json.loads(request.body)
+        if not tw_lines:
+            _say_count = 0  # cleared: dictation starts over with the Text color
         if scroll_mode == "t":
             rebuild_scene()
         if "save" in request.params:
@@ -432,6 +488,19 @@ def web_typewriter(request):
     except Exception as e:
         print("displaytext: typewriter post failed:", e)
     return (200, {}, tw_info())
+
+@ampule.route("/say", method="POST")
+def web_say(request):
+    # A sentence of recognized speech (?t=, url-encoded) from the page's Dictate button.
+    # Returns the full text so the page's editor shows what is on the display.
+    try:
+        add_dictation(ampule.url_decoder(request.params.get("t", "")))
+        if scroll_mode == "t":
+            rebuild_scene()
+        save_settings()
+    except Exception as e:
+        print("displaytext: dictation failed:", e)
+    return (200, {}, tw_info(True))
 
 @ampule.route("/", method="POST")
 def scroller_post(request):
