@@ -197,6 +197,8 @@ settingstxt = {"password": "none",
             "clocktime": 0, 
 
             "user": "", 
+            "data_host": "", 
+            "data_port": 90, 
             "power": 20, 
             "show_lines": [],
             "strip_dest": [],
