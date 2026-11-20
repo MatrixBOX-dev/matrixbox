@@ -1,0 +1,197 @@
+<style>
+.tw-preview{background:#000;border:2px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;position:relative;image-rendering:pixelated}
+.tw-preview canvas{width:100%;height:auto;display:block}
+.tw-editor{width:100%;min-height:120px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r);padding:10px 12px;color:#ccc;font-family:'Cascadia Mono','Fira Code','Consolas',monospace;font-size:.88rem;line-height:1.5;outline:none;white-space:pre-wrap;word-break:break-word;overflow-y:auto}
+.tw-editor:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,111,255,.15)}
+.tw-editor:empty::before{content:attr(data-ph);color:var(--muted);pointer-events:none}
+.tw-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.tw-info{color:var(--muted);font-size:.7rem;margin-top:6px;text-align:right}
+</style>
+
+<div class="card" id="plain-card">
+<div class="section-title">Text</div>
+<div style="display:flex;gap:8px">
+<textarea id="text" rows="3" placeholder="Enter message… (line breaks add gaps)" style="flex:1;resize:vertical"></textarea>
+<button class="btn btn-sm" onclick="send()">&#9654; Send</button>
+</div>
+</div>
+
+<div class="card" id="tw-card" style="display:none">
+<div class="section-title">Typewriter</div>
+<div class="tw-bar"><label style="display:flex;align-items:center;gap:8px;font-size:.7rem;color:var(--muted)"><input type="color" id="twpick" value="#ffffff" class="color-swatch" style="padding:0;border:2px solid rgba(255,255,255,.3);cursor:pointer">Color for the selected text (or all unselected text)</label></div>
+<div class="tw-preview"><canvas id="cvs"></canvas></div>
+<div class="tw-editor" id="ed" contenteditable="true" spellcheck="false" data-ph="Start typing..."></div>
+<div class="tw-info" id="info">Select text + tap a color to colorize</div>
+</div>
+
+<div class="card">
+<div class="section-title">Mode</div>
+<div class="seg" id="mode-seg">
+<button id="mode_h" class="on" onclick="pm('h')">&#8596; Horizontal</button>
+<button id="mode_v" onclick="pm('v')">&#8597; Vertical</button>
+<button id="mode_s" onclick="pm('s')">&#9632; Static</button>
+<button id="mode_t" onclick="pm('t')">&#9000; Typewriter</button>
+</div>
+<div class="seg" id="align-seg" style="display:none;margin-top:6px">
+<button id="al_left" onclick="pa('left')">&#9664; Left</button>
+<button id="al_center" class="on" onclick="pa('center')">Center</button>
+<button id="al_right" onclick="pa('right')">Right &#9654;</button>
+</div>
+<div class="seg" id="font-size-seg" style="margin-top:6px">
+<button id="sz_mini" onclick="pf('mini')">Mini</button>
+<button id="sz_small" onclick="pf('small')">Small</button>
+<button id="sz_large" onclick="pf('large')">Large</button>
+</div>
+<div class="seg" id="dir-seg" style="margin-top:6px">
+<button id="dir_rtl" class="on" onclick="pr(1)">&#8592; Right to Left</button>
+<button id="dir_ltr" onclick="pr(0)">Left to Right &#8594;</button>
+</div>
+</div>
+
+<div class="card">
+<div class="section-title">Colors</div>
+<div class="swatch-row">
+<label style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:.7rem;color:var(--muted)">Text
+<input type="color" id="rgbpick" value="__CURRENT_COLOR__" class="color-swatch" style="padding:0;border:2px solid rgba(255,255,255,.3);cursor:pointer" onchange="fetch('/?rgb='+this.value.substring(1),{method:'POST'});refreshDefault()">
+</label>
+<label style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:.7rem;color:var(--muted)">Shadow
+<input type="color" id="shadowpick" value="__CURRENT_SHADOW__" class="color-swatch" style="padding:0;border:2px solid rgba(255,255,255,.3);cursor:pointer" onchange="fetch('/?shadow_rgb='+this.value.substring(1),{method:'POST'})">
+</label>
+</div>
+</div>
+
+
+
+<div class="card">
+<div class="section-title">Offset &amp; Scale</div>
+<label>Vertical Offset</label>
+<div class="range-wrap">
+<input type="range" id="offset" min="0" max="32" step="1" value="0" oninput="document.getElementById('v_off').textContent=this.value" onchange="p('offset='+this.value)">
+<span class="range-val" id="v_off">0</span>
+</div>
+<label>Scale</label>
+<div class="range-wrap">
+<input type="range" id="scale" min="1" max="2" step="1" value="1" oninput="document.getElementById('v_sc').textContent=this.value+'×'" onchange="p('scale='+this.value)">
+<span class="range-val" id="v_sc">1×</span>
+</div>
+</div>
+
+<script>
+var _font="large",_color="white",_w=128,_h=32,_t=null,_ts=null,_range=null;
+// Colors saved by the old typewriter app were palette names, not hex.
+var _legacy={yellow:"#cccc00",white:"#cccccc",brightwhite:"#ffffff",blue:"#0088ff",red:"#ff2222",green:"#00dd00",orange:"#ff8800",pink:"#ff66aa",light_blue:"#66aaff"};
+// "white" (or no color) means the shared Text color from the Colors card.
+function colorHex(c){if(!c||c==="white")return document.getElementById("rgbpick").value;return c.charAt(0)==="#"?c:(_legacy[c]||"#cccccc")}
+function refreshDefault(){
+var ed=document.getElementById("ed");
+ed.style.color=colorHex(_color);
+var sp=ed.querySelectorAll("span");
+for(var i=0;i<sp.length;i++)sp[i].style.color=colorHex(sp[i].dataset.c);
+twSend();
+}
+function p(q){return fetch("/?"+q,{method:"POST"})}
+function send(){var t=document.getElementById("text").value;if(t)p("text="+encodeURIComponent(t.replace(/\r?\n/g,"\\n")))}
+function setFontUI(s){_font=s;document.querySelectorAll("#font-size-seg button").forEach(function(b){b.classList.toggle("on",b.id==="sz_"+s)})}
+function pf(s){setFontUI(s);p("size="+s).then(twInfo)}
+function setDirUI(v){document.getElementById("dir_rtl").classList.toggle("on",v===1);document.getElementById("dir_ltr").classList.toggle("on",v===0)}
+function pr(v){p("reverse="+v);setDirUI(v)}
+function setModeUI(m){document.querySelectorAll("#mode-seg button").forEach(function(b){b.classList.toggle("on",b.id==="mode_"+m)});var r=document.getElementById("dir_rtl"),l=document.getElementById("dir_ltr");if(m==="v"){r.innerHTML="&#8593; Bottom to Top";l.innerHTML="Top to Bottom &#8595;"}else{r.innerHTML="&#8592; Right to Left";l.innerHTML="Left to Right &#8594;"}document.getElementById("align-seg").style.display=m==="s"?"":"none";document.getElementById("dir-seg").style.display=m==="t"?"none":"";document.getElementById("plain-card").style.display=m==="t"?"none":"";document.getElementById("tw-card").style.display=m==="t"?"":"none";if(m==="t")document.getElementById("ed").focus()}
+function pm(m){p("mode="+m);setModeUI(m)}
+function setAlignUI(a){document.querySelectorAll("#align-seg button").forEach(function(b){b.classList.toggle("on",b.id==="al_"+a)})}
+function pa(a){p("align="+a);setAlignUI(a)}
+
+// The color picker steals focus, so remember the last selection made inside the editor.
+document.addEventListener("selectionchange",function(){
+var sel=window.getSelection(),ed=document.getElementById("ed");
+if(sel.rangeCount>0&&ed.contains(sel.anchorNode)&&ed.contains(sel.focusNode))_range=sel.isCollapsed?null:sel.getRangeAt(0).cloneRange();
+});
+function setColor(c){
+var ed=document.getElementById("ed");
+if(_range&&!_range.collapsed){
+var span=document.createElement("span");
+span.dataset.c=c;span.style.color=c;
+try{_range.surroundContents(span)}
+catch(e){var frag=_range.extractContents();span.appendChild(frag);_range.insertNode(span)}
+_range=null;
+window.getSelection().removeAllRanges();
+}else{
+_color=c;ed.style.color=c;
+}
+twSend();
+}
+function serialize(){
+var ed=document.getElementById("ed");
+var lines=[],cur=[];
+function push(t,c){if(t)cur.push({t:t,c:c})}
+function nl(){lines.push(cur);cur=[];}
+function walk(node,c){
+if(node.nodeType===3){
+var t=node.textContent;var p=t.split("\n");
+for(var i=0;i<p.length;i++){if(i>0)nl();push(p[i],c);}
+}else if(node.nodeName==="BR"){
+var pr=node.parentNode;
+if(pr&&pr!==ed&&(pr.nodeName==="DIV"||pr.nodeName==="P")&&!node.previousSibling&&!node.nextSibling){}
+else nl();
+}else{
+var nc=c;
+if(node.dataset&&node.dataset.c)nc=node.dataset.c;
+var isB=node.nodeName==="DIV"||node.nodeName==="P";
+if(isB&&node!==ed&&(cur.length>0||lines.length>0))nl();
+for(var ch=node.firstChild;ch;ch=ch.nextSibling)walk(ch,nc);
+}
+}
+walk(ed,_color);
+if(cur.length>0)nl();
+for(var i=0;i<lines.length;i++){
+var m=[];
+for(var j=0;j<lines[i].length;j++){
+var s=lines[i][j];
+if(m.length>0&&m[m.length-1].c===s.c)m[m.length-1].t+=s.t;
+else m.push({t:s.t,c:s.c});
+}lines[i]=m;
+}
+return lines;
+}
+function loadEditor(lines){
+var ed=document.getElementById("ed");
+ed.textContent="";
+for(var i=0;i<lines.length;i++){
+if(i>0)ed.appendChild(document.createTextNode("\n"));
+for(var j=0;j<lines[i].length;j++){
+var s=lines[i][j],span=document.createElement("span");
+span.dataset.c=s.c;span.style.color=colorHex(s.c);
+span.textContent=s.t;ed.appendChild(span);
+}}
+}
+function twPost(save){
+fetch("/tw"+(save?"?save=1":""),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(serialize())})
+.then(function(r){return r.json()}).then(applyInfo);
+}
+// Live render shortly after typing; flash is only written once typing pauses.
+function twSend(){
+clearTimeout(_t);clearTimeout(_ts);
+_t=setTimeout(function(){twPost(false)},50);
+_ts=setTimeout(function(){twPost(true)},2000);
+}
+function applyInfo(d){
+_w=d.w;_h=d.h;_font=d.font;
+document.getElementById("info").textContent=_w+"x"+_h+" | ~"+d.cols+" cols x "+d.rows+" rows | font: "+d.font;
+drawPreview(d.rows);
+}
+function twInfo(){fetch("/info").then(function(r){return r.json()}).then(applyInfo)}
+function drawPreview(rows){
+var cvs=document.getElementById("cvs");
+cvs.width=_w;cvs.height=_h;
+var ctx=cvs.getContext("2d");
+ctx.fillStyle="#000";ctx.fillRect(0,0,_w,_h);
+ctx.fillStyle="#222";
+var fh=Math.floor(_h/rows);
+for(var i=1;i<rows;i++)ctx.fillRect(0,i*fh,_w,1);
+}
+document.getElementById("ed").addEventListener("input",twSend);
+document.getElementById("twpick").addEventListener("change",function(){setColor(this.value)});
+fetch("/info").then(function(r){return r.json()}).then(function(d){
+setFontUI(d.font);setDirUI(d.reverse);setAlignUI(d.align);setModeUI(d.mode);
+loadEditor(d.tw);document.getElementById("ed").style.color=colorHex(_color);applyInfo(d);
+});
+</script>
