@@ -12,7 +12,7 @@ _FAVICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><def
 exitbutton = """<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><link rel="icon" type="image/svg+xml" href="/system/favicon.svg"><style>body{background:#08080f;color:#eeeef5;font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;margin:0}a.xbtn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:10px;background:linear-gradient(135deg,#e03c3c,#ff6060);color:#fff;font-weight:700;font-size:.95rem;text-decoration:none;box-shadow:0 2px 14px rgba(224,60,60,.35)}.lbl{color:#7070a0;font-size:.75rem;text-transform:uppercase;letter-spacing:1.5px}</style></head><body><p class="lbl">App Running</p><a class="xbtn" href="/exit">&#x2715; Exit App</a>"""
 backbutton = """<a class="back-btn" href="../">&#8592; Back</a>"""
 bootloaderbutton = """<button class="btn btn-danger" onclick="if(confirm('Enter bootloader mode?'))fetch('/bootloader',{method:'POST'})">&#x26A1; Bootloader</button>"""
-unlock = """<button type="button" class="btn btn-full btn-warning" onclick="fetch('/system/settings?unlock=true', {method: 'POST'})">&#x1F513; Unlock</button>"""
+unlock = """<button type="button" class="btn btn-full btn-danger" onclick="fetch('/system/settings?unlock=true', {method: 'POST'})">&#x1F513; Unlock</button>"""
 # -- LED on/off toggle ---------------------------------------------------------
 _led_off = False
 
@@ -677,6 +677,9 @@ input[type="color"]::-webkit-color-swatch{border:none;border-radius:5px}
 .seg button{flex:1;padding:6px 10px;border:none;border-radius:8px;font-size:.8rem;font-weight:600;cursor:pointer;background:none;color:var(--muted);transition:all .15s}
 .seg button.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 2px 8px rgba(124,111,255,.3)}
 .action-row{display:flex;gap:8px;flex-wrap:wrap}.action-row-fill{flex-wrap:nowrap}.action-row-fill .btn{flex:1;min-width:0;padding-left:4px;padding-right:4px;justify-content:center;text-align:center}
+.settings-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,3fr);gap:8px}
+.settings-actions .btn{min-width:0;padding-left:4px;padding-right:4px}
+.settings-actions .btn-danger{font-size:.8rem}
 .back-btn{display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;font-size:.83rem;padding:8px 13px;border-radius:var(--r);background:var(--surface);border:1px solid var(--border);margin-top:14px;transition:color .15s,border-color .15s}
 .back-btn:hover{color:var(--text);border-color:var(--accent)}
 .error-msg{color:#ff7070;font-size:.82rem;margin-top:10px;text-align:center}
@@ -818,7 +821,7 @@ function sav(e){{e.preventDefault();var b=new URLSearchParams(new FormData(e.tar
 def _preset_buttons():
     def _pbtn(label, s, w, h, svg, rot=None):
         rot_js = f"var _r=document.getElementById('rotation');if(_r){{_r.value={rot};var _rv=document.getElementById('v_rotation');if(_rv)_rv.textContent={rot};}}" if rot is not None else ""
-        return f'<button class="btn btn-sm" onclick="if(confirm(\'Switch to {label} ({w}x{h})?\')){{var _ew=document.getElementById(\'width\');if(_ew){{_ew.value={w};var _vw=document.getElementById(\'v_width\');if(_vw)_vw.textContent={w};}}var _eh=document.getElementById(\'height\');if(_eh){{_eh.value={h};var _vh=document.getElementById(\'v_height\');if(_vh)_vh.textContent={h};}}{rot_js}fetch(\'/system/preset?s={s}\',{{method:\'POST\'}})}}" title="{label} {w}x{h}">{svg}<br><span style="font-size:.6rem">{label}</span></button>'
+        return f'<button class="btn btn-sm" onclick="var _ew=document.getElementById(\'width\');if(_ew){{_ew.value={w};var _vw=document.getElementById(\'v_width\');if(_vw)_vw.textContent={w};}}var _eh=document.getElementById(\'height\');if(_eh){{_eh.value={h};var _vh=document.getElementById(\'v_height\');if(_vh)_vh.textContent={h};}}{rot_js}fetch(\'/system/preset?s={s}\',{{method:\'POST\'}})" title="{label} {w}x{h}">{svg}<br><span style="font-size:.6rem">{label}</span></button>'
     return ''.join([
         _pbtn('XS','xs',64,32,'<svg width="20" height="16" viewBox="0 0 20 16"><rect x="4" y="4" width="12" height="8" rx="1" fill="black" stroke="currentColor" stroke-width="1.5"/></svg>'),
         _pbtn('X','x',128,32,'<svg width="28" height="16" viewBox="0 0 28 16"><rect x="2" y="4" width="24" height="8" rx="1" fill="black" stroke="currentColor" stroke-width="1.5"/></svg>'),
@@ -1028,7 +1031,7 @@ def _settings_content():
 {app_card}
 {adv_card}
 </form>
-""" + unlock + save_button(form_id="settingsform")
+""" + '<div class="settings-actions">' + unlock + save_button(form_id="settingsform") + '</div>'
 
 @ampule.route("/system/settings", method="GET")
 def settings_page(request):
