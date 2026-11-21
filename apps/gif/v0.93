@@ -1,0 +1,7 @@
+{
+  "description": "Plays animated GIFs, with upload and management via the web UI",
+  "v0.93": [
+    "Increased bit_depth",
+    ""
+  ]
+}
