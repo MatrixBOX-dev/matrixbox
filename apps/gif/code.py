@@ -8,6 +8,7 @@ from check_button import check_if_button_pressed
 
 exit = False
 brightness = 0.25  # 0.0-1.0
+MAX_GIF_BRIGHTNESS = 0.5
 selected_gif = None
 black_bmp = None
 dim_bmp = None
@@ -78,6 +79,8 @@ def load_settings():
         with open("gif_settings.json") as f:
             s = json.loads(f.read())
         brightness = s.get("brightness", 0.25)
+        if brightness == 0.125:
+            brightness = 0.25
         selected_gif = s.get("selected_gif")
     except: pass
 
@@ -185,15 +188,16 @@ def webinterface_post(request):
 
 
 def apply_brightness(dim_bmp, src_bmp, black_bmp, brightness):
+    if not 0.0 <= brightness <= 1.0:
+        raise ValueError("GIF brightness must be between 0 and 1")
     # bitmaptools.blit() reading from an on-disk-backed bitmap source (as
     # gifio.OnDiskGif.bitmap is) hard-crashes the board with no Python
     # exception raised (see adafruit/circuitpython#5916), so always go
-    # through alphablend -- factor_1=1.0 gives the same full-weight copy
-    # without that crash.
+    # through alphablend. The square root keeps lower presets visible.
     bitmaptools.alphablend(
         dim_bmp, src_bmp, black_bmp,
         displayio.Colorspace.RGB565_SWAPPED,
-        factor_1=brightness,
+        factor_1=(brightness ** 0.5) * MAX_GIF_BRIGHTNESS,
     )
 
 def load_img(file=False):
