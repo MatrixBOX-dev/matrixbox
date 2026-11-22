@@ -73,7 +73,8 @@ def _geometry():
     # tracked here too -- otherwise apply_display_settings() would see no
     # settings change and skip rebuilding, leaving an app's bit depth
     # override in place after e.g. a rotation change.
-    return (int(settings["width"]), int(settings["height"]), int(settings["tiles"]), _cc, _bit_depth)
+    color_correct = str(settings.get("color_correct","")).lower() not in ("","false","0")
+    return (int(settings["width"]), int(settings["height"]), int(settings["tiles"]), color_correct, _bit_depth)
 
 _last_geometry = None
 
