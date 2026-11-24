@@ -180,6 +180,7 @@ PAGE_TPL = """<!DOCTYPE html>
 <tr><td><b>Destination abbreviations</b></td><td><input type="text" id="dest_abbrev" class="form-control" style="width:160px;display:inline" placeholder="{DEST_ABBREV_VAL}" data-p="dest_abbrev" data-e="blur" data-enc="1"></td></tr>
 <tr><td><b>{T_NO_MORE_DEP}</b></td><td><input type="text" id="no_more_departures" class="form-control" style="width:160px;display:inline" placeholder="{NO_MORE_DEP_VAL}" data-p="no_more_departures" data-e="blur" data-enc="1"></td></tr>
 <tr><td><b>{T_MINS}</b></td><td><input type="text" id="mins" class="form-control" style="width:160px;display:inline" placeholder="{MINS_VAL}" data-p="mins" data-e="blur" data-enc="1"></td></tr>
+<tr><td><b>Data server</b></td><td><input type="text" id="data_server" class="form-control" style="width:160px;display:inline" placeholder="{DATA_SERVER_VAL}" data-p="data_server" data-e="blur" data-enc="1"><br><small>host or host:port. Type "default" to restore data.t-skylt.se:90.</small></td></tr>
 {SKIN_DELETE_SECTION}
 </table>
 {RT_INDICATOR_CHK}
@@ -698,6 +699,7 @@ def html():
         "LINE_LENGTH_VAL": str(s["line_length"]),
         "T_SHOW_LINES": T["show_lines"],
         "SHOW_LINES_VAL": ",".join(s["show_lines"]) if isinstance(s["show_lines"], list) else str(s["show_lines"]),
+        "DATA_SERVER_VAL": "%s:%d" % functions.data_server(),
         "STRIP_DEST_VAL": ",".join(s.get("strip_dest", [])) if isinstance(s.get("strip_dest"), list) else str(s.get("strip_dest", "")),
         "DEST_ABBREV_VAL": ",".join([p[0] + "=" + p[1] for p in s.get("dest_abbrev", []) if isinstance(p, list) and len(p) == 2]) if isinstance(s.get("dest_abbrev"), list) else str(s.get("dest_abbrev", "")),
         "T_NO_MORE_DEP": T["no_more_departures_label"],
