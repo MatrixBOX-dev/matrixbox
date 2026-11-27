@@ -93,7 +93,8 @@ if selected_gif and selected_gif in files:
 def webinterface(request):
     global exit
     exit = True
-    return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
+    #return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
+    return (302, {"Location": "/"}, "")
 
 @ampule.route("/", method="GET")
 def gif_webinterface(request):
