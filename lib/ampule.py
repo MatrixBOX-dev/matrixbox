@@ -242,7 +242,8 @@ def listen(socket):
             __send_response(client, status, headers, body)
         else:
             #__send_response(client, 404, {}, "Not found") # 2026-09-06 Trying to fix web-UI bug 
-            __send_response(client, 200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
+            #__send_response(client, 200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
+            __send_response(client, 302, {"Location": "/"}, "")
     except BaseException as e:
         print("Error with request:", e)
         try:
