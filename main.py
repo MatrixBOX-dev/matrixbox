@@ -43,7 +43,8 @@ screensaver = time.monotonic()
 @ampule.route("/exit", method="GET")
 def webinterface(request):
     load_settings.app_running = False
-    return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
+    #return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
+    return (302, {"Location": "/"}, "")
 
 @ampule.route("/", method="GET")
 def webinterface(request):
