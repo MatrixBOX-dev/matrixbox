@@ -6,5 +6,9 @@ ampule.routes.clear()
 # Restored back to 4 by main.py's initialize_app() when this app exits
 # (also here, for clarity).
 init_display(bit_depth=5)
-import code
+try: import code
+except: 
+    print("Could not use bit_depth 5 - using 4")
+    init_display(bit_depth=4)
+    import code
 init_display(bit_depth=4)

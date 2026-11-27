@@ -31,7 +31,8 @@ scroll_mode = "h"  # "h" horizontal, "v" vertical, "s" static, "t" typewriter (m
 static_align = "center"  # "left", "center", "right"
 btc = 0
 currency = "usd"
-delay = 30
+GAP_PX = 24     # blank pixels between repeats of the text (font-independent)
+_SHADOW_PAD = 2 # extra pixels per line so a drop shadow is never clipped
 reverse_direction = 1   # 0 = left-to-right (normal), 1 = right-to-left
 shadow_color = 0
 custom_rgb = None  # (r, g, b) when a custom text color was picked via the color picker; None = never set
@@ -145,6 +146,7 @@ scroll_x = 0               # current horizontal scroll offset
 scroll_y = 0               # current vertical scroll offset
 
 DISPLAY_WIDTH = settings["width"]
+view_w = DISPLAY_WIDTH        # visible content width in horizontal mode (DISPLAY_WIDTH // scale)
 DISPLAY_HEIGHT = settings["height"]
 PALETTE_SIZE = 10          # matches your existing palette
 _TW_VALUES = 20            # typewriter bitmaps address the whole 20-slot palette (_TW_SLOTS goes up to 19)
@@ -300,9 +302,12 @@ def tw_info(with_text=False):
 def rebuild_scene():
     """Rebuild big bitmap, viewport, and display group based on current text/font/scale."""
     global big_bitmap, viewport_bitmap, viewport_tg
-    global scroller_width, scroller_height, scroll_x, scroll_y
+    global scroller_width, scroller_height, scroll_x, scroll_y, view_w
 
     font = load_screen.currentfont
+    # Horizontal shows DISPLAY_WIDTH // scale content pixels (the group is scaled up);
+    # other modes keep their existing behaviour.
+    view_w = max(1, DISPLAY_WIDTH // default_scale) if scroll_mode == "h" else DISPLAY_WIDTH
     lines = scroller_text.replace("\r", "").split("\n")
 
     if scroll_mode == "v":
@@ -377,31 +382,27 @@ def rebuild_scene():
         scroll_x = 0
 
     else:
-        # --- Horizontal: join lines with gap, add padding ---
-        gap = " " * padding_length
-        text = padded(gap.join(lines))
-
-        scroller_width = strlen(text, font)
-        if scroller_width < 1:
-            scroller_width = 1
-
+        # --- Horizontal: each line rendered separately, GAP_PX pixels apart ---
+        parts = [ln for ln in lines if ln.strip()] or [" "]
+        widths = [strlen(p, font) + _SHADOW_PAD for p in parts]
+        scroller_width = GAP_PX * 2 + sum(widths) + GAP_PX * (len(parts) - 1)
         big_bitmap = displayio.Bitmap(scroller_width, DISPLAY_HEIGHT, PALETTE_SIZE)
-        pprint(
-            text, line=0, font=font,
-            color=load_screen.currentcolor, _refresh=False,
-            window=big_bitmap, block=True, shadow_color=shadow_color,
-        )
-        # Start fully off-screen in the direction text will scroll from, matching
-        # the wrap-around reset values used in the main loop below. Previously this
-        # was hardcoded to DISPLAY_WIDTH, which put the viewport partway (or past)
-        # scroller_width right away -- fine for long text (just skips the lead-in),
-        # but for short text it immediately satisfied the "fully scrolled past"
-        # blank condition in blit_viewport(), so the display stayed black.
-        scroll_x = -scroller_width if reverse_direction else DISPLAY_WIDTH + scroller_width
+        x = GAP_PX
+        for p, w in zip(parts, widths):
+            seg = displayio.Bitmap(w, DISPLAY_HEIGHT, PALETTE_SIZE)
+            pprint(
+                p, line=0, font=font,
+                color=load_screen.currentcolor, _refresh=False,
+                window=seg, block=True, shadow_color=shadow_color,
+            )
+            bitmaptools.blit(big_bitmap, seg, x, 0)
+            x += w + GAP_PX
+        # Start fully off-screen on the side the text enters from.
+        scroll_x = -view_w if reverse_direction else scroller_width
 
     # Viewport (fixed display size); bitmaptools.blit needs both bitmaps to have
     # the same depth, so it follows the mode's source bitmap.
-    viewport_bitmap = displayio.Bitmap(DISPLAY_WIDTH, DISPLAY_HEIGHT, _TW_VALUES if scroll_mode == "t" else PALETTE_SIZE)
+    viewport_bitmap = displayio.Bitmap(view_w, DISPLAY_HEIGHT, _TW_VALUES if scroll_mode == "t" else PALETTE_SIZE)
 
     # TileGrid for viewport
     viewport_tg = displayio.TileGrid(
@@ -438,7 +439,7 @@ def blit_viewport():
         )
     else:
         src_x0 = max(scroll_x, 0)
-        src_x1 = min(scroll_x + DISPLAY_WIDTH, scroller_width)
+        src_x1 = min(scroll_x + view_w, scroller_width)
         w = src_x1 - src_x0
         if w <= 0:
             return
@@ -676,12 +677,16 @@ while not exit:
     ampule.listen(socket)
 
     if scroll_mode == "h":
-        if reverse_direction == 0:
+        # One pixel per frame: the loop's CPU speed sets the scroll speed.
+        # Text's left edge is at screen x = -scroll_x. Wrap only when the text is
+        # completely off-screen, so the re-entry always comes from the edge.
+        span = view_w + scroller_width
+        if reverse_direction == 0:      # left-to-right
             scroll_x -= 1
-            if scroll_x <= -scroller_width: scroll_x = DISPLAY_WIDTH + scroller_width
-        else:
+            if scroll_x <= -view_w: scroll_x += span
+        else:                           # right-to-left
             scroll_x += 1
-            if scroll_x >= DISPLAY_WIDTH + scroller_width: scroll_x = -scroller_width
+            if scroll_x >= scroller_width: scroll_x -= span
     elif scroll_mode == "v":
         if reverse_direction == 1:
             scroll_y += 1

@@ -1,1 +1,1 @@
-{}
+{"align": "right", "reverse": 1, "mode": "h", "color": "white", "offset": 0, "scale": 1, "font": "large", "shadow": 0, "custom_rgb": [15, 0, 0], "custom_shadow_rgb": null, "text": "aaa", "tw": []}
