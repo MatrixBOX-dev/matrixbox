@@ -954,4 +954,5 @@ def webinterface(request):
     #functions.reset()
     #print(varinit.exit)
 #   varinit.exit = True
-    return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
+    #return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
+    return (302, {"Location": "/"}, "")
