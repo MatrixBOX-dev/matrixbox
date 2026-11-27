@@ -458,7 +458,7 @@ def blit_viewport():
 def web_exit(request):
     global exit
     exit = True
-    return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
+    return (302, {"Location": "/"}, "")
 
 @ampule.route("/save", method="POST")
 def web_save(request):
