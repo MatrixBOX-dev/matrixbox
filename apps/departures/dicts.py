@@ -190,6 +190,8 @@ settingstxt = {"password": "none",
             "dsa_layout": 1,
             "dsa_summer_time": 0,
 
+            "dk_api_key": "",
+
             "vbz_color": 1,
 
             "ubahn_countdown_style": 0,

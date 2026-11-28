@@ -502,6 +502,12 @@ def huvudsidan(request):
         varinit.settings["custom_scroll_text"] = text
         functions.switch(_screen=False)
         return (200, {}, "")
+    elif "dk_api_key" in request.params:
+        key = str(request.params["dk_api_key"])
+        for a in html_decode: key = key.replace(a, html_decode[a])
+        varinit.settings["dk_api_key"] = key.strip()[:64]
+        functions.switch(_screen=False)
+        return (200, {}, "")
     elif "dsa_api_provider" in request.params:
         try:
             v = int(request.params["dsa_api_provider"])
@@ -713,8 +719,13 @@ def search_station(request):
             return (200, {}, "")
     datastr = '<option value="0">' + varinit.dicts.language[varinit.settings["language"]]["display"]["select_station"] + '</option>'
     try:
-        data = functions.fetch_data("data.t-skylt.se", 90, "/search_stop?country=" + varinit.settings["stations"][num]["country"] + "&operator=" + varinit.settings["stations"][num]["operator"] + "&station=" + sstring)
-        data = json.loads(data)
+        _stn = varinit.settings["stations"][num]
+        _dk_key = str(varinit.settings.get("dk_api_key", "")).strip()
+        if _dk_key and _stn["country"].lower() == "dk" and _stn["operator"].lower() == "dk_rt":
+            data = functions.dk_search_stop(sstring, _dk_key)
+        else:
+            data = functions.fetch_data("data.t-skylt.se", 90, "/search_stop?country=" + _stn["country"] + "&operator=" + _stn["operator"] + "&station=" + sstring)
+            data = json.loads(data)
         datalist = []
         for stations in data:
             datalist.append((stations, data[stations]))
@@ -954,5 +965,5 @@ def webinterface(request):
     #functions.reset()
     #print(varinit.exit)
 #   varinit.exit = True
-    #return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
+#    return (200, {}, """<meta http-equiv="refresh" content="0; url=../" />""")
     return (302, {"Location": "/"}, "")

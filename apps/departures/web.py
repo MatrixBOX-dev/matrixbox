@@ -29,6 +29,10 @@ country_and_operators = {
   "de":[["local","Germany (gtfs.de)"],["db_trains","DB-trains (Deutsche Bahn)"],["be","Berlin (Unofficial API)"],["vbb","VBB/BVG (Berlin-Brandenburg)"],["vrr","VRR (Rhein-Ruhr)"],["kvv","KVV (Karlsruhe)"],["rmv","RMV (Frankfurt)"],["hochbahn","HVV (Hamburg etc.)"],["vrn","VRN (Rhein-Neckar)"],["vbn","VBN (Bremen-Niedersachsen)"],["vvo","VVO (Dresden)"],["bsvg","BSVG (Braunschweig)"],["gvh","GVH (Hannover)"],["vag","VAG/VGN (Bayern)"]]
 }
 
+# Where users register for their own Rejseplanen API key.
+DK_REGISTER_URL = "https://labs.rejseplan.dk/hc/da"
+
+
 def _opt(val, cur, label):
     s = " selected" if str(val) == str(cur) else ""
     return "<option value='" + str(val) + "'" + s + ">" + label + "</option>"
@@ -117,6 +121,7 @@ PAGE_TPL = """<!DOCTYPE html>
 <div class="dropdown-content">{COMBINED_LIST}</div></div>
 </div>
 {DSA_PROVIDER_SECTION}
+{DK_KEY_SECTION}
 <div id="screenbtns" style="{SCREEN_BTN_DISP}display:flex;align-items:center;gap:6px">
 <span style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Editing</span>
 {SCREEN_BUTTONS}
@@ -199,9 +204,9 @@ function _ck(){var d=new Date(),h=d.getHours(),m=d.getMinutes();document.getElem
 var OPS=JSON.parse(document.getElementById('opsdata').textContent);var STN=JSON.parse(document.getElementById('stndata').textContent);
 function toggleDropdown(e){e.stopPropagation();document.getElementById('opdd').classList.toggle('open');}
 document.addEventListener('click',function(e){var dd=document.getElementById('opdd');if(dd&&!dd.contains(e.target))dd.classList.remove('open');});
-function pickScr(n){fetch('/?screen='+n);var d=STN[n];if(!d)return;document.querySelectorAll('.scr-btn').forEach(function(b){b.classList.toggle('act',b.textContent==String(n));});var co=d.co,op=d.op.toLowerCase();var el=document.querySelector('.dd-grid img[data-c="'+co+'"]');var f=el?el.outerHTML.replace(/dd-sel/g,'')+' ':'';var nm=d.op?d.op.toUpperCase():'OPERATOR';var ops=OPS[co]||[];for(var i=0;i<ops.length;i++){if(ops[i][0]===op){nm=ops[i][1];break;}}document.getElementById('opbtn').innerHTML=f+nm+' &#9660;';document.getElementById('sstring').placeholder=d.ms||'';var cb={METRO:d.M,BUS:d.B,TRAIN:d.T,TRAM:d.R,SHIP:d.S,r:d.r,g:d.g,b:d.b};for(var k in cb){var e=document.getElementById(k);if(e)e.checked=!!cb[k];}var sl=document.getElementById('slsection');if(sl)sl.style.display=op==='sl'?'':'none';var nb=document.getElementById('night_buses');if(nb)nb.checked=!!d.bo;var of2=document.getElementById('offset');if(of2)of2.value=d.of;var di=document.getElementById('direction');if(di)di.value=d.di;}
+function pickScr(n){fetch('/?screen='+n);var d=STN[n];if(!d)return;document.querySelectorAll('.scr-btn').forEach(function(b){b.classList.toggle('act',b.textContent==String(n));});var co=d.co,op=d.op.toLowerCase();var el=document.querySelector('.dd-grid img[data-c="'+co+'"]');var f=el?el.outerHTML.replace(/dd-sel/g,'')+' ':'';var nm=d.op?d.op.toUpperCase():'OPERATOR';var ops=OPS[co]||[];for(var i=0;i<ops.length;i++){if(ops[i][0]===op){nm=ops[i][1];break;}}document.getElementById('opbtn').innerHTML=f+nm+' &#9660;';document.getElementById('sstring').placeholder=d.ms||'';var cb={METRO:d.M,BUS:d.B,TRAIN:d.T,TRAM:d.R,SHIP:d.S,r:d.r,g:d.g,b:d.b};for(var k in cb){var e=document.getElementById(k);if(e)e.checked=!!cb[k];}var sl=document.getElementById('slsection');if(sl)sl.style.display=op==='sl'?'':'none';var dk=document.getElementById('dk_key_section');if(dk)dk.style.display=(co==='dk'&&op==='dk_rt')?'':'none';var nb=document.getElementById('night_buses');if(nb)nb.checked=!!d.bo;var of2=document.getElementById('offset');if(of2)of2.value=d.of;var di=document.getElementById('direction');if(di)di.value=d.di;}
 function pickC(c){var d=document.getElementById('ddops');d.innerHTML='';var ops=OPS[c]||[];for(var i=0;i<ops.length;i++){var a=document.createElement('a');a.href='#';a.textContent=ops[i][1];(function(cc,code,name){a.onclick=function(e){e.preventDefault();chCO(cc,code,name);return false;};})(c,ops[i][0],ops[i][1]);d.appendChild(a);}document.querySelectorAll('.dd-grid img').forEach(function(im){im.classList.toggle('dd-sel',im.dataset.c===c);});}
-function chCO(c,o,n){fetch('/?country='+c+'&operator='+o);var el=document.querySelector('.dd-grid img[data-c="'+c+'"');var f='';if(el)f=el.outerHTML.replace(/dd-sel/g,'')+' ';document.getElementById('opbtn').innerHTML=f+n+' &#9660;';document.getElementById('opbtn').style.animation='';document.getElementById('sstring').style.animation='guide-pulse 2.5s ease-in-out infinite';var sl=document.getElementById('slsection');if(sl)sl.style.display=o==='sl'?'':'none';document.getElementById('opdd').classList.remove('open');}
+function chCO(c,o,n){fetch('/?country='+c+'&operator='+o);var el=document.querySelector('.dd-grid img[data-c="'+c+'"');var f='';if(el)f=el.outerHTML.replace(/dd-sel/g,'')+' ';document.getElementById('opbtn').innerHTML=f+n+' &#9660;';document.getElementById('opbtn').style.animation='';document.getElementById('sstring').style.animation='guide-pulse 2.5s ease-in-out infinite';var sl=document.getElementById('slsection');if(sl)sl.style.display=o==='sl'?'':'none';var dk=document.getElementById('dk_key_section');if(dk)dk.style.display=(c==='dk'&&o==='dk_rt')?'':'none';document.getElementById('opdd').classList.remove('open');}
 function doSearch(){var s=document.getElementById('sstring').value;if(!s)return;var b=document.getElementById('searchbtn');b.disabled=true;b.innerHTML='<span class="spin"></span>';fetch('/search?sstring='+encodeURIComponent(s)).then(function(r){return r.text();}).then(function(h){var sel=document.getElementById('newstation');sel.innerHTML=h;sel.disabled=false;sel.style.borderColor='#ff6060';sel.style.animation='guide-pulse 2.5s ease-in-out infinite';document.getElementById('sstring').style.animation='';b.disabled=false;b.textContent='{T_SEARCH}';}).catch(function(){b.disabled=false;b.textContent='{T_SEARCH}';});}
 function doScan(){fetch('/checknet').then(function(r){return r.text();}).then(function(h){var sel=document.getElementById('ssid');sel.innerHTML=h;sel.disabled=false;document.getElementById('password').disabled=false;document.getElementById('connect_wifi').disabled=false;}).catch(function(){});}
 
@@ -540,6 +545,21 @@ def html():
         + '</div>'
     )
 
+    # Own Rejseplanen API key (Denmark real-time only). Shown only for dk/dk_rt;
+    # when empty, departures keep coming through the standard server.
+    _dk_key_val = str(s.get("dk_api_key", "")).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+    _dk_key_disp = "" if (co == "dk" and stn["operator"].lower() == "dk_rt") else "display:none;"
+    dk_key_html = (
+        '<div id="dk_key_section" style="flex:1 1 100%;margin-top:10px;' + _dk_key_disp + '">'
+        '<small style="display:block;margin-bottom:6px">Because of a hard rate limit from Rejseplanen, we are not always able to provide live data. '
+        'By registering for your own API key at <a href="' + DK_REGISTER_URL + '" target="_blank" rel="noopener noreferrer">' + DK_REGISTER_URL + '</a> '
+        'you can get the data yourself.</small>'
+        '<label for="dk_api_key" class="control-label">Own API key (optional)</label>'
+        '<input type="text" id="dk_api_key" class="form-control" value="' + _dk_key_val + '" '
+        'placeholder="Rejseplanen accessId" data-p="dk_api_key" data-e="blur" data-enc="1">'
+        '</div>'
+    )
+
     # downloaded skin files (Advanced): a delete button for whichever plugin
     # skins currently have local files, so a stuck/broken skin can always be
     # force-reinstalled by deleting + reselecting it - simpler than a
@@ -679,6 +699,7 @@ def html():
         "UBAHN_SETTINGS_SECTION": ubahn_settings_html,
         "OPERATOR_PICKER_DISP": operator_picker_disp,
         "DSA_PROVIDER_SECTION": dsa_provider_html,
+        "DK_KEY_SECTION": dk_key_html,
         "SKIN_DELETE_SECTION": skin_delete_html,
         "DEVIATIONS_SECTION": devs_html,
         "SLEEP_CHK": sleep_html, "BUTTON_MODE_CHK": button_mode_html, "SHOW_STATION_CHK": show_stn_html,

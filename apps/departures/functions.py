@@ -411,6 +411,74 @@ def nightcheck(force=False, _switch=False, turnon=False):
         if not varinit.group.hidden: return lights(False)
     else: lights(True)
     
+# --- Danish real-time (Rejseplanen) with the user's own API key -------------
+# Ported from the server's denmark.py so the board calls the API directly and
+# skips the shared server key (and its rate limit). Output has the same shape
+# as data.t-skylt.se, so the rest of the departure code is unchanged.
+_DK_API = "https://www.rejseplanen.dk/api/"
+
+_DK_TYPE_MAP = {
+    "m": "metro", "metro": "metro",
+    "regional": "train", "re": "train", "express": "train", "lyn": "train",
+    "reg": "train", "ic": "train", "s-tog": "train", "tog": "train",
+    "exb": "bus", "nb": "bus", "tb": "bus", "hv-bus": "bus",
+    "f": "ship", "let": "tram",
+}
+
+def _dk_map_type(t):
+    if t in _DK_TYPE_MAP: return _DK_TYPE_MAP[t]
+    if "bus" in t: return "bus"
+    if "ic" in t: return "train"
+    if "letbane" in t: return "tram"
+    return t
+
+def _dk_get_json(path):
+    from __main__ import requests
+    r = requests.get(_DK_API + path, timeout=10)
+    try: body = r.text
+    finally:
+        try: r.close()
+        except Exception: pass
+    return json.loads(body)
+
+def dk_load_departures(stop_id, api_key):
+    x = _dk_get_json("departureBoard?accessId=" + api_key + "&line=True&format=json&id=" + str(stop_id))
+    results = []
+    for dep in x.get("Departure", []):
+        try:
+            pas = dep["ProductAtStop"]
+            kind = _dk_map_type(pas["catOutL"].lower())
+            try: line = pas["line"]
+            except Exception: line = pas["operatorInfo"]["name"]
+            time_str = dep.get("rtTime") or dep["time"]
+            results.append({
+                "destination": dep["direction"].replace("via ", ""),
+                "direction_code": "0",
+                "expected": (dep["date"] + "T" + time_str + ":00")[:19],
+                "line": {"id": line.replace("-", "."), "transport_mode": kind.upper()},
+                "deviations": [],
+                "id": line,
+            })
+        except Exception as e:
+            print("dk skip:", e)
+    print("DK departures:", len(results))
+    return {"departures": results}
+
+def dk_search_stop(name, api_key):
+    # Returns {stop name: stop id}, same shape as the server's /search_stop.
+    q = str(name).strip().replace(" ", "%20")
+    x = _dk_get_json("location.name?format=json&accessId=" + api_key + "&input=" + q)
+    print("DK search:", q, "| response keys:", list(x.keys()) if isinstance(x, dict) else type(x))
+    if isinstance(x, dict) and "errorCode" in x:
+        print("DK API error:", x.get("errorCode"), x.get("errorText"))
+    out = {}
+    for item in x.get("stopLocationOrCoordLocation", []):
+        st = item.get("StopLocation")
+        if st and st.get("name") and st.get("extId"):
+            out[st["name"]] = st["extId"]
+    print("DK stops found:", len(out))
+    return out
+
 def fetch_data(host, port=80, args="", headers = "", filetype="text"):
     if varinit.if_long > 128 and not int(varinit.settings["listmode"]): version_delay(slowdown=1)
     
@@ -581,13 +649,19 @@ def get_departure(num = "1", dataout = [["1", "^ Data error","","",""]]):
     else:
       try: 
         temperature_check()
-        _data = fetch_data(host="data.t-skylt.se", port=90, args='/get_departures?country=' + varinit.settings["stations"][num]["country"] + '&operator=' + varinit.settings["stations"][num]["operator"] + "&station=" + str(varinit.settings["stations"][num]["siteid"]))
-        if _data: data = json.loads(_data)
-        else: 
-            varinit.active_message = True
-            if str(wifi.radio.ipv4_address) == "0.0.0.0":   ########
-                pass#wifi.radio.enabled = False                  ######## TESTAR
-            return [["1", "-","","",""]]
+        _stn = varinit.settings["stations"][num]
+        _dk_key = str(varinit.settings.get("dk_api_key", "")).strip()
+        if _dk_key and _stn["country"].lower() == "dk" and _stn["operator"].lower() == "dk_rt":
+            # Own Rejseplanen key: call the API directly, bypassing the shared server key
+            data = dk_load_departures(str(_stn["siteid"]), _dk_key)
+        else:
+            _data = fetch_data(host="data.t-skylt.se", port=90, args='/get_departures?country=' + _stn["country"] + '&operator=' + _stn["operator"] + "&station=" + str(_stn["siteid"]))
+            if _data: data = json.loads(_data)
+            else:
+                varinit.active_message = True
+                if str(wifi.radio.ipv4_address) == "0.0.0.0":   ########
+                    pass#wifi.radio.enabled = False                  ######## TESTAR
+                return [["1", "-","","",""]]
       except Exception as e: 
         cls(topbottom)
         print(e)
