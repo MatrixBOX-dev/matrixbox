@@ -1,4 +1,4 @@
 {"description":"Live public transport departures around Europe (formerly known as T-Skylt)",
-"v0.985" : ["more skins, minor bugfix"],
+"v0.986" : ["🇩🇰 users can now use their own API key to avoid server rate limit"],
 "icon":0,
 "emoji":"🚉"}
